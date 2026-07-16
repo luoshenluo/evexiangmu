@@ -149,10 +149,10 @@ export function AdminMarketPage() {
             </tr>
             <tr className="bg-[#111] border-b border-[#2C2C2C]">
               <th className="px-4 py-2"></th>
-              <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">价格(亿)</th>
+              <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">价格(ISK)</th>
               <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">数量</th>
               <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">地点</th>
-              <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">价格(亿)</th>
+              <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">价格(ISK)</th>
               <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">数量</th>
               <th className="px-2 py-2 text-center text-[10px] font-medium text-[#666]">地点</th>
             </tr>
@@ -247,7 +247,7 @@ export function AdminMarketPage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[10px] text-[#666] block mb-1">价格(亿)</label>
+                  <label className="text-[10px] text-[#666] block mb-1">价格(ISK)</label>
                   <Input
                     type="number"
                     value={item.sell_price || ''}
@@ -286,7 +286,7 @@ export function AdminMarketPage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[10px] text-[#666] block mb-1">价格(亿)</label>
+                  <label className="text-[10px] text-[#666] block mb-1">价格(ISK)</label>
                   <Input
                     type="number"
                     value={item.buy_price || ''}

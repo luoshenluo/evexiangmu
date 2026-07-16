@@ -95,7 +95,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
             className="gap-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-purple-500/20 transition-all"
           >
             <Download className="h-4 w-4" />
-            导入到录入
+            导入单价
           </Button>
         </div>
 
@@ -187,7 +187,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(亿)</label>
+                        <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label>
                         <Input
                           type="number"
                           value={item.sell_price || ''}
@@ -228,7 +228,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(亿)</label>
+                        <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label>
                         <Input
                           type="number"
                           value={item.buy_price || ''}
