@@ -678,11 +678,25 @@ export async function recordPageView(visitorId: string, page: string): Promise<v
   } catch { /* ignore */ }
 }
 
+/** 清理过期在线记录（5 分钟未心跳的视为离线） */
+async function cleanupExpiredVisitors(): Promise<void> {
+  if (!hasSupabase()) return;
+  try {
+    const supabase = getSupabaseClient()!;
+    await supabase
+      .from('site_visitors_online')
+      .delete()
+      .lt('last_heartbeat', new Date(Date.now() - 300_000).toISOString());
+  } catch { /* ignore */ }
+}
+
 /** 获取当前在线人数（90 秒内有心跳） */
 export async function getOnlineCount(): Promise<number> {
   if (!hasSupabase()) return 0;
   try {
     const supabase = getSupabaseClient()!;
+    // 顺便清理过期记录
+    await cleanupExpiredVisitors();
     const { count } = await supabase
       .from('site_visitors_online')
       .select('visitor_id', { count: 'exact', head: true })
