@@ -24,7 +24,7 @@ import {
   type IManufactureProject,
 } from '@/data/materials';
 import { sumMaterials } from '@/lib/utils';
-import { loadMaterialPrices, type MarketDataItem } from '@/lib/admin-projects';
+import { type MarketDataItem } from '@/lib/admin-projects';
 import MarketPage from '@/pages/MarketPage/MarketPage';
 
 const STORAGE_KEYS = {
@@ -94,50 +94,6 @@ export default function HomePage() {
   useEffect(() => {
     lsSetItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams));
   }, [calcParams]);
-
-  // 仅追加后台新增的材料到本地列表，不覆盖用户已手动修改的价格
-  useEffect(() => {
-    const syncNewMaterials = async () => {
-      try {
-        const [mineralPrices, shipPrices, buildPrices] = await Promise.all([
-          loadMaterialPrices('minerals'),
-          loadMaterialPrices('ship_materials'),
-          loadMaterialPrices('build_materials'),
-        ]);
-
-        if (mineralPrices.length > 0) {
-          setMinerals((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = mineralPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
-        }
-        if (shipPrices.length > 0) {
-          setShipMaterials((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = shipPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
-        }
-        if (buildPrices.length > 0) {
-          setBuildMaterials((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = buildPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
-        }
-      } catch (err) {
-        console.warn('Failed to sync new materials:', err);
-      }
-    };
-    syncNewMaterials();
-  }, []);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {
     setCalcParams((prev) => ({ ...prev, [key]: value }));
