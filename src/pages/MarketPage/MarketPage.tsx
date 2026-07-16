@@ -68,11 +68,9 @@ export default function MarketPage({ onImport }: MarketPageProps) {
 
   const handleImport = () => {
     // 只导入有数据的项（sell_price > 0 或 sell_quantity > 0）
-    const validItems = items.filter(
-      (item) => (item.sell_price || 0) > 0 || (item.sell_quantity || 0) > 0
-    );
+    const validItems = items.filter((item) => (item.sell_price || 0) > 0);
     if (validItems.length === 0) {
-      toast.info('当前分类没有可导入的市场数据');
+      toast.info('当前分类没有可导入的市场价格');
       return;
     }
     if (onImport) {

@@ -166,7 +166,6 @@ export default function HomePage() {
             return {
               ...item,
               price: marketItem.sell_price || item.price,
-              quantity: marketItem.sell_quantity || item.quantity,
             };
           }
           return item;
@@ -185,7 +184,7 @@ export default function HomePage() {
         categoryName = '建材';
       }
 
-      toast.success(`已导入 ${items.length} 项市场数据到${categoryName}录入`);
+      toast.success(`已导入 ${items.length} 项市场价格到${categoryName}录入`);
     },
     [],
   );
