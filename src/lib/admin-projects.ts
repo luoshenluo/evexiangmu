@@ -482,8 +482,35 @@ function saveMarketDataToLocal(items: MarketDataItem[]): void {
   try { localStorage.setItem(MARKET_DATA_KEY, JSON.stringify(items)); } catch { /* ignore */ }
 }
 
+/** 市场数据默认名称 */
+export const MARKET_DEFAULT_NAMES: Record<string, string[]> = {
+  minerals: ['三钛合金', '类晶体胶矿', '类银超金属', '同位聚合体', '超新星诺克石', '晶状石英核岩', '超噬矿', '莫尔石'],
+  ship_materials: ['光泽合金', '光彩合金', '闪光合金', '浓缩合金', '精密合金', '杂色复合物', '纤维复合物', '透光复合物', '多样复合物', '光滑复合物', '晶体复合物', '黑暗复合物', '基础金属', '重金属', '贵金属', '反应金属', '有毒金属'],
+  build_materials: ['活性气体', '稀有气体', '工业纤维', '超张力塑料', '聚芳酰胺', '冷却剂', '凝缩液', '建筑模块', '纳米体', '硅结构铸材', '灵巧单元建筑模块'],
+};
+
+/** 创建默认市场数据 */
+export function createDefaultMarketData(type: string): MarketDataItem[] {
+  const names = MARKET_DEFAULT_NAMES[type] || [];
+  return names.map((name, i) => ({
+    id: `${type}_${i}`,
+    type: type as MarketDataItem['type'],
+    name,
+    sell_price: 0,
+    sell_quantity: 0,
+    sell_location: '',
+    buy_price: 0,
+    buy_quantity: 0,
+    buy_location: '',
+    updated_at: new Date().toISOString(),
+  }));
+}
+
 /** 加载市场数据 */
 export async function loadMarketData(type: string): Promise<MarketDataItem[]> {
+  // 先从 localStorage 加载
+  const localItems = loadMarketDataFromLocal().filter((item) => item.type === type);
+
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
@@ -498,9 +525,19 @@ export async function loadMarketData(type: string): Promise<MarketDataItem[]> {
         saveMarketDataToLocal([...otherTypes, ...(data as MarketDataItem[])]);
         return data as MarketDataItem[];
       }
-    } catch { /* fallback */ }
+    } catch { /* fallback to localStorage */ }
   }
-  return loadMarketDataFromLocal().filter((item) => item.type === type);
+
+  // 如果 localStorage 和 Supabase 都为空，初始化默认数据
+  if (localItems.length === 0) {
+    const defaults = createDefaultMarketData(type);
+    const allLocal = loadMarketDataFromLocal();
+    const otherTypes = allLocal.filter((item) => item.type !== type);
+    saveMarketDataToLocal([...otherTypes, ...defaults]);
+    return defaults;
+  }
+
+  return localItems;
 }
 
 /** 保存市场数据 */
