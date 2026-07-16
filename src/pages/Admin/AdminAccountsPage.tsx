@@ -53,14 +53,9 @@ export function AdminAccountsPage() {
 
   const loadAccounts = async () => {
     setLoading(true);
-    try {
-      const data = await loadAdminAccounts();
-      setAccounts(data);
-    } catch (err) {
-      console.error('Failed to load admin accounts:', err);
-    } finally {
-      setLoading(false);
-    }
+    const data = await loadAdminAccounts();
+    setAccounts(data);
+    setLoading(false);
   };
 
   const handleEdit = (account: AdminAccount) => {
@@ -90,33 +85,24 @@ export function AdminAccountsPage() {
       alert('请填写用户名和密码');
       return;
     }
-    try {
-      const account: AdminAccount = {
-        id: editingId || `admin_${Date.now()}`,
-        username: formData.username,
-        password: formData.password,
-        role: formData.role,
-        permissions: formData.permissions,
-      };
-      await saveAdminAccount(account);
-      setEditingId(null);
-      setNewAccount(false);
-      await loadAccounts();
-    } catch (err) {
-      console.error('Failed to save admin account:', err);
-      alert('保存失败');
-    }
+    const account: AdminAccount = {
+      id: editingId || `admin_${Date.now()}`,
+      username: formData.username,
+      password: formData.password,
+      role: formData.role,
+      permissions: formData.permissions,
+    };
+    await saveAdminAccount(account);
+    setEditingId(null);
+    setNewAccount(false);
+    await loadAccounts();
+    alert('保存成功');
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('确定要删除此管理员账号吗？')) return;
-    try {
-      await deleteAdminAccount(id);
-      await loadAccounts();
-    } catch (err) {
-      console.error('Failed to delete admin account:', err);
-      alert('删除失败');
-    }
+    await deleteAdminAccount(id);
+    await loadAccounts();
   };
 
   const handleCancel = () => {
@@ -253,48 +239,56 @@ export function AdminAccountsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {accounts.map(account => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-medium">{account.username}</TableCell>
-                  <TableCell>
-                    <span className={account.role === 'super_admin' ? 'text-purple-400' : 'text-blue-400'}>
-                      {account.role === 'super_admin' ? '超级管理员' : '管理员'}
-                    </span>
+              {accounts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    暂无数据，点击右上角"添加账号"创建第一个管理员账号
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {account.permissions?.manage_projects && <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">项目</span>}
-                      {account.permissions?.manage_materials && <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">材料</span>}
-                      {account.permissions?.manage_market && <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded">市场</span>}
-                      {account.permissions?.manage_admins && <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded">管理员</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300"
-                        onClick={() => handleEdit(account)}
-                      >
-                        <i className="fa-solid fa-pen mr-1" />
-                        编辑
-                      </Button>
-                      {account.role !== 'super_admin' && (
+                </TableRow>
+              ) : (
+                accounts.map(account => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.username}</TableCell>
+                    <TableCell>
+                      <span className={account.role === 'super_admin' ? 'text-purple-400' : 'text-blue-400'}>
+                        {account.role === 'super_admin' ? '超级管理员' : '管理员'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {account.permissions?.manage_projects && <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">项目</span>}
+                        {account.permissions?.manage_materials && <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">材料</span>}
+                        {account.permissions?.manage_market && <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded">市场</span>}
+                        {account.permissions?.manage_admins && <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded">管理员</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-xs text-red-400 hover:text-red-300"
-                          onClick={() => handleDelete(account.id)}
+                          className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300"
+                          onClick={() => handleEdit(account)}
                         >
-                          <i className="fa-solid fa-trash mr-1" />
-                          删除
+                          <i className="fa-solid fa-pen mr-1" />
+                          编辑
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {account.role !== 'super_admin' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-red-400 hover:text-red-300"
+                            onClick={() => handleDelete(account.id)}
+                          >
+                            <i className="fa-solid fa-trash mr-1" />
+                            删除
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

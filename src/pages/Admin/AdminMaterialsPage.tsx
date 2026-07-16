@@ -45,14 +45,9 @@ export default function AdminMaterialsPage() {
 
   const fetchItems = useCallback(async (type: MaterialType) => {
     setLoading(true);
-    try {
-      const data = await loadMaterialPrices(type);
-      setItems(data);
-    } catch (error) {
-      console.error('Failed to load materials:', error);
-    } finally {
-      setLoading(false);
-    }
+    const data = await loadMaterialPrices(type);
+    setItems(data);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -82,13 +77,8 @@ export default function AdminMaterialsPage() {
   };
 
   const handleSave = async () => {
-    try {
-      await saveMaterialPrices(items);
-      alert('保存成功');
-    } catch (error) {
-      console.error('Failed to save:', error);
-      alert('保存失败');
-    }
+    await saveMaterialPrices(items);
+    alert('保存成功');
   };
 
   const handleAdd = () => {
@@ -105,12 +95,8 @@ export default function AdminMaterialsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    try {
-      await deleteMaterialPrice(deleteId);
-      setItems((prev) => prev.filter((item) => item.id !== deleteId));
-    } catch (error) {
-      console.error('Failed to delete:', error);
-    }
+    await deleteMaterialPrice(deleteId);
+    setItems((prev) => prev.filter((item) => item.id !== deleteId));
     setDeleteId(null);
   };
 

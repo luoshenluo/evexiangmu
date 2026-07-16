@@ -196,7 +196,7 @@ export function clearAdminLogin(): void {
   lsRemoveItem(LOGIN_KEY);
 }
 
-// ========== 材料价格管理（云端 Supabase） ==========
+// ========== 材料价格管理（Supabase 云端 + localStorage 降级） ==========
 
 export type MaterialType = 'minerals' | 'ship_materials' | 'build_materials';
 
@@ -209,90 +209,157 @@ export interface MaterialPriceItem {
   sortOrder: number;
 }
 
+const MATERIAL_PRICES_KEY = 'eve_material_prices';
+
+function loadMaterialPricesFromLocal(): MaterialPriceItem[] {
+  try {
+    const raw = localStorage.getItem(MATERIAL_PRICES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveMaterialPricesToLocal(items: MaterialPriceItem[]): void {
+  try { localStorage.setItem(MATERIAL_PRICES_KEY, JSON.stringify(items)); } catch { /* ignore */ }
+}
+
 /** 加载指定类型的材料价格列表 */
 export async function loadMaterialPrices(type: MaterialType): Promise<MaterialPriceItem[]> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('material_prices')
-    .select('*')
-    .eq('type', type)
-    .order('sort_order', { ascending: true });
-  if (error) {
-    console.error('loadMaterialPrices error:', error);
-    return [];
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('material_prices')
+      .select('*')
+      .eq('type', type)
+      .order('sort_order', { ascending: true });
+    if (error) {
+      console.warn('[loadMaterialPrices] Supabase error, fallback to localStorage:', error);
+      return loadMaterialPricesFromLocal().filter((item) => item.type === type);
+    }
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      type: row.type as MaterialType,
+      name: row.name,
+      price: Number(row.price) || 0,
+      quantity: Number(row.quantity) || 0,
+      sortOrder: row.sort_order || 0,
+    }));
+  } catch (err) {
+    console.warn('[loadMaterialPrices] Error, fallback to localStorage:', err);
+    return loadMaterialPricesFromLocal().filter((item) => item.type === type);
   }
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    type: row.type as MaterialType,
-    name: row.name,
-    price: Number(row.price) || 0,
-    quantity: Number(row.quantity) || 0,
-    sortOrder: row.sort_order || 0,
-  }));
 }
 
 /** 批量保存材料价格（全量覆盖） */
 export async function saveMaterialPrices(items: MaterialPriceItem[]): Promise<void> {
-  if (items.length === 0) return;
-  const supabase = getSupabaseClient();
-  const rows = items.map((item, index) => ({
-    id: item.id,
-    type: item.type,
-    name: item.name,
-    price: item.price,
-    quantity: item.quantity,
-    sort_order: item.sortOrder || index,
-    updated_at: new Date().toISOString(),
-  }));
-  const { error } = await supabase
-    .from('material_prices')
-    .upsert(rows, { onConflict: 'id' });
-  if (error) throw error;
-}
+  // 先保存到 localStorage 确保数据不丢失
+  const allLocal = loadMaterialPricesFromLocal();
+  const otherTypes = allLocal.filter((item) => item.type !== (items[0]?.type || ''));
+  saveMaterialPricesToLocal([...otherTypes, ...items]);
 
-/** 更新单个材料价格 */
-export async function updateMaterialPrice(item: MaterialPriceItem): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('material_prices')
-    .update({
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', item.id);
-  if (error) throw error;
-}
-
-/** 添加新材料 */
-export async function addMaterialPrice(item: MaterialPriceItem): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('material_prices')
-    .insert({
+  // 尝试保存到 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    const rows = items.map((item, index) => ({
       id: item.id,
       type: item.type,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
-      sort_order: item.sortOrder,
+      sort_order: item.sortOrder || index,
       updated_at: new Date().toISOString(),
-    });
-  if (error) throw error;
+    }));
+    const { error } = await supabase
+      .from('material_prices')
+      .upsert(rows, { onConflict: 'id' });
+    if (error) {
+      console.warn('[saveMaterialPrices] Supabase error, data saved to localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[saveMaterialPrices] Error, data saved to localStorage:', err);
+  }
+}
+
+/** 更新单个材料价格 */
+export async function updateMaterialPrice(item: MaterialPriceItem): Promise<void> {
+  // 更新 localStorage
+  const allLocal = loadMaterialPricesFromLocal();
+  const idx = allLocal.findIndex((i) => i.id === item.id);
+  if (idx >= 0) {
+    allLocal[idx] = item;
+    saveMaterialPricesToLocal(allLocal);
+  }
+
+  // 尝试更新 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('material_prices')
+      .update({
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', item.id);
+    if (error) {
+      console.warn('[updateMaterialPrice] Supabase error, data saved to localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[updateMaterialPrice] Error, data saved to localStorage:', err);
+  }
+}
+
+/** 添加新材料 */
+export async function addMaterialPrice(item: MaterialPriceItem): Promise<void> {
+  // 先保存到 localStorage
+  const allLocal = loadMaterialPricesFromLocal();
+  allLocal.push(item);
+  saveMaterialPricesToLocal(allLocal);
+
+  // 尝试保存到 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('material_prices')
+      .insert({
+        id: item.id,
+        type: item.type,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        sort_order: item.sortOrder,
+        updated_at: new Date().toISOString(),
+      });
+    if (error) {
+      console.warn('[addMaterialPrice] Supabase error, data saved to localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[addMaterialPrice] Error, data saved to localStorage:', err);
+  }
 }
 
 /** 删除材料 */
 export async function deleteMaterialPrice(id: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('material_prices')
-    .delete()
-    .eq('id', id);
-  if (error) throw error;
+  // 先从 localStorage 删除
+  const allLocal = loadMaterialPricesFromLocal();
+  saveMaterialPricesToLocal(allLocal.filter((item) => item.id !== id));
+
+  // 尝试从 Supabase 删除
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('material_prices')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.warn('[deleteMaterialPrice] Supabase error, data removed from localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[deleteMaterialPrice] Error, data removed from localStorage:', err);
+  }
 }
 
-// ==================== 管理员账号管理 ====================
+// ==================== 管理员账号管理（Supabase 云端 + localStorage 降级） ====================
 
 export interface AdminAccount {
   id: string;
@@ -309,54 +376,109 @@ export interface AdminAccount {
   updated_at?: string;
 }
 
+const ADMIN_ACCOUNTS_KEY = 'eve_admin_accounts';
+
+function loadAdminAccountsFromLocal(): AdminAccount[] {
+  try {
+    const raw = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveAdminAccountsToLocal(accounts: AdminAccount[]): void {
+  try { localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify(accounts)); } catch { /* ignore */ }
+}
+
 /** 加载所有管理员账号 */
 export async function loadAdminAccounts(): Promise<AdminAccount[]> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('admin_accounts')
-    .select('*')
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('admin_accounts')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('[loadAdminAccounts] Supabase error, fallback to localStorage:', error);
+      return loadAdminAccountsFromLocal();
+    }
+    return data || [];
+  } catch (err) {
+    console.warn('[loadAdminAccounts] Error, fallback to localStorage:', err);
+    return loadAdminAccountsFromLocal();
+  }
 }
 
 /** 保存管理员账号（新增或更新） */
 export async function saveAdminAccount(account: AdminAccount): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('admin_accounts')
-    .upsert({
-      id: account.id,
-      username: account.username,
-      password: account.password,
-      role: account.role,
-      permissions: account.permissions,
-      updated_at: new Date().toISOString(),
-    });
-  if (error) throw error;
+  // 先保存到 localStorage
+  const allLocal = loadAdminAccountsFromLocal();
+  const idx = allLocal.findIndex((a) => a.id === account.id);
+  if (idx >= 0) {
+    allLocal[idx] = { ...account, updated_at: new Date().toISOString() };
+  } else {
+    allLocal.push({ ...account, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  }
+  saveAdminAccountsToLocal(allLocal);
+
+  // 尝试保存到 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('admin_accounts')
+      .upsert({
+        id: account.id,
+        username: account.username,
+        password: account.password,
+        role: account.role,
+        permissions: account.permissions,
+        updated_at: new Date().toISOString(),
+      });
+    if (error) {
+      console.warn('[saveAdminAccount] Supabase error, data saved to localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[saveAdminAccount] Error, data saved to localStorage:', err);
+  }
 }
 
 /** 删除管理员账号 */
 export async function deleteAdminAccount(id: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from('admin_accounts')
-    .delete()
-    .eq('id', id);
-  if (error) throw error;
+  // 先从 localStorage 删除
+  const allLocal = loadAdminAccountsFromLocal();
+  saveAdminAccountsToLocal(allLocal.filter((a) => a.id !== id));
+
+  // 尝试从 Supabase 删除
+  try {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('admin_accounts')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.warn('[deleteAdminAccount] Supabase error, data removed from localStorage:', error);
+    }
+  } catch (err) {
+    console.warn('[deleteAdminAccount] Error, data removed from localStorage:', err);
+  }
 }
 
 /** 验证管理员登录 */
 export async function verifyAdminLogin(username: string, password: string): Promise<AdminAccount | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('admin_accounts')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .single();
-  if (error) return null;
-  return data;
+  // 尝试 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('admin_accounts')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
+    if (!error && data) return data;
+  } catch { /* fallback to localStorage */ }
+
+  // 降级到 localStorage
+  const accounts = loadAdminAccountsFromLocal();
+  return accounts.find((a) => a.username === username && a.password === password) || null;
 }
 
 // ==================== 市场数据管理 ====================
