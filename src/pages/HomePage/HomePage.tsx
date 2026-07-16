@@ -95,9 +95,9 @@ export default function HomePage() {
     lsSetItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams));
   }, [calcParams]);
 
-  // 从 Supabase 获取管理员设置的材料单价，同步到本地（更新价格 + 追加新材料）
+  // 仅追加后台新增的材料到本地列表，不覆盖用户已手动修改的价格
   useEffect(() => {
-    const syncAdminPrices = async () => {
+    const syncNewMaterials = async () => {
       try {
         const [mineralPrices, shipPrices, buildPrices] = await Promise.all([
           loadMaterialPrices('minerals'),
@@ -105,53 +105,38 @@ export default function HomePage() {
           loadMaterialPrices('build_materials'),
         ]);
 
-        // 同步矿物：更新已有项价格 + 追加云端有但本地没有的新材料
         if (mineralPrices.length > 0) {
           setMinerals((prev) => {
-            const updated = prev.map((item) => {
-              const cloudItem = mineralPrices.find((c) => c.name === item.name);
-              return cloudItem ? { ...item, price: cloudItem.price } : item;
-            });
             const existingNames = new Set(prev.map((p) => p.name));
             const newItems = mineralPrices
               .filter((c) => !existingNames.has(c.name))
               .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+            return newItems.length > 0 ? [...prev, ...newItems] : prev;
           });
         }
-        // 同步船材
         if (shipPrices.length > 0) {
           setShipMaterials((prev) => {
-            const updated = prev.map((item) => {
-              const cloudItem = shipPrices.find((c) => c.name === item.name);
-              return cloudItem ? { ...item, price: cloudItem.price } : item;
-            });
             const existingNames = new Set(prev.map((p) => p.name));
             const newItems = shipPrices
               .filter((c) => !existingNames.has(c.name))
               .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+            return newItems.length > 0 ? [...prev, ...newItems] : prev;
           });
         }
-        // 同步建材
         if (buildPrices.length > 0) {
           setBuildMaterials((prev) => {
-            const updated = prev.map((item) => {
-              const cloudItem = buildPrices.find((c) => c.name === item.name);
-              return cloudItem ? { ...item, price: cloudItem.price } : item;
-            });
             const existingNames = new Set(prev.map((p) => p.name));
             const newItems = buildPrices
               .filter((c) => !existingNames.has(c.name))
               .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+            return newItems.length > 0 ? [...prev, ...newItems] : prev;
           });
         }
       } catch (err) {
-        console.warn('Failed to sync admin prices:', err);
+        console.warn('Failed to sync new materials:', err);
       }
     };
-    syncAdminPrices();
+    syncNewMaterials();
   }, []);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {
