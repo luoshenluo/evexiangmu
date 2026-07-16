@@ -23,6 +23,7 @@ import {
 import {
   loadMaterialPrices,
   saveMaterialPrices,
+  addMaterialPrice,
   deleteMaterialPrice,
   type MaterialPriceItem,
   type MaterialType,
@@ -81,7 +82,7 @@ export default function AdminMaterialsPage() {
     alert('保存成功');
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const newItem: MaterialPriceItem = {
       id: `${activeType}_${Date.now()}`,
       type: activeType,
@@ -90,6 +91,7 @@ export default function AdminMaterialsPage() {
       quantity: 0,
       sortOrder: items.length,
     };
+    await addMaterialPrice(newItem);
     setItems([...items, newItem]);
   };
 

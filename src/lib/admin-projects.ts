@@ -371,12 +371,18 @@ export async function loadAdminAccounts(): Promise<AdminAccount[]> {
 
 /** 保存管理员账号 */
 export async function saveAdminAccount(account: AdminAccount): Promise<void> {
+  const now = new Date().toISOString();
   const allLocal = loadAdminAccountsFromLocal();
   const idx = allLocal.findIndex((a) => a.id === account.id);
+  const accountWithTimestamps = {
+    ...account,
+    created_at: account.created_at || now,
+    updated_at: now,
+  };
   if (idx >= 0) {
-    allLocal[idx] = { ...account, updated_at: new Date().toISOString() };
+    allLocal[idx] = accountWithTimestamps;
   } else {
-    allLocal.push({ ...account, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    allLocal.push(accountWithTimestamps);
   }
   saveAdminAccountsToLocal(allLocal);
 
@@ -389,7 +395,8 @@ export async function saveAdminAccount(account: AdminAccount): Promise<void> {
         password: account.password,
         role: account.role,
         permissions: account.permissions,
-        updated_at: new Date().toISOString(),
+        created_at: accountWithTimestamps.created_at,
+        updated_at: now,
       });
     } catch { /* ignore */ }
   }

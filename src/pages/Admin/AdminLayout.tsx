@@ -9,6 +9,7 @@ import {
   Beaker,
   Users,
   Store,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isAdminLoggedIn, clearAdminLogin } from '@/lib/admin-projects';
@@ -75,7 +76,14 @@ export default function AdminLayout() {
           })}
         </nav>
 
-        <div className="border-t border-[#3A3A3A] p-2">
+        <div className="border-t border-[#3A3A3A] p-2 space-y-1">
+          <button
+            onClick={() => navigate('/')}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#3A3A3A]/50 hover:text-white"
+          >
+            <Home className="h-4 w-4" />
+            返回首页
+          </button>
           <button
             onClick={() => setLogoutConfirmOpen(true)}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#3A3A3A]/50 hover:text-white"
