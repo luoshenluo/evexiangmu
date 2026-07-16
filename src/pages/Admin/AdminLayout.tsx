@@ -10,16 +10,30 @@ import {
   Users,
   Store,
   Home,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isAdminLoggedIn, clearAdminLogin } from '@/lib/admin-projects';
+import {
+  isAdminLoggedIn,
+  clearAdminLogin,
+  getCurrentAdminAccount,
+  setCurrentAdminAccount,
+  hasAdminPermission,
+  type AdminAccount,
+} from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
-const SIDEBAR_ITEMS = [
-  { key: 'projects', label: '项目管理', icon: Package, path: '/admin/projects' },
-  { key: 'materials', label: '材料管理', icon: Beaker, path: '/admin/materials' },
-  { key: 'market', label: '市场管理', icon: Store, path: '/admin/market' },
-  { key: 'accounts', label: '账号管理', icon: Users, path: '/admin/accounts' },
+const SIDEBAR_ITEMS: {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  path: string;
+  permission?: keyof AdminAccount['permissions'];
+}[] = [
+  { key: 'projects', label: '项目管理', icon: Package, path: '/admin/projects', permission: 'manage_projects' },
+  { key: 'materials', label: '材料管理', icon: Beaker, path: '/admin/materials', permission: 'manage_materials' },
+  { key: 'market', label: '市场管理', icon: Store, path: '/admin/market', permission: 'manage_market' },
+  { key: 'accounts', label: '账号管理', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
   { key: 'settings', label: '管理员设置', icon: SettingsIcon, path: '/admin/settings' },
 ];
 
@@ -34,8 +48,27 @@ export default function AdminLayout() {
     return <Navigate to="/admin/login" replace />;
   }
 
+  const currentAccount = getCurrentAdminAccount();
+  const isSuper = currentAccount?.role === 'super_admin';
+
+  // 根据权限过滤菜单项
+  const visibleItems = SIDEBAR_ITEMS.filter((item) => {
+    if (isSuper) return true;
+    if (!item.permission) return true; // settings 无需权限
+    return hasAdminPermission(item.permission);
+  });
+
+  // 检查当前页面是否有权限访问
+  const currentPage = SIDEBAR_ITEMS.find((i) => location.pathname.startsWith(i.path));
+  const hasPageAccess =
+    !currentPage ||
+    isSuper ||
+    !currentPage.permission ||
+    hasAdminPermission(currentPage.permission);
+
   const handleConfirmLogout = () => {
     clearAdminLogin();
+    setCurrentAdminAccount(null);
     setLogoutConfirmOpen(false);
     navigate('/admin/login');
   };
@@ -55,7 +88,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 space-y-1 px-2 py-3">
-          {SIDEBAR_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -115,13 +148,32 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        {/* 移动端底部 Tab */}
+        {/* 主内容区 */}
         <div className="flex-1 overflow-y-auto md:pb-0 pb-16">
-          <Outlet />
+          {hasPageAccess ? (
+            <Outlet />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#EF4444]/15">
+                <ShieldAlert className="h-8 w-8 text-[#EF4444]" />
+              </div>
+              <h2 className="mt-4 text-lg font-semibold text-white">无权访问</h2>
+              <p className="mt-2 text-sm text-[#A0A0A0]">
+                当前账号没有权限访问此页面，请联系超级管理员开通权限。
+              </p>
+              <button
+                onClick={() => navigate('/admin/projects')}
+                className="mt-6 rounded-lg bg-[#7C3AED] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#6D28D9]"
+              >
+                返回首页
+              </button>
+            </div>
+          )}
         </div>
 
+        {/* 移动端底部 Tab */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-[#3A3A3A] bg-[#2C2C2C] md:hidden">
-          {SIDEBAR_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
             return (

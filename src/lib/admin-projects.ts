@@ -455,6 +455,43 @@ export async function verifyAdminLogin(username: string, password: string): Prom
   return accounts.find((a) => a.username === username && a.password === password) || null;
 }
 
+// ========== 当前登录账号（localStorage） ==========
+
+const CURRENT_ADMIN_KEY = 'eve_current_admin_account';
+
+/** 保存当前登录账号 */
+export function setCurrentAdminAccount(account: AdminAccount | null): void {
+  try {
+    if (account) {
+      localStorage.setItem(CURRENT_ADMIN_KEY, JSON.stringify(account));
+    } else {
+      localStorage.removeItem(CURRENT_ADMIN_KEY);
+    }
+  } catch { /* ignore */ }
+}
+
+/** 获取当前登录账号 */
+export function getCurrentAdminAccount(): AdminAccount | null {
+  try {
+    const raw = localStorage.getItem(CURRENT_ADMIN_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** 检查当前账号是否有指定权限 */
+export function hasAdminPermission(permission: keyof AdminAccount['permissions']): boolean {
+  const account = getCurrentAdminAccount();
+  if (!account) return false;
+  if (account.role === 'super_admin') return true;
+  return account.permissions?.[permission] ?? false;
+}
+
+/** 检查当前账号是否是超级管理员 */
+export function isCurrentAdminSuper(): boolean {
+  const account = getCurrentAdminAccount();
+  return account?.role === 'super_admin';
+}
+
 // ==================== 市场数据管理（Supabase + localStorage） ====================
 
 export interface MarketDataItem {

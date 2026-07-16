@@ -152,9 +152,6 @@ export default function HomePage() {
       }
     };
     syncAdminPrices();
-    // 每 10 秒自动同步一次，确保后台新增材料后能及时出现在用户界面
-    const interval = setInterval(syncAdminPrices, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {

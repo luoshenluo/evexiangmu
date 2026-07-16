@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Lock, ArrowLeft, Check, X } from 'lucide-react';
-import { verifyAdminLogin, verifyAdminPassword, setAdminLoggedIn } from '@/lib/admin-projects';
+import { verifyAdminLogin, verifyAdminPassword, setAdminLoggedIn, setCurrentAdminAccount } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 const ADMIN_USERNAME = 'admin';
@@ -37,12 +37,25 @@ export default function AdminLoginPage() {
       const account = await verifyAdminLogin(username, password);
       if (account) {
         setAdminLoggedIn(true);
+        setCurrentAdminAccount(account);
         setSuccessOpen(true);
         return;
       }
       // 回退到默认管理员账号验证
       if (username === ADMIN_USERNAME && await verifyAdminPassword(password)) {
         setAdminLoggedIn(true);
+        setCurrentAdminAccount({
+          id: 'default_admin',
+          username: ADMIN_USERNAME,
+          password,
+          role: 'super_admin',
+          permissions: {
+            manage_projects: true,
+            manage_materials: true,
+            manage_market: true,
+            manage_admins: true,
+          },
+        });
         setSuccessOpen(true);
       } else {
         setErrorOpen(true);
