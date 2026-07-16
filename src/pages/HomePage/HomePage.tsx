@@ -8,6 +8,7 @@ function lsSetItem(key: string, value: string): void {
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import Header from '@/components/Header';
 import BottomTabBar, { type TabKey } from '@/components/BottomTabBar';
 import MaterialInputSection from '@/components/MaterialInputSection';
@@ -23,7 +24,7 @@ import {
   type IManufactureProject,
 } from '@/data/materials';
 import { sumMaterials } from '@/lib/utils';
-import { loadMaterialPrices } from '@/lib/admin-projects';
+import { loadMaterialPrices, type MarketDataItem } from '@/lib/admin-projects';
 import MarketPage from '@/pages/MarketPage/MarketPage';
 
 const STORAGE_KEYS = {
@@ -94,7 +95,7 @@ export default function HomePage() {
     lsSetItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams));
   }, [calcParams]);
 
-  // 从 Supabase 获取管理员设置的材料单价，同步到本地
+  // 从 Supabase 获取管理员设置的材料单价，同步到本地（更新价格 + 追加新材料）
   useEffect(() => {
     const syncAdminPrices = async () => {
       try {
@@ -104,36 +105,56 @@ export default function HomePage() {
           loadMaterialPrices('build_materials'),
         ]);
 
-        // 如果云端有数据，更新本地状态
+        // 同步矿物：更新已有项价格 + 追加云端有但本地没有的新材料
         if (mineralPrices.length > 0) {
-          setMinerals((prev) =>
-            prev.map((item) => {
+          setMinerals((prev) => {
+            const updated = prev.map((item) => {
               const cloudItem = mineralPrices.find((c) => c.name === item.name);
               return cloudItem ? { ...item, price: cloudItem.price } : item;
-            }),
-          );
+            });
+            const existingNames = new Set(prev.map((p) => p.name));
+            const newItems = mineralPrices
+              .filter((c) => !existingNames.has(c.name))
+              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
+            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+          });
         }
+        // 同步船材
         if (shipPrices.length > 0) {
-          setShipMaterials((prev) =>
-            prev.map((item) => {
+          setShipMaterials((prev) => {
+            const updated = prev.map((item) => {
               const cloudItem = shipPrices.find((c) => c.name === item.name);
               return cloudItem ? { ...item, price: cloudItem.price } : item;
-            }),
-          );
+            });
+            const existingNames = new Set(prev.map((p) => p.name));
+            const newItems = shipPrices
+              .filter((c) => !existingNames.has(c.name))
+              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
+            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+          });
         }
+        // 同步建材
         if (buildPrices.length > 0) {
-          setBuildMaterials((prev) =>
-            prev.map((item) => {
+          setBuildMaterials((prev) => {
+            const updated = prev.map((item) => {
               const cloudItem = buildPrices.find((c) => c.name === item.name);
               return cloudItem ? { ...item, price: cloudItem.price } : item;
-            }),
-          );
+            });
+            const existingNames = new Set(prev.map((p) => p.name));
+            const newItems = buildPrices
+              .filter((c) => !existingNames.has(c.name))
+              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
+            return newItems.length > 0 ? [...updated, ...newItems] : updated;
+          });
         }
       } catch (err) {
         console.warn('Failed to sync admin prices:', err);
       }
     };
     syncAdminPrices();
+    // 每 10 秒自动同步一次，确保后台新增材料后能及时出现在用户界面
+    const interval = setInterval(syncAdminPrices, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {
@@ -155,6 +176,40 @@ export default function HomePage() {
   const switchToCalc = useCallback(() => {
     setActiveTab('calc');
   }, []);
+
+  // 从市场数据导入到三项录入
+  const handleImportMarket = useCallback(
+    (category: 'minerals' | 'ship_materials' | 'build_materials', items: MarketDataItem[]) => {
+      const importData = (prev: IMaterialItem[]) => {
+        return prev.map((item) => {
+          const marketItem = items.find((mi) => mi.name === item.name);
+          if (marketItem) {
+            return {
+              ...item,
+              price: marketItem.sell_price || item.price,
+              quantity: marketItem.sell_quantity || item.quantity,
+            };
+          }
+          return item;
+        });
+      };
+
+      let categoryName = '';
+      if (category === 'minerals') {
+        setMinerals((prev) => importData(prev));
+        categoryName = '矿物';
+      } else if (category === 'ship_materials') {
+        setShipMaterials((prev) => importData(prev));
+        categoryName = '船材';
+      } else if (category === 'build_materials') {
+        setBuildMaterials((prev) => importData(prev));
+        categoryName = '建材';
+      }
+
+      toast.success(`已导入 ${items.length} 项市场数据到${categoryName}录入`);
+    },
+    [],
+  );
 
   const renderContent = () => {
     switch (activeTab) {
@@ -210,7 +265,7 @@ export default function HomePage() {
           />
         );
       case 'market':
-        return <MarketPage />;
+        return <MarketPage onImport={handleImportMarket} />;
       default:
         return null;
     }

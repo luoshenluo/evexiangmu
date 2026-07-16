@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { loadMarketData, saveMarketData, type MarketDataItem } from '@/lib/admin-projects';
+import { loadMarketData, type MarketDataItem } from '@/lib/admin-projects';
+import { toast } from 'sonner';
+import { Download } from 'lucide-react';
 
 const CATEGORIES = [
   {
@@ -10,7 +12,6 @@ const CATEGORIES = [
     sublabel: '8 项基础矿物',
     icon: 'fa-gem',
     color: '#22d3ee',
-    gradient: 'from-cyan-500/20 to-cyan-600/5',
     border: 'border-cyan-500/20',
     activeBorder: 'border-cyan-400/50',
     shadow: 'shadow-cyan-500/10',
@@ -21,7 +22,6 @@ const CATEGORIES = [
     sublabel: '17 项舰船材料',
     icon: 'fa-ship',
     color: '#a78bfa',
-    gradient: 'from-violet-500/20 to-violet-600/5',
     border: 'border-violet-500/20',
     activeBorder: 'border-violet-400/50',
     shadow: 'shadow-violet-500/10',
@@ -32,7 +32,6 @@ const CATEGORIES = [
     sublabel: '11 项建筑材料',
     icon: 'fa-building',
     color: '#fbbf24',
-    gradient: 'from-amber-500/20 to-amber-600/5',
     border: 'border-amber-500/20',
     activeBorder: 'border-amber-400/50',
     shadow: 'shadow-amber-500/10',
@@ -41,12 +40,14 @@ const CATEGORIES = [
 
 type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
-export default function MarketPage() {
+interface MarketPageProps {
+  onImport?: (category: CategoryKey, items: MarketDataItem[]) => void;
+}
+
+export default function MarketPage({ onImport }: MarketPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('minerals');
   const [items, setItems] = useState<MarketDataItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     loadItems(selectedCategory);
@@ -54,7 +55,6 @@ export default function MarketPage() {
 
   const loadItems = async (category: CategoryKey) => {
     setLoading(true);
-    setDirty(false);
     try {
       const data = await loadMarketData(category);
       setItems(data);
@@ -66,22 +66,17 @@ export default function MarketPage() {
     }
   };
 
-  const handleUpdate = (id: string, field: keyof MarketDataItem, value: string | number) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+  const handleImport = () => {
+    // 只导入有数据的项（sell_price > 0 或 sell_quantity > 0）
+    const validItems = items.filter(
+      (item) => (item.sell_price || 0) > 0 || (item.sell_quantity || 0) > 0
     );
-    setDirty(true);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await saveMarketData(items);
-      setDirty(false);
-    } catch (err) {
-      console.error('Failed to save market data:', err);
-    } finally {
-      setSaving(false);
+    if (validItems.length === 0) {
+      toast.info('当前分类没有可导入的市场数据');
+      return;
+    }
+    if (onImport) {
+      onImport(selectedCategory, validItems);
     }
   };
 
@@ -94,19 +89,15 @@ export default function MarketPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">市场数据</h2>
-            <p className="text-sm text-[#888] mt-1">查看和编辑市场出售与收购信息</p>
+            <p className="text-sm text-[#888] mt-1">查看市场出售与收购信息（仅后台可编辑）</p>
           </div>
           <Button
-            onClick={handleSave}
-            disabled={!dirty || saving}
-            className={`gap-2 rounded-xl transition-all ${
-              dirty
-                ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-purple-500/20'
-                : 'bg-[#2C2C2C] text-[#666] cursor-not-allowed'
-            }`}
+            onClick={handleImport}
+            disabled={loading || items.length === 0}
+            className="gap-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-purple-500/20 transition-all"
           >
-            <i className={`fa-solid fa-save ${saving ? 'fa-spin' : ''}`} />
-            {saving ? '保存中...' : dirty ? '保存更改' : '已保存'}
+            <Download className="h-4 w-4" />
+            导入到录入
           </Button>
         </div>
 
@@ -161,7 +152,7 @@ export default function MarketPage() {
           ))}
         </div>
 
-        {/* 数据展示 - Figma风格卡片 */}
+        {/* 数据展示 - Figma风格卡片（只读） */}
         {loading ? (
           <div className="flex items-center justify-center py-20 text-[#666]">
             <i className="fa-solid fa-circle-notch fa-spin mr-2 text-lg" />
@@ -172,7 +163,7 @@ export default function MarketPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-[#2C2C2C] bg-[#1a1a1a]/80 backdrop-blur-sm p-4 transition-all duration-200 hover:border-[#3A3A3A] hover:bg-[#1f1f1f]"
+                className="rounded-2xl border border-[#2C2C2C] bg-[#1a1a1a]/80 backdrop-blur-sm p-4"
               >
                 {/* 材料名称 */}
                 <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-[#2C2C2C]/60">
@@ -202,11 +193,9 @@ export default function MarketPage() {
                         <Input
                           type="number"
                           value={item.sell_price || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'sell_price', Number(e.target.value) || 0)
-                          }
+                          readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-green-400 text-center rounded-xl focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-green-400 text-center rounded-xl cursor-not-allowed opacity-70"
                           step="0.01"
                         />
                       </div>
@@ -215,11 +204,9 @@ export default function MarketPage() {
                         <Input
                           type="number"
                           value={item.sell_quantity || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'sell_quantity', Number(e.target.value) || 0)
-                          }
+                          readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl focus:border-white/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
                           step="0.01"
                         />
                       </div>
@@ -227,11 +214,9 @@ export default function MarketPage() {
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label>
                         <Input
                           value={item.sell_location || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'sell_location', e.target.value)
-                          }
+                          readOnly
                           placeholder="-"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl focus:border-white/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
                         />
                       </div>
                     </div>
@@ -249,11 +234,9 @@ export default function MarketPage() {
                         <Input
                           type="number"
                           value={item.buy_price || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'buy_price', Number(e.target.value) || 0)
-                          }
+                          readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-blue-400 text-center rounded-xl focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-blue-400 text-center rounded-xl cursor-not-allowed opacity-70"
                           step="0.01"
                         />
                       </div>
@@ -262,11 +245,9 @@ export default function MarketPage() {
                         <Input
                           type="number"
                           value={item.buy_quantity || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'buy_quantity', Number(e.target.value) || 0)
-                          }
+                          readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl focus:border-white/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
                           step="0.01"
                         />
                       </div>
@@ -274,11 +255,9 @@ export default function MarketPage() {
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label>
                         <Input
                           value={item.buy_location || ''}
-                          onChange={(e) =>
-                            handleUpdate(item.id, 'buy_location', e.target.value)
-                          }
+                          readOnly
                           placeholder="-"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl focus:border-white/20 transition-all"
+                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
                         />
                       </div>
                     </div>
