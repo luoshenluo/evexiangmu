@@ -145,9 +145,20 @@ export async function deleteAdminProject(id: string): Promise<void> {
   await supabase.from('manufacture_projects').delete().eq('id', id);
 }
 
-// ========== 管理员密码（Supabase 云端 app_settings 表） ==========
+// ========== 管理员密码（Supabase 云端 + localStorage 降级） ==========
 
 const LOGIN_KEY = 'eve_admin_logged_in';
+const ADMIN_PASSWORD_KEY = 'eve_admin_password';
+
+function loadAdminPasswordFromLocal(): string {
+  try {
+    return localStorage.getItem(ADMIN_PASSWORD_KEY) || 'admin123';
+  } catch { return 'admin123'; }
+}
+
+function saveAdminPasswordToLocal(password: string): void {
+  try { localStorage.setItem(ADMIN_PASSWORD_KEY, password); } catch { /* ignore */ }
+}
 
 /** 从 Supabase 获取管理员密码 */
 export async function getAdminPassword(): Promise<string> {
@@ -158,19 +169,30 @@ export async function getAdminPassword(): Promise<string> {
       .select('value')
       .eq('key', 'admin_password')
       .single();
-    return (data?.value as string) ?? 'admin123';
+    const password = (data?.value as string) ?? 'admin123';
+    // 同步到 localStorage 以便后续降级使用
+    saveAdminPasswordToLocal(password);
+    return password;
   } catch {
-    return 'admin123';
+    return loadAdminPasswordFromLocal();
   }
 }
 
 /** 修改管理员密码 */
 export async function setAdminPassword(newPassword: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  await supabase
-    .from('app_settings')
-    .update({ value: newPassword, updated_at: new Date().toISOString() })
-    .eq('key', 'admin_password');
+  // 先保存到 localStorage
+  saveAdminPasswordToLocal(newPassword);
+
+  // 尝试同步到 Supabase
+  try {
+    const supabase = getSupabaseClient();
+    await supabase
+      .from('app_settings')
+      .update({ value: newPassword, updated_at: new Date().toISOString() })
+      .eq('key', 'admin_password');
+  } catch (err) {
+    console.warn('[setAdminPassword] Supabase error, password saved to localStorage:', err);
+  }
 }
 
 /** 校验管理员密码 */
