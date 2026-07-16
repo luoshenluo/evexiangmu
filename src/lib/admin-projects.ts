@@ -122,6 +122,13 @@ function getFallbackProjects(): IManufactureProject[] {
 
 /** 加载项目列表 */
 export async function loadAdminProjects(): Promise<IManufactureProject[]> {
+  // 先从 localStorage 加载
+  let localProjects = loadProjectsFromLocal();
+  if (localProjects.length === 0) {
+    localProjects = getFallbackProjects();
+    saveProjectsToLocal(localProjects);
+  }
+
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
@@ -130,17 +137,27 @@ export async function loadAdminProjects(): Promise<IManufactureProject[]> {
         .select('*')
         .order('created_at', { ascending: true });
       if (data && data.length > 0) {
-        saveProjectsToLocal(data as IManufactureProject[]);
-        return data as IManufactureProject[];
+        // 合并 Supabase 数据与 localStorage 数据
+        // 确保 localStorage 中新增但未同步到 Supabase 的项目不丢失
+        const supabaseIds = new Set(data.map((item: any) => item.id));
+        const merged = [...data.map((item: any) => {
+          const localItem = localProjects.find((p) => p.id === item.id);
+          // 使用 localStorage 中的最新数据（可能包含未保存的修改）
+          return localItem || item;
+        }) as IManufactureProject[]];
+        // 补充 localStorage 中有但 Supabase 中没有的项目
+        for (const localItem of localProjects) {
+          if (!supabaseIds.has(localItem.id)) {
+            merged.push(localItem);
+          }
+        }
+        saveProjectsToLocal(merged);
+        return merged;
       }
-    } catch { /* fallback */ }
+    } catch { /* fallback to localStorage */ }
   }
-  let projects = loadProjectsFromLocal();
-  if (projects.length === 0) {
-    projects = getFallbackProjects();
-    saveProjectsToLocal(projects);
-  }
-  return projects;
+
+  return localProjects;
 }
 
 /** 保存全部项目 */
@@ -170,15 +187,21 @@ export async function findAdminProject(id: string): Promise<IManufactureProject 
 
 /** 新增项目 */
 export async function addAdminProject(project: Omit<IManufactureProject, 'id'> & { id?: string }): Promise<IManufactureProject> {
+  const now = new Date().toISOString();
   const newProject = { ...project, id: project.id || `proj_${Date.now()}` } as IManufactureProject;
   const projects = loadProjectsFromLocal();
-  projects.push(newProject);
+  projects.push({ ...newProject, created_at: now, updated_at: now });
   saveProjectsToLocal(projects);
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('manufacture_projects').insert({ ...newProject, created_at: new Date().toISOString() });
-    } catch { /* ignore */ }
+      await supabase.from('manufacture_projects').upsert(
+        { ...newProject, sort_order: projects.length - 1, created_at: now, updated_at: now },
+        { onConflict: 'id' },
+      );
+    } catch (e) {
+      console.warn('addAdminProject: Supabase sync failed, using localStorage only', e);
+    }
   }
   return newProject;
 }

@@ -220,7 +220,7 @@ export default function HomePage() {
     <div className="flex flex-col h-screen bg-[#1E1E1E] text-white">
       <Toaster theme="dark" position="top-center" closeButton />
       <Header />
-      <main className="flex-1 overflow-hidden">{renderContent()}</main>
+      <main className={`flex-1 ${activeTab === 'market' ? 'overflow-y-auto' : 'overflow-hidden'}`}>{renderContent()}</main>
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* 欢迎弹窗 */}

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,6 @@ const CATEGORIES = [
 type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
 export default function MarketPage() {
-  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('minerals');
   const [items, setItems] = useState<MarketDataItem[]>([]);
   const [loading, setLoading] = useState(true);
