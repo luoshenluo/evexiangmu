@@ -132,7 +132,7 @@ export default function AdminSettingsPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-[#A0A0A0]">数据存储</span>
-              <span className="text-white">云端同步 (Supabase)</span>
+              <span className="text-white">本地存储 (localStorage)</span>
             </div>
           </div>
         </div>

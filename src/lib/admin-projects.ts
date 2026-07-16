@@ -11,25 +11,37 @@ function lsRemoveItem(key: string): void {
 import { MANUFACTURE_PROJECTS, type IManufactureProject } from '@/data/materials';
 
 // ====================================================================
-// 数据存储策略：localStorage 为主存储，Supabase 仅做可选同步
-// 所有读写操作优先操作 localStorage，Supabase 同步失败不影响正常使用
+// 数据存储策略：localStorage 为主存储
+// 密码使用 Base64 编码存储，防止明文被抓包直接读取
 // ====================================================================
 
-// ========== 管理员密码（localStorage 主存储） ==========
+// ========== 管理员密码（Base64 编码后存入 localStorage） ==========
 
 const LOGIN_KEY = 'eve_admin_logged_in';
 const ADMIN_PASSWORD_KEY = 'eve_admin_password';
 
-/** 从 localStorage 获取管理员密码 */
+/** Base64 编码 */
+function encodePwd(pwd: string): string {
+  try { return btoa(pwd); } catch { return pwd; }
+}
+
+/** Base64 解码 */
+function decodePwd(encoded: string): string {
+  try { return atob(encoded); } catch { return encoded; }
+}
+
+/** 从 localStorage 获取管理员密码（解码后返回） */
 function loadAdminPassword(): string {
   try {
-    return localStorage.getItem(ADMIN_PASSWORD_KEY) || 'admin123';
+    const stored = localStorage.getItem(ADMIN_PASSWORD_KEY);
+    if (!stored) return 'admin123';
+    return decodePwd(stored);
   } catch { return 'admin123'; }
 }
 
-/** 保存管理员密码到 localStorage */
+/** 保存管理员密码到 localStorage（Base64 编码后存储） */
 function saveAdminPassword(password: string): void {
-  try { localStorage.setItem(ADMIN_PASSWORD_KEY, password); } catch { /* ignore */ }
+  try { localStorage.setItem(ADMIN_PASSWORD_KEY, encodePwd(password)); } catch { /* ignore */ }
 }
 
 /** 获取管理员密码 */
@@ -40,19 +52,6 @@ export async function getAdminPassword(): Promise<string> {
 /** 修改管理员密码 */
 export async function setAdminPassword(newPassword: string): Promise<void> {
   saveAdminPassword(newPassword);
-  // 可选：异步同步到 Supabase（不阻塞，失败不影响）
-  trySyncSupabasePassword(newPassword);
-}
-
-async function trySyncSupabasePassword(password: string): Promise<void> {
-  try {
-    const { getSupabaseClient } = await import('@/storage/database/browser-client');
-    const supabase = getSupabaseClient();
-    await supabase
-      .from('app_settings')
-      .update({ value: password, updated_at: new Date().toISOString() })
-      .eq('key', 'admin_password');
-  } catch { /* Supabase 不可用时静默跳过 */ }
 }
 
 /** 校验管理员密码 */
