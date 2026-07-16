@@ -590,3 +590,214 @@ export async function saveMarketData(items: MarketDataItem[]): Promise<void> {
     } catch { /* ignore */ }
   }
 }
+
+// ==================== 网站数据分析 ====================
+
+export interface AnalyticsDailyRow {
+  date: string;
+  page_views: number;
+  unique_visitors: number;
+}
+
+export interface OnlineVisitor {
+  visitor_id: string;
+  page: string;
+  user_agent: string;
+  last_heartbeat: string;
+}
+
+export interface PageViewRow {
+  id?: number;
+  visitor_id: string;
+  page: string;
+  created_at: string;
+}
+
+/** 发送心跳（upsert 在线访客记录） */
+export async function sendHeartbeat(visitorId: string, page: string, userAgent: string): Promise<void> {
+  if (!hasSupabase()) return;
+  try {
+    const supabase = getSupabaseClient()!;
+    await supabase.from('site_visitors_online').upsert(
+      { visitor_id: visitorId, page, user_agent: userAgent, last_heartbeat: new Date().toISOString() },
+      { onConflict: 'visitor_id' },
+    );
+  } catch { /* ignore */ }
+}
+
+/** 离开时移除在线记录 */
+export async function removeOnlineVisitor(visitorId: string): Promise<void> {
+  if (!hasSupabase()) return;
+  try {
+    const supabase = getSupabaseClient()!;
+    await supabase.from('site_visitors_online').delete().eq('visitor_id', visitorId);
+  } catch { /* ignore */ }
+}
+
+/** 记录一次页面访问 */
+export async function recordPageView(visitorId: string, page: string): Promise<void> {
+  if (!hasSupabase()) return;
+  try {
+    const supabase = getSupabaseClient()!;
+    // 插入 PV 明细
+    await supabase.from('site_page_views').insert({ visitor_id: visitorId, page });
+
+    // 更新或插入今日聚合统计（用 RPC 避免竞态，但为简化直接 upsert）
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const { data: existing } = await supabase
+      .from('site_analytics_daily')
+      .select('id, page_views, unique_visitors')
+      .eq('date', today)
+      .maybeSingle();
+
+    if (existing) {
+      // 检查今天是否已经有过这个访客的 PV
+      const { count } = await supabase
+        .from('site_page_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('visitor_id', visitorId)
+        .gte('created_at', today);
+      const isNewVisitor = (count ?? 0) <= 1; // 刚插入的这一条 + 之前的
+
+      await supabase
+        .from('site_analytics_daily')
+        .update({
+          page_views: (existing.page_views || 0) + 1,
+          unique_visitors: isNewVisitor
+            ? (existing.unique_visitors || 0) + 1
+            : (existing.unique_visitors || 0),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase.from('site_analytics_daily').upsert(
+        { date: today, page_views: 1, unique_visitors: 1, updated_at: new Date().toISOString() },
+        { onConflict: 'date' },
+      );
+    }
+  } catch { /* ignore */ }
+}
+
+/** 获取当前在线人数（90 秒内有心跳） */
+export async function getOnlineCount(): Promise<number> {
+  if (!hasSupabase()) return 0;
+  try {
+    const supabase = getSupabaseClient()!;
+    const { count } = await supabase
+      .from('site_visitors_online')
+      .select('visitor_id', { count: 'exact', head: true })
+      .gte('last_heartbeat', new Date(Date.now() - 90_000).toISOString());
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+/** 获取在线访客列表 */
+export async function getOnlineVisitors(): Promise<OnlineVisitor[]> {
+  if (!hasSupabase()) return [];
+  try {
+    const supabase = getSupabaseClient()!;
+    const { data } = await supabase
+      .from('site_visitors_online')
+      .select('*')
+      .gte('last_heartbeat', new Date(Date.now() - 90_000).toISOString())
+      .order('last_heartbeat', { ascending: false });
+    return (data || []) as OnlineVisitor[];
+  } catch { return []; }
+}
+
+/** 获取最近 N 天的每日统计 */
+export async function getDailyAnalytics(days: number = 30): Promise<AnalyticsDailyRow[]> {
+  if (!hasSupabase()) return [];
+  try {
+    const supabase = getSupabaseClient()!;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days + 1);
+    const { data } = await supabase
+      .from('site_analytics_daily')
+      .select('date, page_views, unique_visitors')
+      .gte('date', startDate.toISOString().slice(0, 10))
+      .order('date', { ascending: true });
+    return (data || []).map((row: any) => ({
+      date: row.date,
+      page_views: Number(row.page_views) || 0,
+      unique_visitors: Number(row.unique_visitors) || 0,
+    }));
+  } catch { return []; }
+}
+
+/** 获取今日访问量统计 */
+export async function getTodayStats(): Promise<{ pageViews: number; uniqueVisitors: number }> {
+  if (!hasSupabase()) return { pageViews: 0, uniqueVisitors: 0 };
+  try {
+    const supabase = getSupabaseClient()!;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from('site_analytics_daily')
+      .select('page_views, unique_visitors')
+      .eq('date', today)
+      .maybeSingle();
+    return {
+      pageViews: Number(data?.page_views) || 0,
+      uniqueVisitors: Number(data?.unique_visitors) || 0,
+    };
+  } catch { return { pageViews: 0, uniqueVisitors: 0 }; }
+}
+
+/** 获取今日各页面 PV 分布 */
+export async function getTodayPageDistribution(): Promise<{ page: string; count: number }[]> {
+  if (!hasSupabase()) return [];
+  try {
+    const supabase = getSupabaseClient()!;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from('site_page_views')
+      .select('page')
+      .gte('created_at', today);
+    if (!data || data.length === 0) return [];
+
+    // 在前端聚合
+    const pageMap = new Map<string, number>();
+    for (const row of data) {
+      const page = row.page as string;
+      pageMap.set(page, (pageMap.get(page) || 0) + 1);
+    }
+    return Array.from(pageMap.entries())
+      .map(([page, count]) => ({ page, count }))
+      .sort((a, b) => b.count - a.count);
+  } catch { return []; }
+}
+
+/** 获取今日每小时 PV 分布（24 小时柱状图） */
+export async function getTodayHourlyDistribution(): Promise<{ hour: number; pv: number }[]> {
+  if (!hasSupabase()) return [];
+  try {
+    const supabase = getSupabaseClient()!;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from('site_page_views')
+      .select('created_at')
+      .gte('created_at', today);
+    if (!data || data.length === 0) return [];
+
+    const hours = new Array(24).fill(0) as number[];
+    for (const row of data) {
+      const h = new Date(row.created_at as string).getHours();
+      hours[h]++;
+    }
+    return hours.map((pv, hour) => ({ hour, pv }));
+  } catch { return []; }
+}
+
+/** 获取总访问量统计 */
+export async function getTotalStats(): Promise<{ totalPv: number; totalDays: number; avgDailyPv: number }> {
+  if (!hasSupabase()) return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
+  try {
+    const supabase = getSupabaseClient()!;
+    const { data } = await supabase
+      .from('site_analytics_daily')
+      .select('page_views');
+    if (!data || data.length === 0) return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
+    const totalPv = data.reduce((sum: number, row: any) => sum + (Number(row.page_views) || 0), 0);
+    return { totalPv, totalDays: data.length, avgDailyPv: Math.round(totalPv / data.length) };
+  } catch { return { totalPv: 0, totalDays: 0, avgDailyPv: 0 }; }
+}

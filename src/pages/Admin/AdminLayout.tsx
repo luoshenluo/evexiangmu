@@ -11,6 +11,7 @@ import {
   Store,
   Home,
   ShieldAlert,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -33,6 +34,7 @@ const SIDEBAR_ITEMS: {
   { key: 'projects', label: '项目管理', icon: Package, path: '/admin/projects', permission: 'manage_projects' },
   { key: 'materials', label: '材料管理', icon: Beaker, path: '/admin/materials', permission: 'manage_materials' },
   { key: 'market', label: '市场管理', icon: Store, path: '/admin/market', permission: 'manage_market' },
+  { key: 'analytics', label: '数据分析', icon: BarChart3, path: '/admin/analytics' },
   { key: 'accounts', label: '账号管理', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
   { key: 'settings', label: '管理员设置', icon: SettingsIcon, path: '/admin/settings' },
 ];
