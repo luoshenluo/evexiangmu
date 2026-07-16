@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tailwind-theme.css";
+@import "./typography.css";
+
+/* 全局移除 focus ring 白边（覆盖 Tailwind ring utility，保留正常阴影） */
+@layer base {
+  *, *::before, *::after {
+    --tw-ring-shadow: 0 0 0 transparent;
+    --tw-ring-offset-shadow: 0 0 0 transparent;
+  }
+  *:focus, *:focus-visible, *:focus-within {
+    outline: none;
+  }
+}
