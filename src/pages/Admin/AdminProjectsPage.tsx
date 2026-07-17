@@ -73,7 +73,7 @@ export default function AdminProjectsPage() {
       </div>
 
       {/* 搜索框 */}
-      <div className="mb-4 relative max-w-md">
+      <div className="mb-4 relative w-full md:max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#666666]" />
         <input
           type="text"
@@ -84,8 +84,8 @@ export default function AdminProjectsPage() {
         />
       </div>
 
-      {/* 项目表格 */}
-      <div className="overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#2C2C2C]">
+      {/* 桌面端：项目表格 */}
+      <div className="overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] hidden md:block">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-[#7C3AED]" />
@@ -157,6 +157,57 @@ export default function AdminProjectsPage() {
             </tbody>
           </table>
         </div>
+        )}
+      </div>
+
+      {/* 手机端：卡片列表 */}
+      <div className="md:hidden space-y-2">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-[#7C3AED]" />
+            <span className="ml-2 text-sm text-[#A0A0A0]">加载中...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-12 text-[#888888]">
+            <Package className="h-8 w-8 opacity-50" />
+            <span className="text-sm">暂无匹配的项目</span>
+          </div>
+        ) : (
+          filtered.map((project) => (
+            <div
+              key={project.id}
+              className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-3"
+            >
+              {/* 第一行：项目名称 + 分类标签 + 操作按钮 */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="font-medium text-white truncate">{project.name}</div>
+                  <span className="shrink-0 rounded-md bg-[#7C3AED]/15 px-1.5 py-0.5 text-[10px] text-[#A78BFA]">
+                    {project.category}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => navigate(`/admin/projects/${project.id}`)}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[#A0A0A0] transition-colors hover:bg-[#7C3AED]/15 hover:text-[#A78BFA]"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(project)}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[#A0A0A0] transition-colors hover:bg-[#DC2626]/15 hover:text-[#EF4444]"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {/* 第二行：成本数据 */}
+              <div className="mt-2 flex gap-4 text-xs text-[#A0A0A0]">
+                <span>材料成本: <span className="text-white tabular-nums">{formatNumber(project.materialCost150)}亿</span></span>
+                <span>蓝图价: <span className="text-white tabular-nums">{formatNumber(project.blueprintPrice)}亿</span></span>
+              </div>
+            </div>
+          ))
         )}
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
   Users,
@@ -127,6 +127,17 @@ export default function AdminAnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadingRef = useRef(false);
+
+  // 响应式：检测是否手机端
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const chartH = isMobile ? 200 : 280;
+  const smallChartH = isMobile ? 180 : 260;
 
   const loadAllData = useCallback(async (showRefresh = false) => {
     if (document.hidden) return;
@@ -385,11 +396,6 @@ export default function AdminAnalyticsPage() {
   const NoDataPlaceholder = ({ text = '暂无数据', h = 200 }: { text?: string; h?: number }) => (
     <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: h }}>{text}</div>
   );
-
-  // 响应式图表高度
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const chartH = isMobile ? 200 : 280;
-  const smallChartH = isMobile ? 180 : 260;
 
   return (
     <div className="space-y-4 p-4 md:p-6 pb-8">

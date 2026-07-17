@@ -27,16 +27,17 @@ import AdminModal from '@/components/admin/AdminModal';
 const SIDEBAR_ITEMS: {
   key: string;
   label: string;
+  mobileLabel: string; // 手机端缩略名（2字）
   icon: React.ElementType;
   path: string;
   permission?: keyof AdminAccount['permissions'];
 }[] = [
-  { key: 'projects', label: '项目管理', icon: Package, path: '/admin/projects', permission: 'manage_projects' },
-  { key: 'materials', label: '材料管理', icon: Beaker, path: '/admin/materials', permission: 'manage_materials' },
-  { key: 'market', label: '市场管理', icon: Store, path: '/admin/market', permission: 'manage_market' },
-  { key: 'analytics', label: '数据分析', icon: BarChart3, path: '/admin/analytics' },
-  { key: 'accounts', label: '账号管理', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
-  { key: 'settings', label: '管理员设置', icon: SettingsIcon, path: '/admin/settings' },
+  { key: 'projects', label: '项目管理', mobileLabel: '项目', icon: Package, path: '/admin/projects', permission: 'manage_projects' },
+  { key: 'materials', label: '材料管理', mobileLabel: '材料', icon: Beaker, path: '/admin/materials', permission: 'manage_materials' },
+  { key: 'market', label: '市场管理', mobileLabel: '市场', icon: Store, path: '/admin/market', permission: 'manage_market' },
+  { key: 'analytics', label: '数据分析', mobileLabel: '分析', icon: BarChart3, path: '/admin/analytics' },
+  { key: 'accounts', label: '账号管理', mobileLabel: '账号', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
+  { key: 'settings', label: '管理员设置', mobileLabel: '设置', icon: SettingsIcon, path: '/admin/settings' },
 ];
 
 export default function AdminLayout() {
@@ -173,7 +174,7 @@ export default function AdminLayout() {
           )}
         </div>
 
-        {/* 移动端底部 Tab */}
+        {/* 移动端底部 Tab - 图标 + 缩略名（2字），字号 text-[9px] */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-[#3A3A3A] bg-[#2C2C2C] md:hidden">
           {visibleItems.map((item) => {
             const Icon = item.icon;
@@ -183,12 +184,12 @@ export default function AdminLayout() {
                 key={item.key}
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  'flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] transition-colors',
+                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[9px] transition-colors',
                   isActive ? 'text-[#A78BFA]' : 'text-[#888888]',
                 )}
               >
                 <Icon className="h-5 w-5" />
-                {item.label}
+                {item.mobileLabel}
               </button>
             );
           })}

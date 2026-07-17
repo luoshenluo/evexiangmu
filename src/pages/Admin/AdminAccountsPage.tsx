@@ -162,8 +162,8 @@ export default function AdminAccountsPage() {
         </button>
       </div>
 
-      {/* 账号列表 */}
-      <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] overflow-hidden">
+      {/* 桌面端：账号列表 */}
+      <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] overflow-hidden hidden md:block">
         <div className="grid grid-cols-[1fr_100px_140px_80px] gap-3 px-4 py-3 text-xs font-medium text-[#888] border-b border-[#2C2C2C] bg-[#151515]">
           <span>用户名</span>
           <span>角色</span>
@@ -222,6 +222,68 @@ export default function AdminAccountsPage() {
           <div className="px-4 py-8 text-center text-sm text-[#666]">
             暂无管理员账号
           </div>
+        )}
+      </div>
+
+      {/* 手机端：卡片列表 */}
+      <div className="md:hidden space-y-2">
+        {accounts.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-[#666]">
+            暂无管理员账号
+          </div>
+        ) : (
+          accounts.map((account) => (
+            <div
+              key={account.id}
+              className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3"
+            >
+              {/* 第一行：用户名 + 角色 + 操作 */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Users className="h-4 w-4 shrink-0 text-[#7C3AED]" />
+                  <span className="text-sm font-medium text-white truncate">{account.username}</span>
+                  <span
+                    className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${
+                      account.role === 'super_admin'
+                        ? 'bg-[#7C3AED]/15 text-[#A78BFA]'
+                        : 'bg-[#2C2C2C] text-[#888]'
+                    }`}
+                  >
+                    {account.role === 'super_admin' ? '超管' : '管理员'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => openEdit(account)}
+                    className="p-1.5 rounded-md text-[#888] hover:text-white hover:bg-[#333] transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(account.id)}
+                    className="p-1.5 rounded-md text-[#888] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {/* 第二行：权限标签 */}
+              {Object.values(account.permissions).some((v) => v) && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {Object.entries(account.permissions)
+                    .filter(([, v]) => v)
+                    .map(([k]) => (
+                      <span key={k} className="text-[10px] text-[#666] bg-[#222] px-1.5 py-0.5 rounded">
+                        {k === 'manage_projects' && '项目'}
+                        {k === 'manage_materials' && '材料'}
+                        {k === 'manage_market' && '市场'}
+                        {k === 'manage_admins' && '账号'}
+                      </span>
+                    ))}
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
 
