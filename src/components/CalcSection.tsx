@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -61,11 +61,11 @@ function NumberInput({
   const [isEditing, setIsEditing] = useState(false);
 
   // 外部 value 变化且不在编辑中时同步
-  useMemo(() => {
+  useEffect(() => {
     if (!isEditing) {
       setLocalValue(value === 0 ? '' : String(value));
     }
-  }, [value]);
+  }, [value, isEditing]);
 
   const displayValue = isEditing ? localValue : value === 0 ? '' : String(value);
 

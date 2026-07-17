@@ -1,10 +1,3 @@
-function lsGetItem(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-function lsSetItem(key: string, value: string): void {
-  try { localStorage.setItem(key, value); } catch { /* ignore */ }
-}
-
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
@@ -37,7 +30,7 @@ const STORAGE_KEYS = {
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
-    const raw = lsGetItem(key);
+    const raw = localStorage.getItem(key);
     if (raw) {
       return JSON.parse(raw) as T;
     }

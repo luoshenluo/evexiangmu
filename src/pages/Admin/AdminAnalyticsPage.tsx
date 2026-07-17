@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
   Users,
@@ -20,8 +20,6 @@ import {
   getTotalStats,
   type OnlineVisitor,
 } from '@/lib/admin-projects';
-
-// ========== 统计卡片 ==========
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -53,8 +51,6 @@ function StatCard({ icon, label, value, sub, color, bgColor }: StatCardProps) {
     </div>
   );
 }
-
-// ========== 在线访客列表 ==========
 
 function OnlineList({ visitors }: { visitors: OnlineVisitor[] }) {
   if (visitors.length === 0) {
@@ -108,10 +104,7 @@ function OnlineList({ visitors }: { visitors: OnlineVisitor[] }) {
   );
 }
 
-// ========== 主页面 ==========
-
 export default function AdminAnalyticsPage() {
-  // 统计数据
   const [onlineCount, setOnlineCount] = useState(0);
   const [todayPv, setTodayPv] = useState(0);
   const [todayUv, setTodayUv] = useState(0);
@@ -119,7 +112,6 @@ export default function AdminAnalyticsPage() {
   const [totalDays, setTotalDays] = useState(0);
   const [avgDailyPv, setAvgDailyPv] = useState(0);
 
-  // 图表数据
   const [dailyData, setDailyData] = useState<{ date: string; page_views: number; unique_visitors: number }[]>([]);
   const [hourlyData, setHourlyData] = useState<{ hour: number; pv: number }[]>([]);
   const [pageDist, setPageDist] = useState<{ page: string; count: number }[]>([]);
@@ -127,10 +119,12 @@ export default function AdminAnalyticsPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadAllData = useCallback(async (showRefresh = false) => {
+    if (document.hidden) return; // 页面不可见时不刷新
     if (showRefresh) setRefreshing(true);
-    else setLoading(true);
+    else if (!loading) setLoading(true);
 
     try {
       const [oc, today, total, daily, hourly, pages, visitors] = await Promise.all([
@@ -154,21 +148,45 @@ export default function AdminAnalyticsPage() {
       setPageDist(pages);
       setOnlineVisitors(visitors);
     } catch (err) {
-      console.error('Failed to load analytics:', err);
+      console.error('[AdminAnalyticsPage] loadAllData error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     loadAllData();
-    // 每 30 秒自动刷新在线人数
-    const timer = setInterval(() => loadAllData(), 30_000);
-    return () => clearInterval(timer);
-  }, [loadAllData]);
 
-  // ===== ECharts 配置 =====
+    // 页面可见时启动定时刷新，不可见时暂停
+    const startTimer = () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => loadAllData(), 30_000);
+    };
+    const stopTimer = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        loadAllData();
+        startTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [loadAllData]);
 
   const trendOption = {
     backgroundColor: 'transparent',
@@ -250,7 +268,7 @@ export default function AdminAnalyticsPage() {
       backgroundColor: '#2C2C2C',
       borderColor: '#3A3A3A',
       textStyle: { color: '#fff', fontSize: 12 },
-      formatter: (params: any) => {
+      formatter: (params: Array<{ name: string; value: number }>) => {
         const p = params[0];
         return `${p.name}:00<br/>访问量: <b>${p.value}</b>`;
       },
@@ -323,8 +341,6 @@ export default function AdminAnalyticsPage() {
     ],
   };
 
-  // ===== 渲染 =====
-
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -338,7 +354,6 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-4 p-4 md:p-6 pb-8">
-      {/* 页面标题 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">数据分析</h2>
@@ -349,12 +364,11 @@ export default function AdminAnalyticsPage() {
           disabled={refreshing}
           className="flex items-center gap-2 self-start sm:self-auto rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] px-3 py-2 text-sm text-[#ccc] transition-colors hover:bg-[#363636] disabled:opacity-50"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'fa-spin' : ''}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
         </button>
       </div>
 
-      {/* 统计卡片 */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           icon={<Users className="h-5 w-5" />}
@@ -390,9 +404,7 @@ export default function AdminAnalyticsPage() {
         />
       </div>
 
-      {/* 图表区域 - 2 列布局 */}
       <div className="grid gap-4 md:grid-cols-3">
-        {/* 30 天趋势 - 占 2 列 */}
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4 md:col-span-2">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">近 30 天访问趋势</h3>
           <ReactECharts
@@ -403,7 +415,6 @@ export default function AdminAnalyticsPage() {
           />
         </div>
 
-        {/* 今日页面分布 - 占 1 列 */}
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日页面分布</h3>
           {pageDist.length > 0 ? (
@@ -421,9 +432,7 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
 
-      {/* 今日小时分布 + 在线访客列表 */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* 今日小时分布 */}
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日每小时访问量</h3>
           <ReactECharts
@@ -434,7 +443,6 @@ export default function AdminAnalyticsPage() {
           />
         </div>
 
-        {/* 在线访客列表 */}
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-medium text-[#ccc]">在线访客</h3>

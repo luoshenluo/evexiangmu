@@ -32,7 +32,7 @@ import {
   PRESET_BUILD_MATERIALS,
 } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
-import { loadAdminProjects, saveAdminProjects } from '@/lib/admin-projects';
+import { loadAdminProjects } from '@/lib/admin-projects';
 
 interface ProjectSectionProps {
   onImportCost: (project: IManufactureProject) => void;
@@ -177,14 +177,7 @@ export default function ProjectSection({
     [projects, selectedId],
   );
 
-  // 持久化所有项目到 Supabase 云端
-  const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    if (!loading && projects.length > 0) {
-      setSaving(true);
-      saveAdminProjects(projects).finally(() => setSaving(false));
-    }
-  }, [projects, loading]);
+
 
   const handleSelect = (project: IManufactureProject) => {
     setSelectedId(project.id);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -24,9 +24,9 @@ export function AdminMarketPage() {
 
   useEffect(() => {
     loadItems(activeTab);
-  }, [activeTab]);
+  }, [activeTab, loadItems]);
 
-  const loadItems = async (type: TabKey) => {
+  const loadItems = useCallback(async (type: TabKey) => {
     setLoading(true);
     setDirty(false);
     try {
@@ -38,7 +38,7 @@ export function AdminMarketPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleChange = (id: string, field: keyof MarketDataItem, value: string | number) => {
     setItems(prev =>
@@ -62,7 +62,7 @@ export function AdminMarketPage() {
     }
   };
 
-  const currentTab = TABS.find(t => t.key === activeTab)!;
+  const currentTab = TABS.find(t => t.key === activeTab) || TABS[0];
 
   if (loading) {
     return (

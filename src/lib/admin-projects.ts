@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { MANUFACTURE_PROJECTS, type IManufactureProject } from '@/data/materials';
 import { isSupabaseConfigured, getSupabaseClient } from '@/storage/database/browser-client';
 
@@ -19,13 +20,9 @@ function lsRemoveItem(key: string): void {
   try { localStorage.removeItem(key); } catch { /* ignore */ }
 }
 
-/** Base64 编码 */
-function encodePwd(pwd: string): string {
-  try { return btoa(pwd); } catch { return pwd; }
-}
-/** Base64 解码 */
-function decodePwd(encoded: string): string {
-  try { return atob(encoded); } catch { return encoded; }
+/** 获取本地日期字符串 (YYYY-MM-DD)，避免 UTC 时区偏差 */
+function getLocalDateString(): string {
+  return new Date().toLocaleDateString('sv-SE');
 }
 
 /** 检查 Supabase 是否可用 */
@@ -33,74 +30,144 @@ function hasSupabase(): boolean {
   return isSupabaseConfigured();
 }
 
-// ========== 管理员密码（Supabase 主存储 + localStorage 降级 + Base64 编码） ==========
+// ========== bcrypt 密码哈希 ==========
+
+const SALT_ROUNDS = 10;
+
+/** 哈希密码 */
+export function hashPassword(plain: string): string {
+  return bcrypt.hashSync(plain, SALT_ROUNDS);
+}
+
+/** 校验密码 */
+export function verifyPassword(plain: string, hash: string): boolean {
+  return bcrypt.compareSync(plain, hash);
+}
+
+// ========== 管理员密码（Supabase 主存储 + localStorage 降级 + bcrypt 哈希） ==========
 
 const LOGIN_KEY = 'eve_admin_logged_in';
-const ADMIN_PASSWORD_KEY = 'eve_admin_password';
+const ADMIN_PASSWORD_KEY = 'eve_admin_password_hash';
 
-function loadAdminPasswordFromLocal(): string {
-  try {
-    const stored = localStorage.getItem(ADMIN_PASSWORD_KEY);
-    if (!stored) return 'admin123';
-    return decodePwd(stored);
-  } catch { return 'admin123'; }
+function loadAdminPasswordHashFromLocal(): string | null {
+  try { return localStorage.getItem(ADMIN_PASSWORD_KEY); } catch { return null; }
 }
 
-function saveAdminPasswordToLocal(password: string): void {
-  try { localStorage.setItem(ADMIN_PASSWORD_KEY, encodePwd(password)); } catch { /* ignore */ }
+function saveAdminPasswordHashToLocal(hash: string): void {
+  try { localStorage.setItem(ADMIN_PASSWORD_KEY, hash); } catch { /* ignore */ }
 }
 
-/** 获取管理员密码 */
-export async function getAdminPassword(): Promise<string> {
+/** 获取管理员密码哈希 */
+export async function getAdminPasswordHash(): Promise<string | null> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('app_settings')
         .select('value')
-        .eq('key', 'admin_password')
+        .eq('key', 'admin_password_hash')
         .single();
+      if (error) throw error;
       if (data?.value) {
-        saveAdminPasswordToLocal(data.value as string);
+        saveAdminPasswordHashToLocal(data.value as string);
         return data.value as string;
       }
-    } catch { /* fallback to localStorage */ }
+    } catch (err) {
+      console.error('[getAdminPasswordHash] Supabase error:', err);
+    }
   }
-  return loadAdminPasswordFromLocal();
+  return loadAdminPasswordHashFromLocal();
 }
 
-/** 修改管理员密码 */
+/** 修改管理员密码（存储哈希） */
 export async function setAdminPassword(newPassword: string): Promise<void> {
-  saveAdminPasswordToLocal(newPassword);
+  const hash = hashPassword(newPassword);
+  saveAdminPasswordHashToLocal(hash);
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase
+      const { error } = await supabase
         .from('app_settings')
         .upsert(
-          { key: 'admin_password', value: newPassword, updated_at: new Date().toISOString() },
+          { key: 'admin_password_hash', value: hash, updated_at: new Date().toISOString() },
           { onConflict: 'key' },
         );
-    } catch { /* Supabase 同步失败，localStorage 已保存 */ }
+      if (error) throw error;
+    } catch (err) {
+      console.error('[setAdminPassword] Supabase error:', err);
+      throw err;
+    }
   }
 }
 
 /** 校验管理员密码 */
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const stored = await getAdminPassword();
-  return password === stored;
+  const hash = await getAdminPasswordHash();
+  if (!hash) return false;
+  return verifyPassword(password, hash);
 }
 
-// ========== 登录态（本地 localStorage） ==========
+// ========== 登录态（本地 session，含时间戳防长期有效） ==========
 
-export function setAdminLoggedIn(value: boolean): void {
-  lsSetItem(LOGIN_KEY, value ? '1' : '0');
+const SESSION_KEY = 'eve_admin_session';
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 小时
+
+export interface AdminSession {
+  id: string;
+  username: string;
+  role: 'super_admin' | 'admin';
+  permissions: {
+    manage_projects: boolean;
+    manage_materials: boolean;
+    manage_market: boolean;
+    manage_admins: boolean;
+  };
+  ts: number; // 登录时间戳
 }
+
+/** 保存登录 session */
+export function setAdminLoggedIn(session: AdminSession): void {
+  lsSetItem(LOGIN_KEY, '1');
+  lsSetItem(SESSION_KEY, JSON.stringify(session));
+}
+
+/** 检查登录态（验证时间戳，防止长期有效） */
 export function isAdminLoggedIn(): boolean {
-  return lsGetItem(LOGIN_KEY) === '1';
+  const flag = lsGetItem(LOGIN_KEY) === '1';
+  if (!flag) return false;
+  try {
+    const raw = lsGetItem(SESSION_KEY);
+    if (!raw) return false;
+    const session = JSON.parse(raw) as AdminSession;
+    const expired = Date.now() - session.ts > SESSION_MAX_AGE_MS;
+    if (expired) {
+      clearAdminLogin();
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
+
+/** 获取当前 session */
+export function getAdminSession(): AdminSession | null {
+  try {
+    const raw = lsGetItem(SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as AdminSession;
+    if (Date.now() - session.ts > SESSION_MAX_AGE_MS) {
+      clearAdminLogin();
+      return null;
+    }
+    return session;
+  } catch { return null; }
+}
+
+/** 清除登录态 */
 export function clearAdminLogin(): void {
   lsRemoveItem(LOGIN_KEY);
+  lsRemoveItem(SESSION_KEY);
 }
 
 // ========== 项目数据 CRUD（Supabase + localStorage） ==========
@@ -122,7 +189,6 @@ function getFallbackProjects(): IManufactureProject[] {
 
 /** 加载项目列表 */
 export async function loadAdminProjects(): Promise<IManufactureProject[]> {
-  // 先从 localStorage 加载
   let localProjects = loadProjectsFromLocal();
   if (localProjects.length === 0) {
     localProjects = getFallbackProjects();
@@ -132,20 +198,23 @@ export async function loadAdminProjects(): Promise<IManufactureProject[]> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('manufacture_projects')
         .select('*')
         .order('created_at', { ascending: true });
+      if (error) throw error;
       if (data && data.length > 0) {
-        // 合并 Supabase 数据与 localStorage 数据
-        // 确保 localStorage 中新增但未同步到 Supabase 的项目不丢失
-        const supabaseIds = new Set(data.map((item: any) => item.id));
-        const merged = [...data.map((item: any) => {
+        const supabaseIds = new Set(data.map((item: Record<string, unknown>) => item.id as string));
+        const merged = [...data.map((item: Record<string, unknown>) => {
           const localItem = localProjects.find((p) => p.id === item.id);
-          // 使用 localStorage 中的最新数据（可能包含未保存的修改）
-          return localItem || item;
-        }) as IManufactureProject[]];
-        // 补充 localStorage 中有但 Supabase 中没有的项目
+          // 优先使用 updated_at 更新的版本
+          if (localItem && localItem.updated_at && item.updated_at) {
+            return new Date(localItem.updated_at) > new Date(item.updated_at as string)
+              ? localItem
+              : item as unknown as IManufactureProject;
+          }
+          return (localItem || item) as unknown as IManufactureProject;
+        })];
         for (const localItem of localProjects) {
           if (!supabaseIds.has(localItem.id)) {
             merged.push(localItem);
@@ -154,7 +223,9 @@ export async function loadAdminProjects(): Promise<IManufactureProject[]> {
         saveProjectsToLocal(merged);
         return merged;
       }
-    } catch { /* fallback to localStorage */ }
+    } catch (err) {
+      console.error('[loadAdminProjects] Error:', err);
+    }
   }
 
   return localProjects;
@@ -167,8 +238,12 @@ export async function saveAdminProjects(projects: IManufactureProject[]): Promis
     try {
       const supabase = getSupabaseClient()!;
       const rows = projects.map((p, i) => ({ ...p, sort_order: i, updated_at: new Date().toISOString() }));
-      await supabase.from('manufacture_projects').upsert(rows, { onConflict: 'id' });
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('manufacture_projects').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (err) {
+      console.error('[saveAdminProjects] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -177,9 +252,12 @@ export async function findAdminProject(id: string): Promise<IManufactureProject 
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase.from('manufacture_projects').select('*').eq('id', id).single();
-      if (data) return data as IManufactureProject;
-    } catch { /* fallback */ }
+      const { data, error } = await supabase.from('manufacture_projects').select('*').eq('id', id).single();
+      if (error) throw error;
+      if (data) return data as unknown as IManufactureProject;
+    } catch (err) {
+      console.error('[findAdminProject] Error:', err);
+    }
   }
   const projects = loadProjectsFromLocal();
   return projects.find((p) => p.id === id) || null;
@@ -195,12 +273,14 @@ export async function addAdminProject(project: Omit<IManufactureProject, 'id'> &
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('manufacture_projects').upsert(
+      const { error } = await supabase.from('manufacture_projects').upsert(
         { ...newProject, sort_order: projects.length - 1, created_at: now, updated_at: now },
         { onConflict: 'id' },
       );
-    } catch (e) {
-      console.warn('addAdminProject: Supabase sync failed, using localStorage only', e);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[addAdminProject] Supabase sync failed:', err);
+      throw err;
     }
   }
   return newProject;
@@ -217,8 +297,12 @@ export async function updateAdminProject(id: string, updates: Partial<IManufactu
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('manufacture_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('manufacture_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[updateAdminProject] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -229,8 +313,12 @@ export async function deleteAdminProject(id: string): Promise<void> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('manufacture_projects').delete().eq('id', id);
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('manufacture_projects').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[deleteAdminProject] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -264,27 +352,29 @@ export async function loadMaterialPrices(type: MaterialType): Promise<MaterialPr
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('material_prices')
         .select('*')
         .eq('type', type)
         .order('sort_order', { ascending: true });
+      if (error) throw error;
       if (data && data.length > 0) {
-        const items = data.map((row: any) => ({
-          id: row.id,
+        const items = data.map((row: Record<string, unknown>) => ({
+          id: row.id as string,
           type: row.type as MaterialType,
-          name: row.name,
+          name: row.name as string,
           price: Number(row.price) || 0,
           quantity: Number(row.quantity) || 0,
-          sortOrder: row.sort_order || 0,
+          sortOrder: (row.sort_order as number) || 0,
         }));
-        // 同步到 localStorage
         const allLocal = loadAllMaterialPricesFromLocal();
         const otherTypes = allLocal.filter((item) => item.type !== type);
         saveAllMaterialPricesToLocal([...otherTypes, ...items]);
         return items;
       }
-    } catch { /* fallback to localStorage */ }
+    } catch (err) {
+      console.error('[loadMaterialPrices] Error:', err);
+    }
   }
   return loadAllMaterialPricesFromLocal().filter((item) => item.type === type);
 }
@@ -307,8 +397,12 @@ export async function saveMaterialPrices(items: MaterialPriceItem[]): Promise<vo
         sort_order: item.sortOrder || index,
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from('material_prices').upsert(rows, { onConflict: 'id' });
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('material_prices').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (err) {
+      console.error('[saveMaterialPrices] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -320,7 +414,7 @@ export async function addMaterialPrice(item: MaterialPriceItem): Promise<void> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('material_prices').insert({
+      const { error } = await supabase.from('material_prices').insert({
         id: item.id,
         type: item.type,
         name: item.name,
@@ -329,7 +423,11 @@ export async function addMaterialPrice(item: MaterialPriceItem): Promise<void> {
         sort_order: item.sortOrder,
         updated_at: new Date().toISOString(),
       });
-    } catch { /* ignore */ }
+      if (error) throw error;
+    } catch (err) {
+      console.error('[addMaterialPrice] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -340,8 +438,12 @@ export async function deleteMaterialPrice(id: string): Promise<void> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('material_prices').delete().eq('id', id);
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('material_prices').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[deleteMaterialPrice] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -350,7 +452,7 @@ export async function deleteMaterialPrice(id: string): Promise<void> {
 export interface AdminAccount {
   id: string;
   username: string;
-  password: string;
+  password_hash: string;
   role: 'super_admin' | 'admin';
   permissions: {
     manage_projects: boolean;
@@ -374,22 +476,25 @@ function saveAdminAccountsToLocal(accounts: AdminAccount[]): void {
   try { localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify(accounts)); } catch { /* ignore */ }
 }
 
-/** 加载所有管理员账号 */
-export async function loadAdminAccounts(): Promise<AdminAccount[]> {
+/** 加载所有管理员账号（返回不含 password_hash 的安全视图） */
+export async function loadAdminAccounts(): Promise<Omit<AdminAccount, 'password_hash'>[]> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('admin_accounts')
-        .select('*')
+        .select('id, username, role, permissions, created_at, updated_at')
         .order('created_at', { ascending: true });
+      if (error) throw error;
       if (data && data.length > 0) {
         saveAdminAccountsToLocal(data as AdminAccount[]);
-        return data as AdminAccount[];
+        return data as Omit<AdminAccount, 'password_hash'>[];
       }
-    } catch { /* fallback to localStorage */ }
+    } catch (err) {
+      console.error('[loadAdminAccounts] Error:', err);
+    }
   }
-  return loadAdminAccountsFromLocal();
+  return loadAdminAccountsFromLocal().map(({ password_hash, ...rest }) => rest);
 }
 
 /** 保存管理员账号 */
@@ -412,16 +517,20 @@ export async function saveAdminAccount(account: AdminAccount): Promise<void> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('admin_accounts').upsert({
+      const { error } = await supabase.from('admin_accounts').upsert({
         id: account.id,
         username: account.username,
-        password: account.password,
+        password_hash: account.password_hash,
         role: account.role,
         permissions: account.permissions,
         created_at: accountWithTimestamps.created_at,
         updated_at: now,
       });
-    } catch { /* ignore */ }
+      if (error) throw error;
+    } catch (err) {
+      console.error('[saveAdminAccount] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -432,35 +541,47 @@ export async function deleteAdminAccount(id: string): Promise<void> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('admin_accounts').delete().eq('id', id);
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('admin_accounts').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[deleteAdminAccount] Error:', err);
+      throw err;
+    }
   }
 }
 
-/** 验证管理员登录 */
+/** 验证管理员登录（bcrypt 哈希比对） */
 export async function verifyAdminLogin(username: string, password: string): Promise<AdminAccount | null> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('admin_accounts')
-        .select('*')
+        .select('id, username, password_hash, role, permissions, created_at, updated_at')
         .eq('username', username)
-        .eq('password', password)
         .maybeSingle();
-      if (data) return data as AdminAccount;
-    } catch { /* fallback to localStorage */ }
+      if (error) throw error;
+      if (data && verifyPassword(password, data.password_hash as string)) {
+        return data as AdminAccount;
+      }
+    } catch (err) {
+      console.error('[verifyAdminLogin] Error:', err);
+    }
   }
   const accounts = loadAdminAccountsFromLocal();
-  return accounts.find((a) => a.username === username && a.password === password) || null;
+  const account = accounts.find((a) => a.username === username);
+  if (account && verifyPassword(password, account.password_hash)) {
+    return account;
+  }
+  return null;
 }
 
-// ========== 当前登录账号（localStorage） ==========
+// ========== 当前登录账号（localStorage，不含密码） ==========
 
 const CURRENT_ADMIN_KEY = 'eve_current_admin_account';
 
-/** 保存当前登录账号 */
-export function setCurrentAdminAccount(account: AdminAccount | null): void {
+/** 保存当前登录账号（安全视图，剔除 password_hash） */
+export function setCurrentAdminAccount(account: Omit<AdminAccount, 'password_hash'> | null): void {
   try {
     if (account) {
       localStorage.setItem(CURRENT_ADMIN_KEY, JSON.stringify(account));
@@ -471,7 +592,7 @@ export function setCurrentAdminAccount(account: AdminAccount | null): void {
 }
 
 /** 获取当前登录账号 */
-export function getCurrentAdminAccount(): AdminAccount | null {
+export function getCurrentAdminAccount(): Omit<AdminAccount, 'password_hash'> | null {
   try {
     const raw = localStorage.getItem(CURRENT_ADMIN_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -545,27 +666,28 @@ export function createDefaultMarketData(type: string): MarketDataItem[] {
 
 /** 加载市场数据 */
 export async function loadMarketData(type: string): Promise<MarketDataItem[]> {
-  // 先从 localStorage 加载
   const localItems = loadMarketDataFromLocal().filter((item) => item.type === type);
 
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('market_data')
         .select('*')
         .eq('type', type)
         .order('updated_at', { ascending: false });
+      if (error) throw error;
       if (data && data.length > 0) {
         const allLocal = loadMarketDataFromLocal();
         const otherTypes = allLocal.filter((item) => item.type !== type);
         saveMarketDataToLocal([...otherTypes, ...(data as MarketDataItem[])]);
         return data as MarketDataItem[];
       }
-    } catch { /* fallback to localStorage */ }
+    } catch (err) {
+      console.error('[loadMarketData] Error:', err);
+    }
   }
 
-  // 如果 localStorage 和 Supabase 都为空，初始化默认数据
   if (localItems.length === 0) {
     const defaults = createDefaultMarketData(type);
     const allLocal = loadMarketDataFromLocal();
@@ -586,8 +708,12 @@ export async function saveMarketData(items: MarketDataItem[]): Promise<void> {
     try {
       const supabase = getSupabaseClient()!;
       const rows = items.map((item) => ({ ...item, updated_at: new Date().toISOString() }));
-      await supabase.from('market_data').upsert(rows, { onConflict: 'id' });
-    } catch { /* ignore */ }
+      const { error } = await supabase.from('market_data').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (err) {
+      console.error('[saveMarketData] Error:', err);
+      throw err;
+    }
   }
 }
 
@@ -618,11 +744,14 @@ export async function sendHeartbeat(visitorId: string, page: string, userAgent: 
   if (!hasSupabase()) return;
   try {
     const supabase = getSupabaseClient()!;
-    await supabase.from('site_visitors_online').upsert(
+    const { error } = await supabase.from('site_visitors_online').upsert(
       { visitor_id: visitorId, page, user_agent: userAgent, last_heartbeat: new Date().toISOString() },
       { onConflict: 'visitor_id' },
     );
-  } catch { /* ignore */ }
+    if (error) throw error;
+  } catch (err) {
+    console.error('[sendHeartbeat] Error:', err);
+  }
 }
 
 /** 离开时移除在线记录 */
@@ -630,8 +759,11 @@ export async function removeOnlineVisitor(visitorId: string): Promise<void> {
   if (!hasSupabase()) return;
   try {
     const supabase = getSupabaseClient()!;
-    await supabase.from('site_visitors_online').delete().eq('visitor_id', visitorId);
-  } catch { /* ignore */ }
+    const { error } = await supabase.from('site_visitors_online').delete().eq('visitor_id', visitorId);
+    if (error) throw error;
+  } catch (err) {
+    console.error('[removeOnlineVisitor] Error:', err);
+  }
 }
 
 /** 记录一次页面访问 */
@@ -639,43 +771,11 @@ export async function recordPageView(visitorId: string, page: string): Promise<v
   if (!hasSupabase()) return;
   try {
     const supabase = getSupabaseClient()!;
-    // 插入 PV 明细
-    await supabase.from('site_page_views').insert({ visitor_id: visitorId, page });
-
-    // 更新或插入今日聚合统计（用 RPC 避免竞态，但为简化直接 upsert）
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const { data: existing } = await supabase
-      .from('site_analytics_daily')
-      .select('id, page_views, unique_visitors')
-      .eq('date', today)
-      .maybeSingle();
-
-    if (existing) {
-      // 检查今天是否已经有过这个访客的 PV
-      const { count } = await supabase
-        .from('site_page_views')
-        .select('id', { count: 'exact', head: true })
-        .eq('visitor_id', visitorId)
-        .gte('created_at', today);
-      const isNewVisitor = (count ?? 0) <= 1; // 刚插入的这一条 + 之前的
-
-      await supabase
-        .from('site_analytics_daily')
-        .update({
-          page_views: (existing.page_views || 0) + 1,
-          unique_visitors: isNewVisitor
-            ? (existing.unique_visitors || 0) + 1
-            : (existing.unique_visitors || 0),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-    } else {
-      await supabase.from('site_analytics_daily').upsert(
-        { date: today, page_views: 1, unique_visitors: 1, updated_at: new Date().toISOString() },
-        { onConflict: 'date' },
-      );
-    }
-  } catch { /* ignore */ }
+    const { error: insertErr } = await supabase.from('site_page_views').insert({ visitor_id: visitorId, page });
+    if (insertErr) throw insertErr;
+  } catch (err) {
+    console.error('[recordPageView] Error:', err);
+  }
 }
 
 /** 清理过期在线记录（5 分钟未心跳的视为离线） */
@@ -683,11 +783,14 @@ async function cleanupExpiredVisitors(): Promise<void> {
   if (!hasSupabase()) return;
   try {
     const supabase = getSupabaseClient()!;
-    await supabase
+    const { error } = await supabase
       .from('site_visitors_online')
       .delete()
       .lt('last_heartbeat', new Date(Date.now() - 300_000).toISOString());
-  } catch { /* ignore */ }
+    if (error) throw error;
+  } catch (err) {
+    console.error('[cleanupExpiredVisitors] Error:', err);
+  }
 }
 
 /** 获取当前在线人数（90 秒内有心跳） */
@@ -695,14 +798,17 @@ export async function getOnlineCount(): Promise<number> {
   if (!hasSupabase()) return 0;
   try {
     const supabase = getSupabaseClient()!;
-    // 顺便清理过期记录
     await cleanupExpiredVisitors();
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from('site_visitors_online')
       .select('visitor_id', { count: 'exact', head: true })
       .gte('last_heartbeat', new Date(Date.now() - 90_000).toISOString());
+    if (error) throw error;
     return count ?? 0;
-  } catch { return 0; }
+  } catch (err) {
+    console.error('[getOnlineCount] Error:', err);
+    return 0;
+  }
 }
 
 /** 获取在线访客列表 */
@@ -710,13 +816,17 @@ export async function getOnlineVisitors(): Promise<OnlineVisitor[]> {
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('site_visitors_online')
       .select('*')
       .gte('last_heartbeat', new Date(Date.now() - 90_000).toISOString())
       .order('last_heartbeat', { ascending: false });
+    if (error) throw error;
     return (data || []) as OnlineVisitor[];
-  } catch { return []; }
+  } catch (err) {
+    console.error('[getOnlineVisitors] Error:', err);
+    return [];
+  }
 }
 
 /** 获取最近 N 天的每日统计 */
@@ -726,17 +836,21 @@ export async function getDailyAnalytics(days: number = 30): Promise<AnalyticsDai
     const supabase = getSupabaseClient()!;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days + 1);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('site_analytics_daily')
       .select('date, page_views, unique_visitors')
-      .gte('date', startDate.toISOString().slice(0, 10))
+      .gte('date', getLocalDateString())
       .order('date', { ascending: true });
-    return (data || []).map((row: any) => ({
-      date: row.date,
+    if (error) throw error;
+    return (data || []).map((row: Record<string, unknown>) => ({
+      date: row.date as string,
       page_views: Number(row.page_views) || 0,
       unique_visitors: Number(row.unique_visitors) || 0,
     }));
-  } catch { return []; }
+  } catch (err) {
+    console.error('[getDailyAnalytics] Error:', err);
+    return [];
+  }
 }
 
 /** 获取今日访问量统计 */
@@ -744,17 +858,20 @@ export async function getTodayStats(): Promise<{ pageViews: number; uniqueVisito
   if (!hasSupabase()) return { pageViews: 0, uniqueVisitors: 0 };
   try {
     const supabase = getSupabaseClient()!;
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('site_analytics_daily')
       .select('page_views, unique_visitors')
-      .eq('date', today)
+      .eq('date', getLocalDateString())
       .maybeSingle();
+    if (error) throw error;
     return {
       pageViews: Number(data?.page_views) || 0,
       uniqueVisitors: Number(data?.unique_visitors) || 0,
     };
-  } catch { return { pageViews: 0, uniqueVisitors: 0 }; }
+  } catch (err) {
+    console.error('[getTodayStats] Error:', err);
+    return { pageViews: 0, uniqueVisitors: 0 };
+  }
 }
 
 /** 获取今日各页面 PV 分布 */
@@ -762,23 +879,26 @@ export async function getTodayPageDistribution(): Promise<{ page: string; count:
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase
+    const today = getLocalDateString();
+    const { data, error } = await supabase
       .from('site_page_views')
       .select('page')
       .gte('created_at', today);
+    if (error) throw error;
     if (!data || data.length === 0) return [];
 
-    // 在前端聚合
     const pageMap = new Map<string, number>();
     for (const row of data) {
-      const page = row.page as string;
+      const page = (row as Record<string, unknown>).page as string;
       pageMap.set(page, (pageMap.get(page) || 0) + 1);
     }
     return Array.from(pageMap.entries())
       .map(([page, count]) => ({ page, count }))
       .sort((a, b) => b.count - a.count);
-  } catch { return []; }
+  } catch (err) {
+    console.error('[getTodayPageDistribution] Error:', err);
+    return [];
+  }
 }
 
 /** 获取今日每小时 PV 分布（24 小时柱状图） */
@@ -786,20 +906,24 @@ export async function getTodayHourlyDistribution(): Promise<{ hour: number; pv: 
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase
+    const today = getLocalDateString();
+    const { data, error } = await supabase
       .from('site_page_views')
       .select('created_at')
       .gte('created_at', today);
+    if (error) throw error;
     if (!data || data.length === 0) return [];
 
     const hours = new Array(24).fill(0) as number[];
     for (const row of data) {
-      const h = new Date(row.created_at as string).getHours();
+      const h = new Date((row as Record<string, unknown>).created_at as string).getHours();
       hours[h]++;
     }
     return hours.map((pv, hour) => ({ hour, pv }));
-  } catch { return []; }
+  } catch (err) {
+    console.error('[getTodayHourlyDistribution] Error:', err);
+    return [];
+  }
 }
 
 /** 获取总访问量统计 */
@@ -807,11 +931,15 @@ export async function getTotalStats(): Promise<{ totalPv: number; totalDays: num
   if (!hasSupabase()) return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
   try {
     const supabase = getSupabaseClient()!;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('site_analytics_daily')
       .select('page_views');
+    if (error) throw error;
     if (!data || data.length === 0) return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
-    const totalPv = data.reduce((sum: number, row: any) => sum + (Number(row.page_views) || 0), 0);
+    const totalPv = data.reduce((sum: number, row: Record<string, unknown>) => sum + (Number(row.page_views) || 0), 0);
     return { totalPv, totalDays: data.length, avgDailyPv: Math.round(totalPv / data.length) };
-  } catch { return { totalPv: 0, totalDays: 0, avgDailyPv: 0 }; }
+  } catch (err) {
+    console.error('[getTotalStats] Error:', err);
+    return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
+  }
 }

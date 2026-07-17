@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Eraser, Calculator as CalcIcon } from 'lucide-react';
 import type { IMaterialItem } from '@/data/materials';
@@ -36,11 +36,11 @@ function NumberInput({
   const [isEditing, setIsEditing] = useState(false);
 
   // 外部 value 变化且不在编辑中时，同步到本地
-  useMemo(() => {
+  useEffect(() => {
     if (!isEditing) {
       setLocalValue(value === 0 ? '' : String(value));
     }
-  }, [value]);
+  }, [value, isEditing]);
 
   const displayValue = isEditing ? localValue : value === 0 ? '' : String(value);
 
@@ -93,8 +93,6 @@ export default function MaterialInputSection({
   materials,
   onChange,
 }: MaterialInputSectionProps) {
-  const [showSummary, setShowSummary] = useState(false);
-
   const handlePriceChange = (index: number, num: number) => {
     const newMaterials = [...materials];
     newMaterials[index] = { ...newMaterials[index], price: num };
@@ -118,7 +116,6 @@ export default function MaterialInputSection({
   };
 
   const handleSummary = () => {
-    setShowSummary(true);
     const total = sumMaterials(materials);
     toast.info(`${title}合计：${formatNumber(total)} 亿 ISK`);
   };
@@ -131,14 +128,12 @@ export default function MaterialInputSection({
       <div className="px-4 pt-4 pb-3">
         <h2 className="text-lg font-semibold text-white">{title}</h2>
         {subtitle && <p className="mt-1 text-sm text-[#A0A0A0]">{subtitle}</p>}
-        {showSummary && (
-          <div className="mt-3 rounded-lg bg-[#7C3AED]/15 border border-[#7C3AED]/30 px-4 py-2.5">
-            <div className="text-xs text-[#A0A0A0]">当前合计</div>
-            <div className="text-lg font-bold text-[#A78BFA] tabular-nums">
-              {formatNumber(total)} <span className="text-sm font-normal">亿 ISK</span>
-            </div>
+        <div className="mt-3 rounded-lg bg-[#7C3AED]/15 border border-[#7C3AED]/30 px-4 py-2.5">
+          <div className="text-xs text-[#A0A0A0]">当前合计</div>
+          <div className="text-lg font-bold text-[#A78BFA] tabular-nums">
+            {formatNumber(total)} <span className="text-sm font-normal">亿 ISK</span>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 表头 */}

@@ -1,300 +1,352 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Pencil, Trash2, Users, UserPlus, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   loadAdminAccounts,
   saveAdminAccount,
   deleteAdminAccount,
+  hashPassword,
   type AdminAccount,
 } from '@/lib/admin-projects';
+import AdminModal from '@/components/admin/AdminModal';
 
-const defaultPermissions = {
-  manage_projects: true,
-  manage_materials: true,
-  manage_market: true,
-  manage_admins: false,
-};
-
-export function AdminAccountsPage() {
+export default function AdminAccountsPage() {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
+  const [accounts, setAccounts] = useState<Omit<AdminAccount, 'password_hash'>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [newAccount, setNewAccount] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState('');
+  const [editingId, setEditingId] = useState('');
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
     role: 'admin' as 'super_admin' | 'admin',
-    permissions: { ...defaultPermissions },
+    permissions: {
+      manage_projects: false,
+      manage_materials: false,
+      manage_market: false,
+      manage_admins: false,
+    },
   });
 
   useEffect(() => {
-    loadAccounts();
+    loadData();
   }, []);
 
-  const loadAccounts = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const data = await loadAdminAccounts();
-    setAccounts(data);
-    setLoading(false);
+    try {
+      const data = await loadAdminAccounts();
+      setAccounts(data);
+    } catch (err) {
+      console.error('[AdminAccountsPage] loadData error:', err);
+      toast.error('加载账号列表失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (account: AdminAccount) => {
-    setEditingId(account.id);
-    setNewAccount(false);
-    setFormData({
-      username: account.username,
-      password: account.password,
-      role: account.role,
-      permissions: account.permissions || { ...defaultPermissions },
-    });
-  };
-
-  const handleNew = () => {
-    setEditingId(null);
-    setNewAccount(true);
+  const openAdd = () => {
+    setEditingId('');
     setFormData({
       username: '',
       password: '',
       role: 'admin',
-      permissions: { ...defaultPermissions },
+      permissions: {
+        manage_projects: false,
+        manage_materials: false,
+        manage_market: false,
+        manage_admins: false,
+      },
     });
+    setModalOpen(true);
+  };
+
+  const openEdit = (account: Omit<AdminAccount, 'password_hash'>) => {
+    setEditingId(account.id);
+    setFormData({
+      username: account.username,
+      password: '', // 编辑时不回填密码
+      role: account.role,
+      permissions: { ...account.permissions },
+    });
+    setModalOpen(true);
+  };
+
+  const confirmDelete = (id: string) => {
+    setDeleteId(id);
+    setDeleteOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formData.username || !formData.password) {
-      alert('请填写用户名和密码');
+    if (!formData.username.trim()) {
+      toast.error('请输入用户名');
       return;
     }
-    const account: AdminAccount = {
-      id: editingId || `admin_${Date.now()}`,
-      username: formData.username,
-      password: formData.password,
-      role: formData.role,
-      permissions: formData.permissions,
-    };
-    await saveAdminAccount(account);
-    setEditingId(null);
-    setNewAccount(false);
-    await loadAccounts();
-    alert('保存成功');
+    // 新增时必须输入密码
+    if (!editingId && !formData.password.trim()) {
+      toast.error('请输入密码');
+      return;
+    }
+    // 编辑时如果输入了密码则更新，留空则不修改
+    if (editingId && !formData.password.trim()) {
+      // 保留原密码哈希（从本地加载）
+      const allRaw = localStorage.getItem('eve_admin_accounts');
+      const allAccounts: AdminAccount[] = allRaw ? JSON.parse(allRaw) : [];
+      const existing = allAccounts.find((a) => a.id === editingId);
+      if (existing) {
+        await saveAdminAccount({
+          ...existing,
+          username: formData.username.trim(),
+          role: formData.role,
+          permissions: formData.permissions,
+        });
+      }
+    } else {
+      const account: AdminAccount = {
+        id: editingId || `acc_${Date.now()}`,
+        username: formData.username.trim(),
+        password_hash: hashPassword(formData.password.trim()),
+        role: formData.role,
+        permissions: formData.permissions,
+      };
+      await saveAdminAccount(account);
+    }
+
+    await loadData();
+    setModalOpen(false);
+    toast.success(editingId ? '账号更新成功' : '账号创建成功');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此管理员账号吗？')) return;
-    await deleteAdminAccount(id);
-    await loadAccounts();
+  const handleDelete = async () => {
+    await deleteAdminAccount(deleteId);
+    await loadData();
+    setDeleteOpen(false);
+    toast.success('账号已删除');
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setNewAccount(false);
-  };
-
-  const togglePermission = (key: keyof typeof defaultPermissions) => {
-    setFormData(prev => ({
+  const togglePermission = (key: keyof typeof formData.permissions) => {
+    setFormData((prev) => ({
       ...prev,
-      permissions: {
-        ...prev.permissions,
-        [key]: !prev.permissions[key],
-      },
+      permissions: { ...prev.permissions, [key]: !prev.permissions[key] },
     }));
   };
 
   if (loading) {
     return (
-      <div className="flex h-32 items-center justify-center">
-        <div className="text-muted-foreground">加载中...</div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-[#888] flex items-center gap-2">
+          <i className="fa-solid fa-circle-notch fa-spin" />
+          加载中...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 pb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">管理员账号管理</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理管理员账号和权限设置
-          </p>
+          <h2 className="text-xl font-bold text-white">账号管理</h2>
+          <p className="text-xs text-[#888] mt-0.5">管理后台管理员账号和权限</p>
         </div>
-        <Button onClick={handleNew} className="gap-2">
-          <i className="fa-solid fa-plus" />
-          添加账号
-        </Button>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 self-start sm:self-auto rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#6D28D9]"
+        >
+          <UserPlus className="h-4 w-4" />
+          新增账号
+        </button>
       </div>
 
-      {(editingId || newAccount) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{newAccount ? '添加新账号' : '编辑账号'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>用户名</Label>
-                <Input
-                  value={formData.username}
-                  onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                  placeholder="请输入用户名"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>密码</Label>
-                <Input
-                  type="password"
-                  value={formData.password}
-                  onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="请输入密码"
-                />
-              </div>
+      {/* 账号列表 */}
+      <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] overflow-hidden">
+        <div className="grid grid-cols-[1fr_100px_140px_80px] gap-3 px-4 py-3 text-xs font-medium text-[#888] border-b border-[#2C2C2C] bg-[#151515]">
+          <span>用户名</span>
+          <span>角色</span>
+          <span>权限</span>
+          <span className="text-right">操作</span>
+        </div>
+        {accounts.map((account) => (
+          <div
+            key={account.id}
+            className="grid grid-cols-[1fr_100px_140px_80px] gap-3 px-4 py-3 items-center border-b border-[#2C2C2C]/50 hover:bg-[#222] transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Users className="h-4 w-4 shrink-0 text-[#7C3AED]" />
+              <span className="text-sm text-white truncate">{account.username}</span>
             </div>
-            <div className="space-y-2">
-              <Label>角色</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(v: 'super_admin' | 'admin') => setFormData(prev => ({ ...prev, role: v }))}
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full w-fit ${
+                account.role === 'super_admin'
+                  ? 'bg-[#7C3AED]/15 text-[#A78BFA]'
+                  : 'bg-[#2C2C2C] text-[#888]'
+              }`}
+            >
+              {account.role === 'super_admin' ? '超级管理员' : '管理员'}
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(account.permissions)
+                .filter(([, v]) => v)
+                .map(([k]) => (
+                  <span key={k} className="text-[10px] text-[#666] bg-[#222] px-1.5 py-0.5 rounded">
+                    {k === 'manage_projects' && '项目'}
+                    {k === 'manage_materials' && '材料'}
+                    {k === 'manage_market' && '市场'}
+                    {k === 'manage_admins' && '账号'}
+                  </span>
+                ))}
+            </div>
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => openEdit(account)}
+                className="p-1.5 rounded-md text-[#888] hover:text-white hover:bg-[#333] transition-colors"
+                title="编辑"
               >
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="super_admin">超级管理员</SelectItem>
-                  <SelectItem value="admin">管理员</SelectItem>
-                </SelectContent>
-              </Select>
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => confirmDelete(account.id)}
+                className="p-1.5 rounded-md text-[#888] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                title="删除"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label>权限设置</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={formData.permissions.manage_projects}
-                    onCheckedChange={() => togglePermission('manage_projects')}
-                  />
-                  <Label className="text-sm">项目管理</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={formData.permissions.manage_materials}
-                    onCheckedChange={() => togglePermission('manage_materials')}
-                  />
-                  <Label className="text-sm">材料管理</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={formData.permissions.manage_market}
-                    onCheckedChange={() => togglePermission('manage_market')}
-                  />
-                  <Label className="text-sm">市场管理</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={formData.permissions.manage_admins}
-                    onCheckedChange={() => togglePermission('manage_admins')}
-                  />
-                  <Label className="text-sm">管理员管理</Label>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>保存</Button>
-              <Button variant="outline" onClick={handleCancel}>取消</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        ))}
+        {accounts.length === 0 && (
+          <div className="px-4 py-8 text-center text-sm text-[#666]">
+            暂无管理员账号
+          </div>
+        )}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>账号列表 ({accounts.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>用户名</TableHead>
-                <TableHead>角色</TableHead>
-                <TableHead>权限</TableHead>
-                <TableHead className="text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accounts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    暂无数据，点击右上角"添加账号"创建第一个管理员账号
-                  </TableCell>
-                </TableRow>
-              ) : (
-                accounts.map(account => (
-                  <TableRow key={account.id}>
-                    <TableCell className="font-medium">{account.username}</TableCell>
-                    <TableCell>
-                      <span className={account.role === 'super_admin' ? 'text-purple-400' : 'text-blue-400'}>
-                        {account.role === 'super_admin' ? '超级管理员' : '管理员'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {account.permissions?.manage_projects && <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">项目</span>}
-                        {account.permissions?.manage_materials && <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">材料</span>}
-                        {account.permissions?.manage_market && <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded">市场</span>}
-                        {account.permissions?.manage_admins && <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded">管理员</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300"
-                          onClick={() => handleEdit(account)}
-                        >
-                          <i className="fa-solid fa-pen mr-1" />
-                          编辑
-                        </Button>
-                        {account.role !== 'super_admin' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-red-400 hover:text-red-300"
-                            onClick={() => handleDelete(account.id)}
-                          >
-                            <i className="fa-solid fa-trash mr-1" />
-                            删除
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* 新增/编辑弹窗 */}
+      <AdminModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        icon={<UserPlus className="h-5 w-5" />}
+        iconBgClass="bg-[#7C3AED]/15"
+        iconColorClass="text-[#A78BFA]"
+        title={editingId ? '编辑账号' : '新增账号'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-[#888] mb-1 block">用户名</label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData((p) => ({ ...p, username: e.target.value }))}
+              placeholder="请输入用户名"
+              className="w-full rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#888] mb-1 block">
+              密码 {editingId ? <span className="text-[#666]">（留空则不修改）</span> : ''}
+            </label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData((p) => ({ ...p, password: e.target.value }))}
+              placeholder={editingId ? '如需修改请输入新密码' : '请输入密码'}
+              className="w-full rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#888] mb-1 block">角色</label>
+            <div className="flex gap-2">
+              {(['admin', 'super_admin'] as const).map((role) => (
+                <button
+                  key={role}
+                  onClick={() => setFormData((p) => ({ ...p, role }))}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-all ${
+                    formData.role === role
+                      ? 'border-[#7C3AED] bg-[#7C3AED]/15 text-[#A78BFA]'
+                      : 'border-[#3A3A3A] bg-[#1E1E1E] text-[#888] hover:border-[#555]'
+                  }`}
+                >
+                  {role === 'super_admin' ? '超级管理员' : '管理员'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-[#888] mb-2 block">权限设置</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { key: 'manage_projects' as const, label: '项目管理' },
+                  { key: 'manage_materials' as const, label: '材料管理' },
+                  { key: 'manage_market' as const, label: '市场管理' },
+                  { key: 'manage_admins' as const, label: '账号管理' },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => togglePermission(key)}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all ${
+                    formData.permissions[key]
+                      ? 'border-[#7C3AED] bg-[#7C3AED]/15 text-[#A78BFA]'
+                      : 'border-[#3A3A3A] bg-[#1E1E1E] text-[#888] hover:border-[#555]'
+                  }`}
+                >
+                  {formData.permissions[key] ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <div className="h-3.5 w-3.5 rounded border border-[#666]" />
+                  )}
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setModalOpen(false)}
+              className="flex-1 rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] py-2.5 text-sm text-[#888] hover:bg-[#2C2C2C]"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex-1 rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white hover:bg-[#6D28D9]"
+            >
+              {editingId ? '保存' : '创建'}
+            </button>
+          </div>
+        </div>
+      </AdminModal>
+
+      {/* 删除确认 */}
+      <AdminModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        icon={<Trash2 className="h-5 w-5 text-red-400" />}
+        iconBgClass="bg-red-400/15"
+        iconColorClass="text-red-400"
+        title="确认删除"
+        description="此操作不可恢复，是否确认删除该账号？"
+      >
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDeleteOpen(false)}
+            className="flex-1 rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] py-2.5 text-sm text-[#888] hover:bg-[#2C2C2C]"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleDelete}
+            className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
+          >
+            删除
+          </button>
+        </div>
+      </AdminModal>
     </div>
   );
 }
-
-export default AdminAccountsPage;

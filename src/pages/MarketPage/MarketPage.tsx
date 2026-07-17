@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { loadMarketData, type MarketDataItem } from '@/lib/admin-projects';
@@ -51,12 +51,13 @@ export default function MarketPage({ onImport }: MarketPageProps) {
 
   useEffect(() => {
     loadItems(selectedCategory);
-  }, [selectedCategory]);
+  }, [selectedCategory, loadItems]);
 
-  const loadItems = async (category: CategoryKey) => {
+  const loadItems = useCallback(async (type: CategoryKey) => {
     setLoading(true);
+    setDirty(false);
     try {
-      const data = await loadMarketData(category);
+      const data = await loadMarketData(type);
       setItems(data);
     } catch (err) {
       console.error('Failed to load market data:', err);
@@ -64,7 +65,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleImport = () => {
     // 只导入有数据的项（sell_price > 0 或 sell_quantity > 0）
@@ -78,7 +79,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
     }
   };
 
-  const currentCategory = CATEGORIES.find((c) => c.key === selectedCategory)!;
+  const currentCategory = CATEGORIES.find((c) => c.key === selectedCategory) || CATEGORIES[0];
 
   return (
     <div className="h-full overflow-y-auto">
