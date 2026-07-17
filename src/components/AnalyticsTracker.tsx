@@ -3,10 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { sendHeartbeat, removeOnlineVisitor, recordPageView } from '@/lib/admin-projects';
 
 const VISITOR_KEY = 'eve_visitor_id';
-const HEARTBEAT_INTERVAL = 30_000; // 30 秒
-const MAX_PV_PER_MINUTE = 30; // 防刷：每分钟最多 30 次 PV
+const HEARTBEAT_INTERVAL = 30_000;
+const MAX_PV_PER_MINUTE = 30;
 
-/** 生成或恢复访客 ID（简单 fingerprint：随机 + 持久化） */
 function getVisitorId(): string {
   try {
     let id = localStorage.getItem(VISITOR_KEY);
@@ -20,7 +19,6 @@ function getVisitorId(): string {
   }
 }
 
-/** 获取页面路径的中文名 */
 function getPageName(path: string): string {
   if (path === '/' || path === '') return '首页';
   if (path === '/market') return '市场';
@@ -28,14 +26,12 @@ function getPageName(path: string): string {
   return path;
 }
 
-/** 限流检查 */
 function checkRateLimit(): boolean {
   try {
     const key = 'eve_pv_limit';
     const raw = localStorage.getItem(key);
     const now = Date.now();
     let records: number[] = raw ? JSON.parse(raw) : [];
-    // 保留最近 1 分钟的记录
     records = records.filter((t) => now - t < 60_000);
     if (records.length >= MAX_PV_PER_MINUTE) return false;
     records.push(now);
@@ -59,11 +55,9 @@ export default function AnalyticsTracker() {
     sendHeartbeat(visitorIdRef.current, page, navigator.userAgent);
   }, [location.pathname]);
 
-  // 记录 PV + 启动心跳
   useEffect(() => {
     const visitorId = visitorIdRef.current;
     const path = location.pathname;
-
     if (path !== lastRecordedPathRef.current) {
       lastRecordedPathRef.current = path;
       if (checkRateLimit()) {
@@ -72,16 +66,13 @@ export default function AnalyticsTracker() {
         sendHeartbeat(visitorId, pageName, navigator.userAgent);
       }
     }
-
     if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
     heartbeatTimerRef.current = setInterval(doHeartbeat, HEARTBEAT_INTERVAL);
-
     return () => {
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
     };
   }, [location.pathname, doHeartbeat]);
 
-  // 页面可见性变化：暂停/恢复心跳
   useEffect(() => {
     const handleVisibility = () => {
       visibleRef.current = !document.hidden;
@@ -93,7 +84,6 @@ export default function AnalyticsTracker() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [doHeartbeat]);
 
-  // 页面关闭时移除在线记录
   useEffect(() => {
     const handleUnload = () => {
       removeOnlineVisitor(visitorIdRef.current);
