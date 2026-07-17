@@ -1,24 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
+import { Plus, Trash2, Loader2, Save } from 'lucide-react';
 import {
   loadMaterialPrices,
   saveMaterialPrices,
@@ -44,9 +26,15 @@ export default function AdminMaterialsPage() {
 
   const fetchItems = useCallback(async (type: MaterialType) => {
     setLoading(true);
-    const data = await loadMaterialPrices(type);
-    setItems(data);
-    setLoading(false);
+    try {
+      const data = await loadMaterialPrices(type);
+      setItems(data);
+    } catch (err) {
+      console.error('[AdminMaterialsPage] fetchItems error:', err);
+      toast.error('加载材料列表失败');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -76,8 +64,13 @@ export default function AdminMaterialsPage() {
   };
 
   const handleSave = async () => {
-    await saveMaterialPrices(items);
-    alert('保存成功');
+    try {
+      await saveMaterialPrices(items);
+      toast.success('保存成功');
+    } catch (err) {
+      console.error('[AdminMaterialsPage] save error:', err);
+      toast.error('保存失败，请检查网络');
+    }
   };
 
   const handleAdd = async () => {
@@ -89,8 +82,13 @@ export default function AdminMaterialsPage() {
       quantity: 0,
       sortOrder: items.length,
     };
-    await addMaterialPrice(newItem);
-    setItems([...items, newItem]);
+    try {
+      await addMaterialPrice(newItem);
+      setItems([...items, newItem]);
+    } catch (err) {
+      console.error('[AdminMaterialsPage] add error:', err);
+      toast.error('添加失败');
+    }
   };
 
   const handleDelete = async () => {
@@ -101,7 +99,7 @@ export default function AdminMaterialsPage() {
       toast.success('材料已删除');
     } catch (err) {
       console.error('[AdminMaterialsPage] delete error:', err);
-      toast.error('删除失败，请检查网络或刷新重试');
+      toast.error('删除失败，请检查网络');
     } finally {
       setDeleteId(null);
     }
@@ -109,183 +107,116 @@ export default function AdminMaterialsPage() {
 
   return (
     <div className="space-y-4 pb-8">
-      {/* 页面标题 */}
       <div>
         <h2 className="text-lg font-semibold text-white">材料管理</h2>
-        <p className="mt-0.5 text-sm text-[#A0A0A0]">
-          管理材料价格数据，所有用户可见
-        </p>
+        <p className="mt-0.5 text-sm text-[#A0A0A0]">管理材料价格数据，所有用户可见</p>
       </div>
 
       {/* 类型切换 */}
       <div className="flex gap-2">
         {TYPE_OPTIONS.map((type) => (
-          <Button
+          <button
             key={type}
-            variant={activeType === type ? 'default' : 'outline'}
-            className={`flex-1 ${
+            onClick={() => setActiveType(type)}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
               activeType === type
                 ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0'
-                : 'border-white/10 bg-white/5 text-white/70'
+                : 'border-[#3A3A3A] bg-[#2C2C2C] text-[#A0A0A0] hover:bg-[#363636]'
             }`}
-            onClick={() => setActiveType(type)}
           >
             {TYPE_LABELS[type]}
-          </Button>
+          </button>
         ))}
       </div>
 
-      {/* 材料列表 */}
-      <Card className="bg-[#111] border-white/10">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-white/80">
-              {TYPE_LABELS[activeType]}列表 ({items.length})
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
-                onClick={handleAdd}
-              >
-                <i className="fa-solid fa-plus mr-1 text-xs" />
-                添加
-              </Button>
-              <Button
-                size="sm"
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                onClick={handleSave}
-              >
-                <i className="fa-solid fa-save mr-1 text-xs" />
-                保存
-              </Button>
-            </div>
+      {/* 列表卡片 */}
+      <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] overflow-hidden">
+        {/* 工具栏 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3A3A3A]">
+          <span className="text-sm text-[#A0A0A0]">{TYPE_LABELS[activeType]}列表 ({items.length})</span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              className="flex items-center gap-1 rounded-lg border border-[#444] bg-[#1E1E1E] px-3 py-1.5 text-xs text-white hover:bg-[#363636] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> 添加
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-1 rounded-lg bg-[#7C3AED] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#6D28D9] transition-colors"
+            >
+              <Save className="h-3.5 w-3.5" /> 保存
+            </button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
+        </div>
+
+        <div className="divide-y divide-[#3A3A3A]/50 max-h-[60vh] overflow-y-auto">
           {loading ? (
-            <div className="py-8 text-center text-white/40">加载中...</div>
+            <div className="flex items-center justify-center py-12 gap-2 text-[#888]">
+              <Loader2 className="h-5 w-5 animate-spin" /> 加载中...
+            </div>
           ) : items.length === 0 ? (
-            <div className="py-8 text-center text-white/40">暂无数据</div>
+            <div className="py-12 text-center text-[#666] text-sm">暂无数据</div>
           ) : (
-            <>
-              {/* 桌面端表头 */}
-              <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-xs text-white/50">
-                <div className="col-span-4">名称</div>
-                <div className="col-span-3">单价</div>
-                <div className="col-span-3">数量</div>
-                <div className="col-span-2 text-right">操作</div>
-              </div>
-              {/* 数据行 */}
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-lg border border-white/5 bg-white/5 p-2"
-                >
-                  {/* 手机端：单列布局，名称和输入框上下排列 */}
-                  <div className="flex flex-col gap-2 md:hidden">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => handleNameChange(item.id, e.target.value)}
-                      className="h-8 bg-transparent border-white/10 text-sm text-white"
-                    />
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        value={item.price || ''}
-                        onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                        placeholder="单价"
-                        className="h-8 flex-1 bg-transparent border-white/10 text-sm text-white"
-                      />
-                      <Input
-                        type="number"
-                        value={item.quantity || ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        placeholder="数量"
-                        className="h-8 flex-1 bg-transparent border-white/10 text-sm text-white"
-                      />
-                    </div>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs"
-                        onClick={() => setDeleteId(item.id)}
-                      >
-                        <i className="fa-solid fa-trash mr-1" />
-                        删除
-                      </Button>
-                    </div>
-                  </div>
-                  {/* 桌面端：12 列网格布局 */}
-                  <div className="hidden md:grid md:grid-cols-12 gap-2 items-center">
-                    <div className="col-span-4">
-                      <Input
-                        value={item.name}
-                        onChange={(e) => handleNameChange(item.id, e.target.value)}
-                        className="h-8 bg-transparent border-white/10 text-sm text-white"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        value={item.price || ''}
-                        onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                        placeholder="0"
-                        className="h-8 bg-transparent border-white/10 text-sm text-white"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        value={item.quantity || ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        placeholder="0"
-                        className="h-8 bg-transparent border-white/10 text-sm text-white"
-                      />
-                    </div>
-                    <div className="col-span-2 flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs"
-                        onClick={() => setDeleteId(item.id)}
-                      >
-                        <i className="fa-solid fa-trash mr-1" />
-                        删除
-                      </Button>
-                    </div>
-                  </div>
+            items.map((item) => (
+              <div key={item.id} className="flex flex-col gap-2 p-3 hover:bg-[#3A3A3A]/20 transition-colors">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={item.name}
+                    onChange={(e) => handleNameChange(item.id, e.target.value)}
+                    className="flex-1 rounded-md border border-[#444] bg-[#1E1E1E] px-2 py-1.5 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                    placeholder="名称"
+                  />
+                  <input
+                    type="number"
+                    value={item.price || ''}
+                    onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                    className="w-28 rounded-md border border-[#444] bg-[#1E1E1E] px-2 py-1.5 text-sm text-right text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                    placeholder="单价"
+                  />
+                  <input
+                    type="number"
+                    value={item.quantity || ''}
+                    onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                    className="w-28 rounded-md border border-[#444] bg-[#1E1E1E] px-2 py-1.5 text-sm text-right text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                    placeholder="数量"
+                  />
+                  <button
+                    onClick={() => setDeleteId(item.id)}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-[#888] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-              ))}
-            </>
+              </div>
+            ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 删除确认弹窗 */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#1a1a1a] border-white/10">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">确认删除</AlertDialogTitle>
-            <AlertDialogDescription className="text-white/60">
-              确定要删除这个材料吗？此操作不可撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-white/10 bg-transparent text-white hover:bg-white/10">
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-500 hover:bg-red-600 text-white"
-              onClick={handleDelete}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-sm rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-white">确认删除</h3>
+            <p className="mt-2 text-sm text-[#A0A0A0]">确定要删除这个材料吗？此操作不可撤销。</p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setDeleteId(null)}
+                className="flex-1 rounded-lg border border-[#444] bg-[#1E1E1E] py-2.5 text-sm text-white hover:bg-[#363636]"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

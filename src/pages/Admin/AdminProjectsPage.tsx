@@ -25,9 +25,15 @@ export default function AdminProjectsPage() {
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
-    const data = await loadAdminProjects();
-    setProjects(data);
-    setLoading(false);
+    try {
+      const data = await loadAdminProjects();
+      setProjects(data);
+    } catch (err) {
+      console.error('[AdminProjectsPage] fetchProjects error:', err);
+      toast.error('加载项目列表失败');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // 每次进入/返回列表页时重新加载数据，确保新增/编辑后刷新
@@ -47,10 +53,16 @@ export default function AdminProjectsPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteAdminProject(deleteTarget.id);
-    await fetchProjects();
-    setDeleteTarget(null);
-    toast.success('项目已删除');
+    try {
+      await deleteAdminProject(deleteTarget.id);
+      await fetchProjects();
+      toast.success('项目已删除');
+    } catch (err) {
+      console.error('[AdminProjectsPage] delete error:', err);
+      toast.error('删除失败，请检查网络');
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   return (

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Users, UserPlus, Check } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Users, UserPlus, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadAdminAccounts,
@@ -12,7 +11,6 @@ import {
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminAccountsPage() {
-  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Omit<AdminAccount, 'password_hash'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -32,11 +30,7 @@ export default function AdminAccountsPage() {
     },
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const data = await loadAdminAccounts();
@@ -47,7 +41,11 @@ export default function AdminAccountsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const openAdd = () => {
     setEditingId('');
@@ -91,41 +89,52 @@ export default function AdminAccountsPage() {
       toast.error('请输入密码');
       return;
     }
-    // 编辑时如果输入了密码则更新，留空则不修改
-    if (editingId && !formData.password.trim()) {
-      // 保留原密码哈希（从本地加载）
-      const allRaw = localStorage.getItem('eve_admin_accounts');
-      const allAccounts: AdminAccount[] = allRaw ? JSON.parse(allRaw) : [];
-      const existing = allAccounts.find((a) => a.id === editingId);
-      if (existing) {
-        await saveAdminAccount({
-          ...existing,
+    try {
+      // 编辑时如果输入了密码则更新，留空则不修改
+      if (editingId && !formData.password.trim()) {
+        // 保留原密码哈希（从本地加载）
+        const allRaw = localStorage.getItem('eve_admin_accounts');
+        const allAccounts: AdminAccount[] = allRaw ? JSON.parse(allRaw) : [];
+        const existing = allAccounts.find((a) => a.id === editingId);
+        if (existing) {
+          await saveAdminAccount({
+            ...existing,
+            username: formData.username.trim(),
+            role: formData.role,
+            permissions: formData.permissions,
+          });
+        }
+      } else {
+        const account: AdminAccount = {
+          id: editingId || `acc_${Date.now()}`,
           username: formData.username.trim(),
+          password_hash: hashPassword(formData.password.trim()),
           role: formData.role,
           permissions: formData.permissions,
-        });
+        };
+        await saveAdminAccount(account);
       }
-    } else {
-      const account: AdminAccount = {
-        id: editingId || `acc_${Date.now()}`,
-        username: formData.username.trim(),
-        password_hash: hashPassword(formData.password.trim()),
-        role: formData.role,
-        permissions: formData.permissions,
-      };
-      await saveAdminAccount(account);
-    }
 
-    await loadData();
-    setModalOpen(false);
-    toast.success(editingId ? '账号更新成功' : '账号创建成功');
+      await loadData();
+      setModalOpen(false);
+      toast.success(editingId ? '账号更新成功' : '账号创建成功');
+    } catch (err) {
+      console.error('[AdminAccountsPage] save error:', err);
+      toast.error('保存失败，请检查网络');
+    }
   };
 
   const handleDelete = async () => {
-    await deleteAdminAccount(deleteId);
-    await loadData();
-    setDeleteOpen(false);
-    toast.success('账号已删除');
+    try {
+      await deleteAdminAccount(deleteId);
+      await loadData();
+      toast.success('账号已删除');
+    } catch (err) {
+      console.error('[AdminAccountsPage] delete error:', err);
+      toast.error('删除失败，请检查网络');
+    } finally {
+      setDeleteOpen(false);
+    }
   };
 
   const togglePermission = (key: keyof typeof formData.permissions) => {
@@ -139,7 +148,7 @@ export default function AdminAccountsPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-[#888] flex items-center gap-2">
-          <i className="fa-solid fa-circle-notch fa-spin" />
+          <Loader2 className="h-5 w-5 animate-spin text-[#888]" />
           加载中...
         </div>
       </div>
