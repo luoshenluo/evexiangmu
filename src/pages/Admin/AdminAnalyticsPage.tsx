@@ -63,11 +63,14 @@ function OnlineList({ visitors }: { visitors: OnlineVisitor[] }) {
   }
 
   const formatTime = (iso: string) => {
+    if (!iso) return '--:--:--';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '--:--:--';
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
   };
 
   const parseUA = (ua: string) => {
+    if (!ua) return 'Unknown';
     if (ua.includes('iPhone')) return 'iPhone';
     if (ua.includes('iPad')) return 'iPad';
     if (ua.includes('Android')) return 'Android';
@@ -87,7 +90,7 @@ function OnlineList({ visitors }: { visitors: OnlineVisitor[] }) {
           <div className="flex items-center gap-3 min-w-0">
             <Monitor className="h-4 w-4 shrink-0 text-[#7C3AED]" />
             <div className="min-w-0">
-              <p className="truncate text-sm text-white">{v.page}</p>
+              <p className="truncate text-sm text-white">{v.page ?? '未知页面'}</p>
               <p className="text-[11px] text-[#666]">
                 <Globe className="mr-0.5 inline h-3 w-3" />
                 {parseUA(v.user_agent)}

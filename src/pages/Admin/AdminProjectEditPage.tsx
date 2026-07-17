@@ -79,7 +79,7 @@ function MaterialGroup({
               <input
                 type="text"
                 inputMode="numeric"
-                value={values[idx] === 0 ? '' : String(values[idx])}
+                value={(values[idx] ?? 0) === 0 ? '' : String(values[idx] ?? 0)}
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw !== '' && !/^\d*$/.test(raw)) return;

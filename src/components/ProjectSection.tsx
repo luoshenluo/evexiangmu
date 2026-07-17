@@ -96,6 +96,9 @@ function MaterialGroup({
   const [open, setOpen] = useState(false);
   const isEditable = !!onChange;
 
+  // 安全获取数量，undefined/null → 0
+  const getQty = (idx: number): number => (quantities[idx] ?? 0);
+
   return (
     <div className="rounded-lg border border-[#3A3A3A] bg-[#1E1E1E]/60 overflow-hidden">
       <button
@@ -126,7 +129,7 @@ function MaterialGroup({
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={quantities[idx] === 0 ? '' : String(quantities[idx])}
+                  value={getQty(idx) === 0 ? '' : String(getQty(idx))}
                   onChange={(e) => {
                     const raw = e.target.value;
                     if (raw !== '' && !/^\d*$/.test(raw)) return;
@@ -137,7 +140,7 @@ function MaterialGroup({
                 />
               ) : (
                 <span className="text-xs font-medium text-white tabular-nums">
-                  {quantities[idx].toLocaleString()}
+                  {getQty(idx).toLocaleString()}
                   <span className="ml-0.5 text-[10px] font-normal text-[#888888]">个</span>
                 </span>
               )}
@@ -231,15 +234,15 @@ export default function ProjectSection({
   const calcMaterialCost = (mats: IProjectMaterials) => {
     let total = 0;
     mats.minerals.forEach((q, i) => {
-      const price = currentMinerals[i]?.price || 0;
+      const price = currentMinerals[i]?.price ?? 0;
       total += (price * q) / 100000000;
     });
     mats.shipMaterials.forEach((q, i) => {
-      const price = currentShipMaterials[i]?.price || 0;
+      const price = currentShipMaterials[i]?.price ?? 0;
       total += (price * q) / 100000000;
     });
     mats.buildMaterials.forEach((q, i) => {
-      const price = currentBuildMaterials[i]?.price || 0;
+      const price = currentBuildMaterials[i]?.price ?? 0;
       total += (price * q) / 100000000;
     });
     return total;
@@ -329,18 +332,18 @@ export default function ProjectSection({
     }
     const newMinerals = PRESET_MINERALS.map((m, i) => ({
       ...m,
-      price: currentMinerals[i]?.price || 0,
-      quantity: mats.minerals[i] || 0,
+      price: currentMinerals[i]?.price ?? 0,
+      quantity: mats.minerals[i] ?? 0,
     }));
     const newShipMaterials = PRESET_SHIP_MATERIALS.map((m, i) => ({
       ...m,
-      price: currentShipMaterials[i]?.price || 0,
-      quantity: mats.shipMaterials[i] || 0,
+      price: currentShipMaterials[i]?.price ?? 0,
+      quantity: mats.shipMaterials[i] ?? 0,
     }));
     const newBuildMaterials = PRESET_BUILD_MATERIALS.map((m, i) => ({
       ...m,
-      price: currentBuildMaterials[i]?.price || 0,
-      quantity: mats.buildMaterials[i] || 0,
+      price: currentBuildMaterials[i]?.price ?? 0,
+      quantity: mats.buildMaterials[i] ?? 0,
     }));
     onImportMaterials({
       minerals: newMinerals,

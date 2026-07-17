@@ -149,7 +149,7 @@ export default function MaterialInputSection({
       <div className="flex-1 overflow-y-auto px-4 pb-40">
         <div className="space-y-2">
           {materials.map((item, index) => {
-            const itemTotal = ((item.price || 0) * (item.quantity || 0)) / 100000000;
+            const itemTotal = ((item.price ?? 0) * (item.quantity ?? 0)) / 100000000;
             return (
               <div
                 key={item.name}
