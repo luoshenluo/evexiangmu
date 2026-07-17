@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Shield, LogOut, Eye, EyeOff, Loader2 } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Lock,
+  Save,
+  Check,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { clearAdminLogin, setCurrentAdminAccount, updateCurrentAccountPassword } from '@/lib/admin-projects';
+import { getAdminPassword, setAdminPassword, clearAdminLogin } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminSettingsPage() {
@@ -10,179 +15,145 @@ export default function AdminSettingsPage() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showOld, setShowOld] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [logoutOpen, setLogoutOpen] = useState(false);
-  const [changing, setChanging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error('请填写完整');
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast.error('新密码至少 6 位');
+      toast.error('请填写完整信息');
       return;
     }
     if (newPassword !== confirmPassword) {
       toast.error('两次输入的新密码不一致');
       return;
     }
+    if (newPassword.length < 6) {
+      toast.error('密码长度至少6位');
+      return;
+    }
 
-    setChanging(true);
+    setSaving(true);
     try {
-      const ok = await updateCurrentAccountPassword(oldPassword, newPassword);
-      if (!ok) {
+      const current = await getAdminPassword();
+      if (oldPassword !== current) {
         toast.error('原密码错误');
+        setSaving(false);
         return;
       }
-      toast.success('密码修改成功');
+      await setAdminPassword(newPassword);
+      setSaving(false);
+      setSuccessOpen(true);
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err) {
-      console.error('[AdminSettingsPage] change password error:', err);
-      toast.error('密码修改失败');
-    } finally {
-      setChanging(false);
+    } catch {
+      toast.error('保存失败，请重试');
+      setSaving(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleGoLogin = () => {
     clearAdminLogin();
-    setCurrentAdminAccount(null);
-    setLogoutOpen(false);
-    toast.success('已退出登录');
     navigate('/admin/login');
   };
 
   return (
-    <div className="space-y-4 pb-8">
-      <div>
-        <h2 className="text-xl font-bold text-white">管理员设置</h2>
-        <p className="text-xs text-[#888] mt-0.5">修改密码和账号管理</p>
+    <div className="p-4 md:p-6 pb-20">
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold text-white">管理员设置</h2>
+        <p className="mt-0.5 text-sm text-[#A0A0A0]">修改管理员密码和系统配置</p>
       </div>
 
-      {/* 修改密码 */}
-      <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4 space-y-4">
-        <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-[#A78BFA]" />
-          <h3 className="text-sm font-medium text-white">修改密码</h3>
-        </div>
+      <div className="max-w-md space-y-5">
+        {/* 修改密码 */}
+        <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7C3AED]/15 text-[#A78BFA]">
+              <Lock className="h-4 w-4" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">修改管理员密码</h3>
+          </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-[#888] mb-1 block">原密码</label>
-            <div className="relative">
+          <form onSubmit={handleChangePassword} className="space-y-3">
+            <div>
+              <label className="text-xs text-[#A0A0A0] mb-1 block">原密码</label>
               <input
-                type={showOld ? 'text' : 'password'}
+                type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 placeholder="请输入原密码"
-                className="w-full rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] px-3 py-2.5 pr-10 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                className="w-full rounded-md border border-[#444444] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666666] outline-none transition-all focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
               />
-              <button
-                type="button"
-                onClick={() => setShowOld(!showOld)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#A0A0A0]"
-              >
-                {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-[#888] mb-1 block">新密码</label>
-            <div className="relative">
+            <div>
+              <label className="text-xs text-[#A0A0A0] mb-1 block">新密码</label>
               <input
-                type={showNew ? 'text' : 'password'}
+                type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="至少 6 位"
-                className="w-full rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] px-3 py-2.5 pr-10 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                placeholder="请输入新密码（至少6位）"
+                className="w-full rounded-md border border-[#444444] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666666] outline-none transition-all focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
               />
-              <button
-                type="button"
-                onClick={() => setShowNew(!showNew)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#A0A0A0]"
-              >
-                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-[#888] mb-1 block">确认新密码</label>
-            <div className="relative">
+            <div>
+              <label className="text-xs text-[#A0A0A0] mb-1 block">确认新密码</label>
               <input
-                type={showConfirm ? 'text' : 'password'}
+                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="再次输入新密码"
-                className="w-full rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] px-3 py-2.5 pr-10 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
+                className="w-full rounded-md border border-[#444444] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666666] outline-none transition-all focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
               />
-              <button
-                type="button"
-                onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#A0A0A0]"
-              >
-                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
-          <button
-            onClick={handleChangePassword}
-            disabled={changing}
-            className="w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white hover:bg-[#6D28D9] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {changing && <Loader2 className="h-4 w-4 animate-spin" />}
-            {changing ? '修改中...' : '修改密码'}
-          </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(124_58_237_0.3)] transition-all hover:bg-[#6D28D9] active:scale-[0.98] disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? '保存中...' : '保存密码'}
+            </button>
+          </form>
         </div>
-      </div>
 
-      {/* 退出登录 */}
-      <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
-        <div className="flex items-center justify-between">
+        {/* 系统信息 */}
+        <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <LogOut className="h-4 w-4 text-red-400" />
-            <div>
-              <h3 className="text-sm font-medium text-white">退出登录</h3>
-              <p className="text-xs text-[#666]">退出当前管理员账号</p>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#06B6D4]/15 text-[#06B6D4]">
+              <SettingsIcon className="h-4 w-4" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">系统信息</h3>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-[#A0A0A0]">版本</span>
+              <span className="text-white">v1.0.0 (测试版)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#A0A0A0]">数据存储</span>
+              <span className="text-white">云端同步 (Supabase)</span>
             </div>
           </div>
-          <button
-            onClick={() => setLogoutOpen(true)}
-            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-all"
-          >
-            退出
-          </button>
         </div>
       </div>
 
-      {/* 退出确认 */}
+      {/* 修改密码成功弹窗 */}
       <AdminModal
-        open={logoutOpen}
-        onClose={() => setLogoutOpen(false)}
-        icon={<LogOut className="h-5 w-5 text-red-400" />}
-        iconBgClass="bg-red-400/15"
-        iconColorClass="text-red-400"
-        title="确认退出"
-        description="是否确认退出当前管理员账号？"
+        open={successOpen}
+        onClose={handleGoLogin}
+        icon={<Check className="h-6 w-6" />}
+        iconBgClass="bg-[#22C55E]/15"
+        iconColorClass="text-[#22C55E]"
+        title="密码修改成功"
+        description="请使用新密码重新登录"
       >
-        <div className="flex gap-2">
-          <button
-            onClick={() => setLogoutOpen(false)}
-            className="flex-1 rounded-lg border border-[#3A3A3A] bg-[#1E1E1E] py-2.5 text-sm text-[#888] hover:bg-[#2C2C2C]"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleLogout}
-            className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
-          >
-            确认退出
-          </button>
-        </div>
+        <button
+          onClick={handleGoLogin}
+          className="w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white transition-all hover:bg-[#6D28D9] active:scale-[0.98]"
+        >
+          确定
+        </button>
       </AdminModal>
     </div>
   );
