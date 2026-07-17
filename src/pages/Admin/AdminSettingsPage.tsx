@@ -7,7 +7,7 @@ import {
   Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getAdminPassword, setAdminPassword, clearAdminLogin } from '@/lib/admin-projects';
+import { getAdminPasswordHash, verifyPassword, setAdminPassword, clearAdminLogin } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminSettingsPage() {
@@ -35,8 +35,8 @@ export default function AdminSettingsPage() {
 
     setSaving(true);
     try {
-      const current = await getAdminPassword();
-      if (oldPassword !== current) {
+      const currentHash = await getAdminPasswordHash();
+      if (!currentHash || !verifyPassword(oldPassword, currentHash)) {
         toast.error('原密码错误');
         setSaving(false);
         return;
