@@ -32,17 +32,17 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, sub, color, bgColor }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4 transition-colors hover:bg-[#222]">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-[#888]">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-white" style={{ color }}>
+    <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4 transition-colors hover:bg-[#222]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] md:text-xs text-[#888]">{label}</p>
+          <p className="mt-1 text-xl md:text-2xl font-bold text-white tabular-nums" style={{ color }}>
             {value}
           </p>
-          {sub && <p className="mt-1 text-[11px] text-[#666]">{sub}</p>}
+          {sub && <p className="mt-1 text-[10px] md:text-[11px] text-[#666] truncate">{sub}</p>}
         </div>
         <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+          className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg"
           style={{ backgroundColor: bgColor }}
         >
           <span style={{ color }}>{icon}</span>
@@ -217,18 +217,19 @@ export default function AdminAnalyticsPage() {
       trigger: 'axis' as const,
       backgroundColor: '#2C2C2C',
       borderColor: '#3A3A3A',
-      textStyle: { color: '#fff', fontSize: 12 },
+      textStyle: { color: '#fff', fontSize: 11 },
+      confine: true,
     },
     legend: {
       data: ['页面浏览量', '独立访客'],
       top: 0,
       right: 0,
-      textStyle: { color: '#888', fontSize: 11 },
+      textStyle: { color: '#888', fontSize: 10 },
       icon: 'roundRect' as const,
-      itemWidth: 12,
-      itemHeight: 3,
+      itemWidth: 10,
+      itemHeight: 2,
     },
-    grid: { left: 40, right: 16, top: 30, bottom: 24 },
+    grid: { left: isMobile ? 32 : 40, right: isMobile ? 8 : 16, top: 28, bottom: isMobile ? 20 : 24 },
     xAxis: {
       type: 'category' as const,
       data: dailyData.map((d) => {
@@ -236,13 +237,13 @@ export default function AdminAnalyticsPage() {
         return `${dt.getMonth() + 1}/${dt.getDate()}`;
       }),
       axisLine: { lineStyle: { color: '#2C2C2C' } },
-      axisLabel: { color: '#666', fontSize: 10 },
+      axisLabel: { color: '#666', fontSize: 9, interval: isMobile ? 4 : 0 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value' as const,
       splitLine: { lineStyle: { color: '#2C2C2C', type: 'dashed' as const } },
-      axisLabel: { color: '#666', fontSize: 10 },
+      axisLabel: { color: '#666', fontSize: 9 },
     },
     series: [
       {
@@ -290,28 +291,29 @@ export default function AdminAnalyticsPage() {
       trigger: 'axis' as const,
       backgroundColor: '#2C2C2C',
       borderColor: '#3A3A3A',
-      textStyle: { color: '#fff', fontSize: 12 },
+      textStyle: { color: '#fff', fontSize: 11 },
+      confine: true,
       formatter: (params: Array<{ name: string; value: number }>) => {
         const p = params[0];
         return `${p.name}:00<br/>访问量: <b>${p.value}</b>`;
       },
     },
-    grid: { left: 36, right: 12, top: 12, bottom: 24 },
+    grid: { left: isMobile ? 28 : 36, right: isMobile ? 8 : 12, top: 12, bottom: isMobile ? 20 : 24 },
     xAxis: {
       type: 'category' as const,
       data: hourlyData.map((h) => `${h.hour}:00`),
       axisLine: { lineStyle: { color: '#2C2C2C' } },
       axisLabel: {
         color: '#666',
-        fontSize: 10,
-        interval: (index: number) => index % 3 === 0,
+        fontSize: 9,
+        interval: isMobile ? 3 : 2,
       },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value' as const,
       splitLine: { lineStyle: { color: '#2C2C2C', type: 'dashed' as const } },
-      axisLabel: { color: '#666', fontSize: 10 },
+      axisLabel: { color: '#666', fontSize: 9 },
     },
     series: [
       {
@@ -328,7 +330,7 @@ export default function AdminAnalyticsPage() {
           },
           borderRadius: [3, 3, 0, 0],
         },
-        barMaxWidth: 16,
+        barMaxWidth: isMobile ? 10 : 16,
       },
     ],
   };
@@ -339,21 +341,26 @@ export default function AdminAnalyticsPage() {
       trigger: 'item' as const,
       backgroundColor: '#2C2C2C',
       borderColor: '#3A3A3A',
-      textStyle: { color: '#fff', fontSize: 12 },
+      textStyle: { color: '#fff', fontSize: 11 },
+      confine: true,
       formatter: '{b}: {c} ({d}%)',
     },
     series: [
       {
         type: 'pie',
-        radius: ['45%', '70%'],
+        radius: isMobile ? ['40%', '65%'] : ['45%', '70%'],
         center: ['50%', '55%'],
         avoidLabelOverlap: true,
         label: {
           color: '#aaa',
-          fontSize: 11,
-          formatter: '{b}\n{d}%',
+          fontSize: isMobile ? 9 : 11,
+          formatter: isMobile ? '{d}%' : '{b}\n{d}%',
         },
-        labelLine: { lineStyle: { color: '#555' } },
+        labelLine: {
+          length: isMobile ? 8 : 15,
+          length2: isMobile ? 5 : 10,
+          lineStyle: { color: '#555' },
+        },
         data: pageDist.map((p) => ({
           name: p.page,
           value: p.count,
@@ -375,9 +382,14 @@ export default function AdminAnalyticsPage() {
     );
   }
 
-  const NoDataPlaceholder = ({ text = '暂无数据' }: { text?: string }) => (
-    <div className="flex h-full items-center justify-center text-[#666] text-sm">{text}</div>
+  const NoDataPlaceholder = ({ text = '暂无数据', h = 200 }: { text?: string; h?: number }) => (
+    <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: h }}>{text}</div>
   );
+
+  // 响应式图表高度
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const chartH = isMobile ? 200 : 280;
+  const smallChartH = isMobile ? 180 : 260;
 
   return (
     <div className="space-y-4 p-4 md:p-6 pb-8">
@@ -439,60 +451,58 @@ export default function AdminAnalyticsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4 md:col-span-2">
+        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4 md:col-span-2">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">近 30 天访问趋势</h3>
           {dailyData.length > 0 ? (
             <ReactECharts
               option={trendOption}
-              style={{ height: 280 }}
+              style={{ height: chartH }}
               opts={{ renderer: 'svg' }}
               notMerge
             />
           ) : (
-            <NoDataPlaceholder />
+            <NoDataPlaceholder h={chartH} />
           )}
         </div>
 
-        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
+        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日页面分布</h3>
           {pageDist.length > 0 ? (
             <ReactECharts
               option={pageDistOption}
-              style={{ height: 280 }}
+              style={{ height: chartH }}
               opts={{ renderer: 'svg' }}
               notMerge
             />
           ) : (
-            <div className="flex h-[280px] items-center justify-center text-[#666] text-sm">
-              暂无数据
-            </div>
+            <NoDataPlaceholder h={chartH} />
           )}
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
+        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日每小时访问量</h3>
           {hourlyData.some((h) => h.pv > 0) ? (
             <ReactECharts
               option={hourlyOption}
-              style={{ height: 260 }}
+              style={{ height: smallChartH }}
               opts={{ renderer: 'svg' }}
               notMerge
             />
           ) : (
-            <NoDataPlaceholder />
+            <NoDataPlaceholder h={smallChartH} />
           )}
         </div>
 
-        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
+        <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-medium text-[#ccc]">在线访客</h3>
             <span className="rounded-full bg-[#22d3ee]/15 px-2 py-0.5 text-[11px] font-medium text-[#22d3ee]">
               {onlineCount} 人在线
             </span>
           </div>
-          <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1">
+          <div className="max-h-[220px] md:max-h-[260px] overflow-y-auto space-y-2 pr-1">
             <OnlineList visitors={onlineVisitors} />
           </div>
         </div>

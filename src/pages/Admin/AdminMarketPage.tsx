@@ -22,10 +22,6 @@ export function AdminMarketPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadItems(activeTab);
-  }, [activeTab, loadItems]);
-
   const loadItems = useCallback(async (type: TabKey) => {
     setLoading(true);
     setDirty(false);
@@ -39,6 +35,10 @@ export function AdminMarketPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadItems(activeTab);
+  }, [activeTab, loadItems]);
 
   const handleChange = (id: string, field: keyof MarketDataItem, value: string | number) => {
     setItems(prev =>
