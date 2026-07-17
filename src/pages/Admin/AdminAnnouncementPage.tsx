@@ -74,9 +74,9 @@ export default function AdminAnnouncementPage() {
           </div>
           <button
             onClick={() => setEnabled(!enabled)}
-            className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? 'bg-[#7C3AED]' : 'bg-[#444]'}`}
+            className={"relative h-6 w-11 rounded-full transition-colors " + (enabled ? 'bg-[#7C3AED]' : 'bg-[#444]')}
           >
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            <span className={"absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform " + (enabled ? 'translate-x-5' : 'translate-x-0.5')} />
           </button>
         </div>
 
