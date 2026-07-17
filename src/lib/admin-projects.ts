@@ -57,20 +57,29 @@ function saveAdminPasswordHashToLocal(hash: string): void {
   try { localStorage.setItem(ADMIN_PASSWORD_KEY, hash); } catch { /* ignore */ }
 }
 
-/** 获取管理员密码哈希 */
+/** 获取管理员密码哈希（向后兼容：先查 hash，不存在则查明文） */
 export async function getAdminPasswordHash(): Promise<string | null> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
+      // 先尝试读取 bcrypt 哈希
       const { data, error } = await supabase
         .from('app_settings')
         .select('value')
         .eq('key', 'admin_password_hash')
         .single();
-      if (error) throw error;
-      if (data?.value) {
+      if (!error && data?.value) {
         saveAdminPasswordHashToLocal(data.value as string);
         return data.value as string;
+      }
+      // 向后兼容：读取旧版明文密码
+      const { data: oldData, error: oldErr } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'admin_password')
+        .single();
+      if (!oldErr && oldData?.value) {
+        return oldData.value as string;
       }
     } catch (err) {
       console.error('[getAdminPasswordHash] Supabase error:', err);
@@ -100,11 +109,16 @@ export async function setAdminPassword(newPassword: string): Promise<void> {
   }
 }
 
-/** 校验管理员密码 */
+/** 校验管理员密码（向后兼容：支持 bcrypt 哈希和明文） */
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const hash = await getAdminPasswordHash();
-  if (!hash) return false;
-  return verifyPassword(password, hash);
+  const stored = await getAdminPasswordHash();
+  if (!stored) return false;
+  // 如果是 bcrypt 哈希（以 $2 开头）
+  if (stored.startsWith('$2')) {
+    return verifyPassword(password, stored);
+  }
+  // 向后兼容：明文密码
+  return password === stored;
 }
 
 // ========== 登录态（本地 session，含时间戳防长期有效） ==========
@@ -550,28 +564,46 @@ export async function deleteAdminAccount(id: string): Promise<void> {
   }
 }
 
-/** 验证管理员登录（bcrypt 哈希比对） */
+/** 验证管理员登录（bcrypt 哈希比对，向后兼容明文） */
 export async function verifyAdminLogin(username: string, password: string): Promise<AdminAccount | null> {
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
+      // 先尝试查询新版 password_hash 列
       const { data, error } = await supabase
         .from('admin_accounts')
         .select('id, username, password_hash, role, permissions, created_at, updated_at')
         .eq('username', username)
         .maybeSingle();
-      if (error) throw error;
-      if (data && verifyPassword(password, data.password_hash as string)) {
-        return data as AdminAccount;
+      if (!error && data) {
+        const hash = data.password_hash as string;
+        const valid = hash.startsWith('$2') ? verifyPassword(password, hash) : password === hash;
+        if (valid) return data as AdminAccount;
       }
-    } catch (err) {
-      console.error('[verifyAdminLogin] Error:', err);
+    } catch {
+      // 列可能不存在，尝试旧版 password 列
+      try {
+        const supabase = getSupabaseClient()!;
+        const { data, error } = await supabase
+          .from('admin_accounts')
+          .select('id, username, password, role, permissions, created_at, updated_at')
+          .eq('username', username)
+          .maybeSingle();
+        if (!error && data && password === (data.password as string)) {
+          return { ...data, password_hash: data.password as string } as AdminAccount;
+        }
+      } catch (err2) {
+        console.error('[verifyAdminLogin] fallback error:', err2);
+      }
     }
   }
+  // 本地缓存兼容
   const accounts = loadAdminAccountsFromLocal();
   const account = accounts.find((a) => a.username === username);
-  if (account && verifyPassword(password, account.password_hash)) {
-    return account;
+  if (account) {
+    const stored = account.password_hash || (account as any).password;
+    const valid = stored?.startsWith('$2') ? verifyPassword(password, stored) : password === stored;
+    if (valid) return account;
   }
   return null;
 }
