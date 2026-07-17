@@ -1,209 +1,103 @@
-function lsGetItem(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Download, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-import { loadMarketData, saveMarketData, type MarketDataItem } from '@/lib/admin-projects';
+import { useEffect, useState, useCallback } from 'react';
+import { Gem, Ship, Factory, Download, Loader2 } from 'lucide-react';
+import { loadMarketData, type MarketDataItem } from '@/lib/admin-projects';
+import { toast } from 'sonner';
 
 const CATEGORIES = [
-  { key: 'minerals', label: '矿物' },
-  { key: 'ship_materials', label: '船材' },
-  { key: 'build_materials', label: '建材' },
-] as const;
-
+  { key: 'minerals' as const, label: '矿物', sublabel: '8 项基础矿物', icon: Gem, color: '#22d3ee' },
+  { key: 'ship_materials' as const, label: '船材', sublabel: '17 项舰船材料', icon: Ship, color: '#a78bfa' },
+  { key: 'build_materials' as const, label: '建材', sublabel: '11 项建筑材料', icon: Factory, color: '#fbbf24' },
+];
 type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
-const STORAGE_KEYS = {
-  minerals: 'eve_minerals_v3',
-  shipMaterials: 'eve_ship_materials_v3',
-  buildMaterials: 'eve_build_materials_v3',
-};
+interface MarketPageProps { onImport?: (category: CategoryKey, items: MarketDataItem[]) => void; }
 
-interface InputMaterial {
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-export default function MarketPage() {
+export default function MarketPage({ onImport }: MarketPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('minerals');
   const [items, setItems] = useState<MarketDataItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<MarketDataItem | null>(null);
-  const [importing, setImporting] = useState(false);
 
-  useEffect(() => {
-    loadItems(selectedCategory);
-  }, [selectedCategory]);
-
-  const loadItems = async (category: CategoryKey) => {
+  const loadItems = useCallback(async (type: CategoryKey) => {
     setLoading(true);
-    setSelectedItem(null);
-    try {
-      const data = await loadMarketData(category);
-      setItems(data);
-    } catch (err) {
-      console.error('Failed to load market data:', err);
-    } finally {
-      setLoading(false);
-    }
+    try { const data = await loadMarketData(type); setItems(data); } catch { setItems([]); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadItems(selectedCategory); }, [selectedCategory, loadItems]);
+
+  const handleImport = () => {
+    const validItems = items.filter((item) => (item.sell_price || 0) > 0);
+    if (validItems.length === 0) { toast.info('当前分类没有可导入的市场价格'); return; }
+    if (onImport) onImport(selectedCategory, validItems);
   };
 
-  // 一键导入：从三个录入页读取数据，更新市场数据
-  const handleImportFromInputs = async () => {
-    setImporting(true);
-    try {
-      const mineralsData: InputMaterial[] = JSON.parse(
-        lsGetItem(STORAGE_KEYS.minerals) || '[]',
-      );
-      const shipData: InputMaterial[] = JSON.parse(
-        lsGetItem(STORAGE_KEYS.shipMaterials) || '[]',
-      );
-      const buildData: InputMaterial[] = JSON.parse(
-        lsGetItem(STORAGE_KEYS.buildMaterials) || '[]',
-      );
-      const sourceData =
-        selectedCategory === 'minerals'
-          ? mineralsData
-          : selectedCategory === 'ship_materials'
-            ? shipData
-            : buildData;
-      let importedCount = 0;
-      const updatedItems = items.map(item => {
-        const source = sourceData.find(s => s.name === item.name);
-        if (source && source.price > 0) {
-          importedCount++;
-          return { ...item, sell_price: source.price, sell_quantity: source.quantity };
-        }
-        return item;
-      });
-      await saveMarketData(updatedItems);
-      setItems(updatedItems);
-      alert(`已导入 ${importedCount} 条数据到${CATEGORIES.find(c => c.key === selectedCategory)?.label}市场`);
-    } catch (err) {
-      console.error('Failed to import data:', err);
-      alert('导入失败，请重试');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-32 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-[#7C3AED] mr-2" />
-        <span className="text-[#A0A0A0]">加载中...</span>
-      </div>
-    );
-  }
+  const currentCategory = CATEGORIES.find((c) => c.key === selectedCategory) || CATEGORIES[0];
+  const CatIcon = currentCategory.icon;
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-lg md:text-2xl font-bold text-white">市场数据</h2>
-          <p className="text-xs md:text-sm text-[#A0A0A0] mt-0.5 md:mt-1">
-            查看矿物、船材、建材的市场出售和收购信息
-          </p>
-        </div>
-        <Button
-          onClick={handleImportFromInputs}
-          disabled={importing}
-          size="sm"
-          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white h-11 md:h-auto w-full sm:w-auto"
-        >
-          <Download className="h-4 w-4 mr-1.5" />
-          {importing ? '导入中...' : '一键导入录入数据'}
-        </Button>
-      </div>
-
-      <div className="flex gap-2">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat.key}
-            onClick={() => setSelectedCategory(cat.key)}
-            className={`flex-1 sm:flex-initial rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium transition-colors ${
-              selectedCategory === cat.key
-                ? 'bg-[#7C3AED] text-white'
-                : 'bg-[#2C2C2C] text-[#A0A0A0] hover:bg-[#3A3A3A]'
-            }`}
-          >
-            {cat.label}
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white tracking-tight">市场数据</h2>
+            <p className="text-sm text-[#888] mt-1">查看市场出售与收购信息（仅后台可编辑）</p>
+          </div>
+          <button onClick={handleImport} disabled={loading || items.length === 0} className="flex items-center gap-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 text-white px-4 py-2.5 text-sm font-medium shadow-lg shadow-purple-500/20 transition-all active:scale-[0.98]">
+            <Download className="h-4 w-4" />导入单价
           </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-        <Card className="bg-[#2C2C2C] border-[#3A3A3A]">
-          <CardHeader className="pb-2 md:pb-3">
-            <CardTitle className="text-sm md:text-base text-white">
-              {CATEGORIES.find(c => c.key === selectedCategory)?.label}列表 ({items.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-0.5 max-h-[300px] md:max-h-[500px] overflow-y-auto">
-              {items.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => setSelectedItem(item)}
-                  className={`w-full text-left px-3 py-2.5 md:py-2 rounded-lg transition-colors text-sm ${
-                    selectedItem?.id === item.id
-                      ? 'bg-[#7C3AED]/20 text-[#A78BFA]'
-                      : 'hover:bg-[#3A3A3A]/50 text-[#E0E0E0]'
-                  }`}
-                >
-                  <div className="text-sm md:text-base font-medium">{item.name}</div>
-                  <div className="text-[10px] md:text-xs text-[#888888] mt-0.5">
-                    出售: {item.sell_price || 0} | 收购: {item.buy_price || 0}
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = cat.key === selectedCategory;
+            return (
+              <button key={cat.key} onClick={() => setSelectedCategory(cat.key)} className="relative rounded-2xl border p-4 text-left transition-all duration-300" style={{ background: isActive ? 'linear-gradient(135deg, ' + cat.color + '15, transparent)' : 'rgba(26,26,26,0.8)', borderColor: isActive ? cat.color + '60' : '#2C2C2C' }}>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: isActive ? cat.color + '20' : 'rgba(44,44,44,0.8)' }}>
+                    <Icon className="h-5 w-5" style={{ color: isActive ? cat.color : '#666' }} />
                   </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#2C2C2C] border-[#3A3A3A]">
-          <CardHeader className="pb-2 md:pb-3">
-            <CardTitle className="text-sm md:text-base text-white">
-              {selectedItem ? selectedItem.name : '请选择材料'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {selectedItem ? (
-              <div className="space-y-3 md:space-y-4">
-                <div className="rounded-lg bg-[#1E1E1E] p-3 md:p-4">
-                  <h3 className="text-xs md:text-sm font-medium text-[#22C55E] mb-2 md:mb-3 flex items-center gap-1.5">
-                    <TrendingUp className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                    市场出售
-                  </h3>
-                  <div className="space-y-1.5 md:space-y-2">
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">价格</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.sell_price || 0} 亿 ISK</span></div>
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">数量</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.sell_quantity || 0}</span></div>
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">地址</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.sell_location || '-'}</span></div>
+                  <div>
+                    <div className={'text-sm font-semibold ' + (isActive ? 'text-white' : 'text-[#A0A0A0]')}>{cat.label}</div>
+                    <div className="text-[11px] text-[#666] mt-0.5">{cat.sublabel}</div>
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#1E1E1E] p-3 md:p-4">
-                  <h3 className="text-xs md:text-sm font-medium text-[#3B82F6] mb-2 md:mb-3 flex items-center gap-1.5">
-                    <TrendingDown className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                    收购订单
-                  </h3>
-                  <div className="space-y-1.5 md:space-y-2">
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">价格</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.buy_price || 0} 亿 ISK</span></div>
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">数量</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.buy_quantity || 0}</span></div>
-                    <div className="flex justify-between"><span className="text-[11px] md:text-sm text-[#A0A0A0]">地址</span><span className="text-[11px] md:text-sm font-medium text-white">{selectedItem.buy_location || '-'}</span></div>
+                {isActive && <div className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full" style={{ backgroundColor: cat.color }} />}
+              </button>
+            );
+          })}
+        </div>
+        {loading ? <div className="flex items-center justify-center py-20 text-[#666] gap-2"><Loader2 className="h-5 w-5 animate-spin" />加载中...</div> : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-[#666]"><CatIcon className="h-10 w-10 opacity-30" /><span className="mt-2 text-sm">暂无市场数据</span></div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {items.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-[#2C2C2C] bg-[#1a1a1a]/80 backdrop-blur-sm p-4">
+                <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-[#2C2C2C]/60">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: currentCategory.color + '15' }}><CatIcon className="h-4 w-4" style={{ color: currentCategory.color }} /></div>
+                  <span className="text-sm font-semibold text-white">{item.name}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-400" /><span className="text-xs font-medium text-green-400">市场出售</span></div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label><input type="text" value={item.sell_price || ''} readOnly placeholder="0" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-green-400 text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">数量</label><input type="text" value={item.sell_quantity || ''} readOnly placeholder="0" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label><input type="text" value={item.sell_location || ''} readOnly placeholder="-" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-blue-400" /><span className="text-xs font-medium text-blue-400">收购订单</span></div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label><input type="text" value={item.buy_price || ''} readOnly placeholder="0" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-blue-400 text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">数量</label><input type="text" value={item.buy_quantity || ''} readOnly placeholder="0" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                      <div><label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label><input type="text" value={item.buy_location || ''} readOnly placeholder="-" className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none" /></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex h-32 md:h-48 items-center justify-center text-[#888888] text-sm">
-                请从列表选择材料查看详情
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-center gap-6 text-xs text-[#555] pt-2"><span className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-green-400" />绿色 = 出售价格</span><span className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-blue-400" />蓝色 = 收购价格</span></div>
       </div>
     </div>
   );
