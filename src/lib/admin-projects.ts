@@ -871,6 +871,25 @@ export async function recordPageView(visitorId: string, page: string): Promise<v
   } catch (err) {
     console.error('[recordPageView] Error:', err);
   }
+  // 触发每日聚合（前端节流：每小时最多一次）
+  triggerDailyAggregation();
+}
+
+/** 触发每日 PV/UV 聚合（节流：1 小时内不重复调用） */
+let _lastAggregateTime = 0;
+function triggerDailyAggregation(): void {
+  const now = Date.now();
+  if (now - _lastAggregateTime < 3_600_000) return; // 1 小时节流
+  _lastAggregateTime = now;
+
+  if (!hasSupabase()) return;
+  getSupabaseClient()!
+    .rpc('aggregate_daily_stats')
+    .then(() => { /* 静默成功 */ })
+    .catch((err) => {
+      // 如果函数不存在，静默忽略（用户尚未执行建表 SQL）
+      console.warn('[triggerDailyAggregation] rpc not available:', err.message);
+    });
 }
 
 /** 清理过期在线记录（5 分钟未心跳的视为离线） */
