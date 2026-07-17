@@ -9,6 +9,7 @@ import {
   Monitor,
   Globe,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import {
   getOnlineCount,
@@ -225,7 +226,8 @@ export default function AdminAnalyticsPage() {
     };
   }, [loadAllData]);
 
-  const trendOption = {
+  const trendOption = useMemo(() => {
+    return {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis' as const,
@@ -297,9 +299,11 @@ export default function AdminAnalyticsPage() {
         },
       },
     ],
-  };
+    };
+  }, [dailyData, isMobile]);
 
-  const hourlyOption = {
+  const hourlyOption = useMemo(() => {
+    return {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis' as const,
@@ -347,9 +351,11 @@ export default function AdminAnalyticsPage() {
         barMaxWidth: isMobile ? 10 : 16,
       },
     ],
-  };
+    };
+  }, [hourlyData, isMobile]);
 
-  const pageDistOption = {
+  const pageDistOption = useMemo(() => {
+    return {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item' as const,
@@ -384,21 +390,22 @@ export default function AdminAnalyticsPage() {
       },
     ],
   };
+  }, [pageDist, isMobile]);
+
+  // ========== NoDataPlaceholder 提取到模块顶层（见文件末尾） ==========
 
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-[#888] flex items-center gap-2">
-          <i className="fa-solid fa-circle-notch fa-spin" />
+          <Loader2 className="h-5 w-5 animate-spin" />
           加载中...
         </div>
       </div>
     );
   }
 
-  const NoDataPlaceholder = ({ text = '暂无数据', h = 200 }: { text?: string; h?: number }) => (
-    <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: h }}>{text}</div>
-  );
+  // NoDataPlaceholder 已提取到模块顶层
 
   return (
     <div className="space-y-4 p-4 md:p-6 pb-8">
@@ -516,6 +523,15 @@ export default function AdminAnalyticsPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 模块顶层组件 — 避免每次渲染重建组件类型 */
+function NoDataPlaceholder({ text = '暂无数据', h = 200 }: { text?: string; h?: number }) {
+  return (
+    <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: h }}>
+      {text}
     </div>
   );
 }

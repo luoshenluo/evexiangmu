@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Eraser, Calculator as CalcIcon } from 'lucide-react';
+import { NumberInput } from '@/components/shared/NumberInput';
 import type { IMaterialItem } from '@/data/materials';
 import { formatNumber, sumMaterials } from '@/lib/utils';
 
@@ -9,82 +10,6 @@ interface MaterialInputSectionProps {
   subtitle?: string;
   materials: IMaterialItem[];
   onChange: (materials: IMaterialItem[]) => void;
-}
-
-/**
- * 数字输入框（字符串状态 + 失焦转数值）
- * 解决输入 0 开头小数时 0 被吞掉的问题：
- * - 输入过程中用字符串保存原始输入（允许 "0." 等中间态）
- * - 失焦时才 parse 成数字同步给父组件
- */
-function NumberInput({
-  value,
-  onChange,
-  step = '1',
-  placeholder = '0',
-  className = '',
-}: {
-  value: number;
-  onChange: (num: number) => void;
-  step?: string;
-  placeholder?: string;
-  className?: string;
-}) {
-  // 本地字符串状态：输入过程中保留原始字符串（含 "0." 中间态）
-  const [localValue, setLocalValue] = useState<string>(value === 0 ? '' : String(value));
-  // 追踪是否正在编辑，编辑期间以 localValue 为准
-  const [isEditing, setIsEditing] = useState(false);
-
-  // 外部 value 变化且不在编辑中时，同步到本地
-  useEffect(() => {
-    if (!isEditing) {
-      setLocalValue(value === 0 ? '' : String(value));
-    }
-  }, [value, isEditing]);
-
-  const displayValue = isEditing ? localValue : value === 0 ? '' : String(value);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    // 只允许数字和小数点
-    if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) {
-      return;
-    }
-    setLocalValue(raw);
-    setIsEditing(true);
-  };
-
-  const handleBlur = () => {
-    setIsEditing(false);
-    const trimmed = localValue.trim();
-    if (trimmed === '' || trimmed === '.') {
-      setLocalValue('');
-      onChange(0);
-      return;
-    }
-    const num = parseFloat(trimmed);
-    if (isNaN(num) || num < 0) {
-      setLocalValue('');
-      onChange(0);
-      return;
-    }
-    setLocalValue(String(num));
-    onChange(num);
-  };
-
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      step={step}
-      value={displayValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      onFocus={() => setIsEditing(true)}
-      placeholder={placeholder}
-      className={className}
-    />
-  );
 }
 
 export default function MaterialInputSection({

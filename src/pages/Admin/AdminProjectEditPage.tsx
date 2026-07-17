@@ -23,14 +23,7 @@ import {
   addAdminProject,
   updateAdminProject,
 } from '@/lib/admin-projects';
-
-function emptyMaterials(): IProjectMaterials {
-  return {
-    minerals: new Array(PRESET_MINERALS.length).fill(0),
-    shipMaterials: new Array(PRESET_SHIP_MATERIALS.length).fill(0),
-    buildMaterials: new Array(PRESET_BUILD_MATERIALS.length).fill(0),
-  };
-}
+import { emptyMaterials } from '@/components/shared/emptyMaterials';
 
 /** 可折叠材料数量编辑组 */
 function MaterialGroup({

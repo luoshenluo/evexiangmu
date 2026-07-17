@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -47,8 +47,14 @@ export default function AdminLayout() {
 
   // 登录态校验
   const isLoggedIn = isAdminLoggedIn();
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
+
   if (!isLoggedIn) {
-    return <Navigate to="/admin/login" replace />;
+    return null;
   }
 
   const currentAccount = getCurrentAdminAccount();

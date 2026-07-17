@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   ChevronDown,
@@ -39,6 +39,7 @@ import {
 } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
 import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
+import { emptyMaterials } from '@/components/shared/emptyMaterials';
 
 /** 分类配置 */
 const CATEGORY_CONFIG: Record<string, { icon: typeof Ship; color: string }> = {
@@ -66,15 +67,6 @@ interface ProjectSectionProps {
 }
 
 type ViewMode = 'detail' | 'create' | 'edit';
-
-/** 创建空的材料数量数组 */
-function emptyMaterials(): IProjectMaterials {
-  return {
-    minerals: new Array(PRESET_MINERALS.length).fill(0),
-    shipMaterials: new Array(PRESET_SHIP_MATERIALS.length).fill(0),
-    buildMaterials: new Array(PRESET_BUILD_MATERIALS.length).fill(0),
-  };
-}
 
 /** 可折叠的材料明细区块 */
 function MaterialGroup({
@@ -168,15 +160,18 @@ export default function ProjectSection({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // 从 Supabase 云端加载项目
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     const data = await loadAdminProjects();
     setProjects(data);
-    if (data.length > 0 && !selectedId) {
+    if (data.length > 0 && !selectedIdRef.current) {
       setSelectedId(data[0].id);
     }
     setLoading(false);
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     fetchProjects();
