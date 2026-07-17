@@ -30,6 +30,7 @@ export default function AdminProjectsPage() {
     setLoading(false);
   }, []);
 
+  // 每次进入/返回列表页时重新加载数据，确保新增/编辑后刷新
   useEffect(() => {
     fetchProjects();
   }, [location.pathname, fetchProjects]);
@@ -54,6 +55,7 @@ export default function AdminProjectsPage() {
 
   return (
     <div className="p-4 md:p-6">
+      {/* 顶部标题栏 */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">制造项目管理</h2>
@@ -70,6 +72,7 @@ export default function AdminProjectsPage() {
         </button>
       </div>
 
+      {/* 搜索框 */}
       <div className="mb-4 relative w-full sm:max-w-sm">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#666666]" />
         <input
@@ -81,6 +84,7 @@ export default function AdminProjectsPage() {
         />
       </div>
 
+      {/* 加载状态 - 共享 */}
       {loading ? (
         <div className="flex items-center justify-center py-12 rounded-xl border border-[#3A3A3A] bg-[#2C2C2C]">
           <Loader2 className="h-6 w-6 animate-spin text-[#7C3AED]" />
@@ -88,6 +92,7 @@ export default function AdminProjectsPage() {
         </div>
       ) : (
         <>
+          {/* 移动端卡片视图 */}
           <div className="space-y-3 md:hidden">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] text-[#888888]">
@@ -137,6 +142,7 @@ export default function AdminProjectsPage() {
             )}
           </div>
 
+          {/* 桌面端表格视图 */}
           <div className="hidden md:block overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#2C2C2C]">
             <div className="w-full overflow-x-auto">
               <table className="w-full text-sm">
@@ -207,6 +213,7 @@ export default function AdminProjectsPage() {
         </>
       )}
 
+      {/* 删除确认弹层 */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="w-full max-w-sm rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-5 shadow-2xl">

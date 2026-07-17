@@ -30,6 +30,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
+  // 登录态校验
   const isLoggedIn = isAdminLoggedIn();
   if (!isLoggedIn) {
     return <Navigate to="/admin/login" replace />;
@@ -45,6 +46,7 @@ export default function AdminLayout() {
     <div className="flex h-screen bg-[#1E1E1E] text-white">
       {/* 侧边栏 - md 及以上显示 */}
       <aside className="hidden w-64 shrink-0 border-r border-[#3A3A3A] bg-[#2C2C2C] md:flex md:flex-col">
+        {/* Logo 区域 */}
         <div className="flex items-center gap-3 border-b border-[#3A3A3A] px-5 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#7C3AED]/20 text-[#A78BFA]">
             <LayoutDashboard className="h-5 w-5" />
@@ -55,6 +57,7 @@ export default function AdminLayout() {
           </div>
         </div>
 
+        {/* 导航菜单 */}
         <nav className="flex-1 space-y-0.5 px-2 py-4">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -81,6 +84,7 @@ export default function AdminLayout() {
           })}
         </nav>
 
+        {/* 底部操作区 */}
         <div className="border-t border-[#3A3A3A] p-2">
           <button
             onClick={() => navigate('/')}
@@ -102,12 +106,15 @@ export default function AdminLayout() {
           </button>
         </div>
 
+        {/* 版本号 */}
         <div className="border-t border-[#3A3A3A] px-4 py-2 text-center text-[10px] text-[#555555] select-none">
           {APP_VERSION}
         </div>
       </aside>
 
+      {/* 移动端 + 主内容区 */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* 移动端顶部栏 */}
         <div className="flex items-center justify-between border-b border-[#3A3A3A] px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
             <button
@@ -126,14 +133,17 @@ export default function AdminLayout() {
           </button>
         </div>
 
+        {/* 主内容区域 */}
         <div
           className={cn(
             'flex-1 overflow-y-auto',
+            // 自定义滚动条
             '[&::-webkit-scrollbar]:w-1.5',
             '[&::-webkit-scrollbar-track]:bg-transparent',
             '[&::-webkit-scrollbar-thumb]:rounded-full',
             '[&::-webkit-scrollbar-thumb]:bg-[#3A3A3A]',
             '[&::-webkit-scrollbar-thumb]:hover:bg-[#555555]',
+            // 底部留出 Tab 栏空间
             'pb-16 md:pb-0',
           )}
         >
@@ -142,6 +152,7 @@ export default function AdminLayout() {
           </div>
         </div>
 
+        {/* 移动端底部 Tab 导航 */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch border-t border-[#3A3A3A] bg-[#2C2C2C]/95 backdrop-blur-sm md:hidden">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -163,8 +174,10 @@ export default function AdminLayout() {
             );
           })}
 
+          {/* 分隔线 */}
           <div className="w-px self-stretch bg-[#3A3A3A] my-2" />
 
+          {/* 返回主页 */}
           <button
             onClick={() => navigate('/')}
             className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 text-[9px] leading-tight text-[#888888] transition-colors duration-150 active:bg-[#3A3A3A]/50"
@@ -173,6 +186,7 @@ export default function AdminLayout() {
             <span>返回主页</span>
           </button>
 
+          {/* 退出 */}
           <button
             onClick={() => setLogoutConfirmOpen(true)}
             className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 text-[9px] leading-tight text-[#888888] transition-colors duration-150 active:text-[#EF4444] active:bg-[#EF4444]/10"
@@ -183,6 +197,7 @@ export default function AdminLayout() {
         </nav>
       </div>
 
+      {/* 退出登录确认弹窗 */}
       <AdminModal
         open={logoutConfirmOpen}
         onClose={() => setLogoutConfirmOpen(false)}

@@ -32,6 +32,7 @@ function emptyMaterials(): IProjectMaterials {
   };
 }
 
+/** 可折叠材料数量编辑组 */
 function MaterialGroup({
   title,
   icon: Icon,
@@ -100,6 +101,7 @@ export default function AdminProjectEditPage() {
   const { id } = useParams();
   const isNew = id === 'new';
 
+  // 加载项目数据（异步）
   const [existing, setExisting] = useState<IManufactureProject | null>(null);
   const [loading, setLoading] = useState(!isNew);
 
@@ -183,6 +185,7 @@ export default function AdminProjectEditPage() {
 
   return (
     <div className="p-4 md:p-6 pb-20">
+      {/* 顶部返回栏 */}
       <div className="mb-5 flex items-center gap-3">
         <button
           onClick={() => navigate('/admin/projects')}
@@ -198,6 +201,7 @@ export default function AdminProjectEditPage() {
       </div>
 
       <div className="space-y-5 max-w-2xl">
+        {/* 基本信息 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">基本信息</h3>
           <div>
@@ -222,6 +226,7 @@ export default function AdminProjectEditPage() {
           </div>
         </div>
 
+        {/* 材料数量明细 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
           <p className="text-[11px] text-[#888888] -mt-1">
@@ -271,6 +276,7 @@ export default function AdminProjectEditPage() {
           />
         </div>
 
+        {/* 价格参数 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">价格参数</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -339,6 +345,7 @@ export default function AdminProjectEditPage() {
 
       </div>
 
+      {/* 保存按钮 - 移动端固定底部，桌面端跟随内容 */}
       <div className="md:max-w-2xl md:mt-5">
         <button
           onClick={handleSave}
