@@ -95,9 +95,16 @@ export default function AdminMaterialsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteMaterialPrice(deleteId);
-    setItems((prev) => prev.filter((item) => item.id !== deleteId));
-    setDeleteId(null);
+    try {
+      await deleteMaterialPrice(deleteId);
+      setItems((prev) => prev.filter((item) => item.id !== deleteId));
+      toast.success('材料已删除');
+    } catch (err) {
+      console.error('[AdminMaterialsPage] delete error:', err);
+      toast.error('删除失败，请检查网络或刷新重试');
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   return (

@@ -88,9 +88,9 @@ export default function HomePage() {
     try { localStorage.setItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams)); } catch { /* ignore */ }
   }, [calcParams]);
 
-  // 仅追加后台新增材料（不覆盖用户已手动修改的已有数据）
+  // 同步后台材料列表（保留用户已手动修改的单价/数量，删除后台已移除的项）
   useEffect(() => {
-    const syncNewMaterials = async () => {
+    const syncMaterials = async () => {
       try {
         const [mineralPrices, shipPrices, buildPrices] = await Promise.all([
           loadMaterialPrices('minerals'),
@@ -98,35 +98,44 @@ export default function HomePage() {
           loadMaterialPrices('build_materials'),
         ]);
         if (mineralPrices.length > 0) {
-          setMinerals((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = mineralPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
+          setMinerals((prev) =>
+            mineralPrices.map((c) => {
+              const local = prev.find((p) => p.name === c.name);
+              return {
+                name: c.name,
+                price: local?.price ?? c.price,
+                quantity: local?.quantity ?? c.quantity ?? 0,
+              };
+            }),
+          );
         }
         if (shipPrices.length > 0) {
-          setShipMaterials((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = shipPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
+          setShipMaterials((prev) =>
+            shipPrices.map((c) => {
+              const local = prev.find((p) => p.name === c.name);
+              return {
+                name: c.name,
+                price: local?.price ?? c.price,
+                quantity: local?.quantity ?? c.quantity ?? 0,
+              };
+            }),
+          );
         }
         if (buildPrices.length > 0) {
-          setBuildMaterials((prev) => {
-            const existingNames = new Set(prev.map((p) => p.name));
-            const newItems = buildPrices
-              .filter((c) => !existingNames.has(c.name))
-              .map((c) => ({ name: c.name, price: c.price, quantity: c.quantity || 0 }));
-            return newItems.length > 0 ? [...prev, ...newItems] : prev;
-          });
+          setBuildMaterials((prev) =>
+            buildPrices.map((c) => {
+              const local = prev.find((p) => p.name === c.name);
+              return {
+                name: c.name,
+                price: local?.price ?? c.price,
+                quantity: local?.quantity ?? c.quantity ?? 0,
+              };
+            }),
+          );
         }
       } catch { /* ignore */ }
     };
-    syncNewMaterials();
+    syncMaterials();
   }, []);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {
