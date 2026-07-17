@@ -10,15 +10,19 @@ import {
   Users,
   Store,
   Home,
+  BarChart3,
+  Megaphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isAdminLoggedIn, clearAdminLogin } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 const SIDEBAR_ITEMS = [
+  { key: 'analytics', label: '数据统计', icon: BarChart3, path: '/admin/analytics' },
   { key: 'projects', label: '项目管理', icon: Package, path: '/admin/projects' },
   { key: 'materials', label: '材料管理', icon: Beaker, path: '/admin/materials' },
   { key: 'market', label: '市场管理', icon: Store, path: '/admin/market' },
+  { key: 'announcement', label: '公告管理', icon: Megaphone, path: '/admin/announcement' },
   { key: 'accounts', label: '账号管理', icon: Users, path: '/admin/accounts' },
   { key: 'settings', label: '管理员设置', icon: SettingsIcon, path: '/admin/settings' },
 ];
