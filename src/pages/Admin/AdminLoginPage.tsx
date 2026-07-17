@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -60,8 +60,16 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [locked, setLocked] = useState(isLocked);
 
-  const locked = isLocked();
+  // 定时检查锁定状态是否过期
+  useEffect(() => {
+    if (!locked) return;
+    const timer = setInterval(() => {
+      if (!isLocked()) setLocked(false);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [locked]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

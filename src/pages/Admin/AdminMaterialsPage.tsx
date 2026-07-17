@@ -169,14 +169,14 @@ export default function AdminMaterialsPage() {
                   />
                   <input
                     type="number"
-                    value={item.price || ''}
+                    value={item.price === 0 ? '0' : item.price || ''}
                     onChange={(e) => handlePriceChange(item.id, e.target.value)}
                     className="w-28 rounded-md border border-[#444] bg-[#1E1E1E] px-2 py-1.5 text-sm text-right text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
                     placeholder="单价"
                   />
                   <input
                     type="number"
-                    value={item.quantity || ''}
+                    value={item.quantity === 0 ? '0' : item.quantity || ''}
                     onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                     className="w-28 rounded-md border border-[#444] bg-[#1E1E1E] px-2 py-1.5 text-sm text-right text-white placeholder-[#666] outline-none focus:border-[#7C3AED]"
                     placeholder="数量"

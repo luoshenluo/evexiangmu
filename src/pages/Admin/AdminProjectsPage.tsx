@@ -47,7 +47,7 @@ export default function AdminProjectsPage() {
     return projects.filter(
       (p) =>
         p.name.toLowerCase().includes(kw) ||
-        p.category.toLowerCase().includes(kw),
+        (p.category || '').toLowerCase().includes(kw),
     );
   }, [projects, keyword]);
 

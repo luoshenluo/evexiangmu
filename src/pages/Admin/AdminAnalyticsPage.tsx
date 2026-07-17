@@ -313,7 +313,7 @@ export default function AdminAnalyticsPage() {
       confine: true,
       formatter: (params: Array<{ name: string; value: number }>) => {
         const p = params[0];
-        return `${p.name}:00<br/>访问量: <b>${p.value}</b>`;
+        return `${p.name}<br/>访问量: <b>${p.value}</b>`;
       },
     },
     grid: { left: isMobile ? 28 : 36, right: isMobile ? 8 : 12, top: 12, bottom: isMobile ? 20 : 24 },

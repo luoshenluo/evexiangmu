@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Shield, LogOut, Eye, EyeOff } from 'lucide-react';
+import { Settings, Shield, LogOut, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { setAdminPassword, clearAdminLogin, setCurrentAdminAccount } from '@/lib/admin-projects';
+import { clearAdminLogin, setCurrentAdminAccount, updateCurrentAccountPassword } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminSettingsPage() {
@@ -14,6 +14,7 @@ export default function AdminSettingsPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -29,16 +30,13 @@ export default function AdminSettingsPage() {
       return;
     }
 
+    setChanging(true);
     try {
-      // 校验旧密码
-      const { verifyAdminPassword } = await import('@/lib/admin-projects');
-      const valid = await verifyAdminPassword(oldPassword);
-      if (!valid) {
+      const ok = await updateCurrentAccountPassword(oldPassword, newPassword);
+      if (!ok) {
         toast.error('原密码错误');
         return;
       }
-
-      await setAdminPassword(newPassword);
       toast.success('密码修改成功');
       setOldPassword('');
       setNewPassword('');
@@ -46,6 +44,8 @@ export default function AdminSettingsPage() {
     } catch (err) {
       console.error('[AdminSettingsPage] change password error:', err);
       toast.error('密码修改失败');
+    } finally {
+      setChanging(false);
     }
   };
 
@@ -131,9 +131,11 @@ export default function AdminSettingsPage() {
           </div>
           <button
             onClick={handleChangePassword}
-            className="w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white hover:bg-[#6D28D9] transition-all"
+            disabled={changing}
+            className="w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white hover:bg-[#6D28D9] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            修改密码
+            {changing && <Loader2 className="h-4 w-4 animate-spin" />}
+            {changing ? '修改中...' : '修改密码'}
           </button>
         </div>
       </div>

@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Users, UserPlus, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadAdminAccounts,
   saveAdminAccount,
+  updateAdminAccountMeta,
   deleteAdminAccount,
   hashPassword,
+  getCurrentAdminAccount,
+  clearAdminLogin,
   type AdminAccount,
 } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminAccountsPage() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Omit<AdminAccount, 'password_hash'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -92,18 +97,11 @@ export default function AdminAccountsPage() {
     try {
       // 编辑时如果输入了密码则更新，留空则不修改
       if (editingId && !formData.password.trim()) {
-        // 保留原密码哈希（从本地加载）
-        const allRaw = localStorage.getItem('eve_admin_accounts');
-        const allAccounts: AdminAccount[] = allRaw ? JSON.parse(allRaw) : [];
-        const existing = allAccounts.find((a) => a.id === editingId);
-        if (existing) {
-          await saveAdminAccount({
-            ...existing,
-            username: formData.username.trim(),
-            role: formData.role,
-            permissions: formData.permissions,
-          });
-        }
+        await updateAdminAccountMeta(editingId, {
+          username: formData.username.trim(),
+          role: formData.role,
+          permissions: formData.permissions,
+        });
       } else {
         const account: AdminAccount = {
           id: editingId || `acc_${Date.now()}`,
@@ -125,8 +123,16 @@ export default function AdminAccountsPage() {
   };
 
   const handleDelete = async () => {
+    if (!deleteId) return;
     try {
       await deleteAdminAccount(deleteId);
+      // 如果删除的是当前登录账号，自动退出
+      const current = getCurrentAdminAccount();
+      if (current && current.id === deleteId) {
+        clearAdminLogin();
+        navigate('/admin/login', { replace: true });
+        return;
+      }
       await loadData();
       toast.success('账号已删除');
     } catch (err) {

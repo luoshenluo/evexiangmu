@@ -165,12 +165,18 @@ export default function ProjectSection({
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
-    const data = await loadAdminProjects();
-    setProjects(data);
-    if (data.length > 0 && !selectedIdRef.current) {
-      setSelectedId(data[0].id);
+    try {
+      const data = await loadAdminProjects();
+      setProjects(data);
+      if (data.length > 0 && !selectedIdRef.current) {
+        setSelectedId(data[0].id);
+      }
+    } catch (err) {
+      console.error('[ProjectSection] fetchProjects error:', err);
+      toast.error('加载项目失败');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

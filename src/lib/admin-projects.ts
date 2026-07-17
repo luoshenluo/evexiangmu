@@ -25,6 +25,11 @@ function getLocalDateString(): string {
   return new Date().toLocaleDateString('sv-SE');
 }
 
+/** 从指定 Date 对象获取本地日期字符串 */
+function getLocalDateStringFrom(d: Date): string {
+  return d.toLocaleDateString('sv-SE');
+}
+
 /** 检查 Supabase 是否可用 */
 function hasSupabase(): boolean {
   return isSupabaseConfigured();
@@ -86,6 +91,38 @@ export async function getAdminPasswordHash(): Promise<string | null> {
     }
   }
   return loadAdminPasswordHashFromLocal();
+}
+
+/** 修改当前登录账号的密码 */
+export async function updateCurrentAccountPassword(oldPassword: string, newPassword: string): Promise<boolean> {
+  const current = getCurrentAdminAccount();
+  if (!current) return false;
+
+  // 验证旧密码
+  const account = await verifyAdminLogin(current.username, oldPassword);
+  if (!account) return false;
+
+  const newHash = hashPassword(newPassword);
+  if (hasSupabase()) {
+    try {
+      const supabase = getSupabaseClient()!;
+      const { error } = await supabase
+        .from('admin_accounts')
+        .update({ password_hash: newHash, updated_at: new Date().toISOString() })
+        .eq('id', current.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[updateCurrentAccountPassword] Error:', err);
+    }
+  }
+  // 同步本地
+  const allLocal = loadAdminAccountsFromLocal();
+  const idx = allLocal.findIndex((a) => a.id === current.id);
+  if (idx >= 0) {
+    allLocal[idx].password_hash = newHash;
+    saveAdminAccountsToLocal(allLocal);
+  }
+  return true;
 }
 
 /** 修改管理员密码（存储哈希） */
@@ -511,6 +548,32 @@ export async function loadAdminAccounts(): Promise<Omit<AdminAccount, 'password_
   return loadAdminAccountsFromLocal().map(({ password_hash, ...rest }) => rest);
 }
 
+/** 更新管理员账号元信息（不修改密码） */
+export async function updateAdminAccountMeta(
+  id: string,
+  updates: { username: string; role: string; permissions: AdminAccount['permissions'] },
+): Promise<void> {
+  if (hasSupabase()) {
+    try {
+      const supabase = getSupabaseClient()!;
+      const { error } = await supabase
+        .from('admin_accounts')
+        .update({ username: updates.username, role: updates.role, permissions: updates.permissions as any, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[updateAdminAccountMeta] Error:', err);
+    }
+  }
+  // 同步本地
+  const allLocal = loadAdminAccountsFromLocal();
+  const idx = allLocal.findIndex((a) => a.id === id);
+  if (idx >= 0) {
+    allLocal[idx] = { ...allLocal[idx], ...updates, updated_at: new Date().toISOString() };
+    saveAdminAccountsToLocal(allLocal);
+  }
+}
+
 /** 保存管理员账号 */
 export async function saveAdminAccount(account: AdminAccount): Promise<void> {
   const now = new Date().toISOString();
@@ -868,10 +931,12 @@ export async function getDailyAnalytics(days: number = 30): Promise<AnalyticsDai
     const supabase = getSupabaseClient()!;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days + 1);
+    // 使用本地日期而非 UTC 日期，与 getTodayStats 的 getLocalDateString 保持一致
+    const startDateStr = getLocalDateStringFrom(startDate);
     const { data, error } = await supabase
       .from('site_analytics_daily')
       .select('date, page_views, unique_visitors')
-      .gte('date', startDate.toISOString().slice(0, 10))
+      .gte('date', startDateStr)
       .order('date', { ascending: true });
     if (error) throw error;
     return (data || []).map((row: Record<string, unknown>) => ({
@@ -906,9 +971,11 @@ export async function getTodayStats(): Promise<{ pageViews: number; uniqueVisito
   }
 }
 
-/** 获取今天本地零点的 ISO 字符串，用于 timestamptz 比较 */
+/** 获取今天本地零点对应的 UTC ISO 字符串，用于 timestamptz 比较 */
 function getLocalStartOfDayISO(): string {
   const d = new Date();
+  // setHours 设置本地时区零点，toISOString 转为 UTC
+  // 例如 UTC+8 本地 2026-07-17 00:00:00 → UTC 2026-07-16T16:00:00.000Z
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
