@@ -32,7 +32,7 @@ import {
   PRESET_BUILD_MATERIALS,
 } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
-import { loadAdminProjects } from '@/lib/admin-projects';
+import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
 
 interface ProjectSectionProps {
   onImportCost: (project: IManufactureProject) => void;
@@ -231,60 +231,72 @@ export default function ProjectSection({
     return total;
   };
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!formName.trim()) {
       toast.error('请输入项目名称');
       return;
     }
+    setSaving(true);
 
-    const materialCost = calcMaterialCost(formMaterials);
+    try {
+      const materialCost = calcMaterialCost(formMaterials);
 
-    if (viewMode === 'create') {
-      const newProject: IManufactureProject = {
-        id: `proj_${Date.now()}`,
-        name: formName.trim(),
-        category: formCategory.trim() || '自定义',
-        materialCost150: materialCost,
-        blueprintPrice: formBlueprint,
-        fixedManufactureFee: formFixedFee,
-        buyOrderPrice: formBuyPrice,
-        marketSellPrice: formSellPrice,
-        materials: formMaterials,
-      };
-      setProjects((prev) => [...prev, newProject]);
-      setSelectedId(newProject.id);
-      toast.success('项目已保存');
-    } else if (selected) {
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === selected.id
-            ? {
-                ...p,
-                name: formName.trim(),
-                category: formCategory.trim() || '自定义',
-                materialCost150: materialCost,
-                blueprintPrice: formBlueprint,
-                fixedManufactureFee: formFixedFee,
-                buyOrderPrice: formBuyPrice,
-                marketSellPrice: formSellPrice,
-                materials: formMaterials,
-              }
-            : p,
-        ),
-      );
-      toast.success('项目已更新');
+      if (viewMode === 'create') {
+        const newProject = await addAdminProject({
+          name: formName.trim(),
+          category: formCategory.trim() || '自定义',
+          materialCost150: materialCost,
+          blueprintPrice: formBlueprint,
+          fixedManufactureFee: formFixedFee,
+          buyOrderPrice: formBuyPrice,
+          marketSellPrice: formSellPrice,
+          materials: formMaterials,
+        });
+        setProjects((prev) => [...prev, newProject]);
+        setSelectedId(newProject.id);
+        toast.success('项目已保存');
+      } else if (selected) {
+        const updates: Partial<IManufactureProject> = {
+          name: formName.trim(),
+          category: formCategory.trim() || '自定义',
+          materialCost150: materialCost,
+          blueprintPrice: formBlueprint,
+          fixedManufactureFee: formFixedFee,
+          buyOrderPrice: formBuyPrice,
+          marketSellPrice: formSellPrice,
+          materials: formMaterials,
+        };
+        await updateAdminProject(selected.id, updates);
+        setProjects((prev) =>
+          prev.map((p) => (p.id === selected.id ? { ...p, ...updates } : p)),
+        );
+        toast.success('项目已更新');
+      }
+      setViewMode('detail');
+    } catch (err) {
+      console.error('[ProjectSection] save error:', err);
+      toast.error('保存失败，请检查网络');
+    } finally {
+      setSaving(false);
     }
-    setViewMode('detail');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selected) return;
-    const remaining = projects.filter((p) => p.id !== selected.id);
-    setProjects(remaining);
-    setSelectedId(remaining[0]?.id ?? '');
-    setShowDeleteConfirm(false);
-    setViewMode('detail');
-    toast.success('项目已删除');
+    try {
+      await deleteAdminProject(selected.id);
+      const remaining = projects.filter((p) => p.id !== selected.id);
+      setProjects(remaining);
+      setSelectedId(remaining[0]?.id ?? '');
+      setShowDeleteConfirm(false);
+      setViewMode('detail');
+      toast.success('项目已删除');
+    } catch (err) {
+      console.error('[ProjectSection] delete error:', err);
+      toast.error('删除失败，请检查网络');
+    }
   };
 
   const handleImportCost = () => {
@@ -504,10 +516,11 @@ export default function ProjectSection({
         <div className="px-4 pt-5">
           <button
             onClick={handleSave}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98] disabled:opacity-60"
           >
-            <Save className="h-4 w-4" />
-            保存项目
+            <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''}`} />
+            {saving ? '保存中...' : '保存项目'}
           </button>
         </div>
 
