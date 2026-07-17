@@ -71,7 +71,7 @@ export default function MaterialInputSection({
       </div>
 
       {/* 材料列表 */}
-      <div className="flex-1 overflow-y-auto px-4 pb-40">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 md:pb-4">
         <div className="space-y-2">
           {materials.map((item, index) => {
             const itemTotal = ((item.price ?? 0) * (item.quantity ?? 0)) / 100000000;
@@ -110,7 +110,7 @@ export default function MaterialInputSection({
       </div>
 
       {/* 底部操作按钮 */}
-      <div className="fixed bottom-16 left-0 right-0 border-t border-[#3A3A3A] bg-[#1E1E1E]/95 backdrop-blur-md px-4 py-3">
+      <div className="fixed bottom-16 md:static md:mt-4 md:border md:rounded-xl left-0 right-0 md:left-auto md:right-auto border-t md:border-t-0 border-[#3A3A3A] bg-[#1E1E1E]/95 md:bg-[#2C2C2C] backdrop-blur-md px-4 py-3">
         <div className="mx-auto flex max-w-md gap-2">
           <button
             onClick={handleClearPrices}

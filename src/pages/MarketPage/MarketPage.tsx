@@ -144,7 +144,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
             <span className="mt-2 text-sm">暂无市场数据</span>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {items.map((item) => (
               <div
                 key={item.id}

@@ -137,7 +137,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
   };
 
   return (
-    <div className="h-full overflow-y-auto pb-24">
+    <div className="h-full overflow-y-auto pb-24 md:pb-6">
       {/* 联动提示条 */}
       <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-3 py-2">
         <Link2 className="h-4 w-4 shrink-0 text-[#A78BFA]" />
@@ -156,7 +156,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
             <Settings className="h-4 w-4 text-[#7C3AED]" />
             <h2 className="text-sm font-semibold text-white">参数设置</h2>
           </div>
-          <div className="p-4 space-y-3">
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {PARAM_FIELDS.map((field) => (
               <div key={field.key} className="flex items-center gap-3">
                 <label className="flex-1 text-xs text-[#A0A0A0] truncate flex items-center gap-1">
@@ -225,7 +225,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
           <BarChart3 className="h-4 w-4 text-[#7C3AED]" />
           <h2 className="text-sm font-semibold text-white">计算结果 · 三方案对比</h2>
         </div>
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {plans.map((plan, idx) => (
             <PlanCard key={plan.planName} plan={plan} highlighted={idx === 2} />
           ))}

@@ -19,7 +19,8 @@ const TABS: { key: TabKey; label: string; Icon: typeof Calculator }[] = [
 
 export default function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_-2px_12px_rgba(0_0_0_0.3)]">
+    // md:hidden 桌面端隐藏
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_-2px_12px_rgba(0_0_0_0.3)] md:hidden">
       <div className="mx-auto flex h-16 max-w-md items-center justify-around px-1">
         {TABS.map(({ key, label, Icon }) => {
           const isActive = activeTab === key;
