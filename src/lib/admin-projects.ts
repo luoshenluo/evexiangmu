@@ -871,7 +871,7 @@ export async function getDailyAnalytics(days: number = 30): Promise<AnalyticsDai
     const { data, error } = await supabase
       .from('site_analytics_daily')
       .select('date, page_views, unique_visitors')
-      .gte('date', getLocalDateString())
+      .gte('date', startDate.toISOString().slice(0, 10))
       .order('date', { ascending: true });
     if (error) throw error;
     return (data || []).map((row: Record<string, unknown>) => ({
@@ -906,12 +906,19 @@ export async function getTodayStats(): Promise<{ pageViews: number; uniqueVisito
   }
 }
 
+/** 获取今天本地零点的 ISO 字符串，用于 timestamptz 比较 */
+function getLocalStartOfDayISO(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 /** 获取今日各页面 PV 分布 */
 export async function getTodayPageDistribution(): Promise<{ page: string; count: number }[]> {
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
-    const today = getLocalDateString();
+    const today = getLocalStartOfDayISO();
     const { data, error } = await supabase
       .from('site_page_views')
       .select('page')
@@ -938,7 +945,7 @@ export async function getTodayHourlyDistribution(): Promise<{ hour: number; pv: 
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
-    const today = getLocalDateString();
+    const today = getLocalStartOfDayISO();
     const { data, error } = await supabase
       .from('site_page_views')
       .select('created_at')

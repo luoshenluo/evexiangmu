@@ -49,13 +49,8 @@ export default function MarketPage({ onImport }: MarketPageProps) {
   const [items, setItems] = useState<MarketDataItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadItems(selectedCategory);
-  }, [selectedCategory, loadItems]);
-
   const loadItems = useCallback(async (type: CategoryKey) => {
     setLoading(true);
-    setDirty(false);
     try {
       const data = await loadMarketData(type);
       setItems(data);
@@ -66,6 +61,10 @@ export default function MarketPage({ onImport }: MarketPageProps) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadItems(selectedCategory);
+  }, [selectedCategory, loadItems]);
 
   const handleImport = () => {
     // 只导入有数据的项（sell_price > 0 或 sell_quantity > 0）

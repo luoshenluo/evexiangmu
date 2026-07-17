@@ -104,6 +104,11 @@ function OnlineList({ visitors }: { visitors: OnlineVisitor[] }) {
   );
 }
 
+/** 从 Promise.allSettled 结果中安全取值 */
+function settledValue<T>(r: PromiseSettledResult<T>, fallback: T): T {
+  return r.status === 'fulfilled' ? r.value : fallback;
+}
+
 export default function AdminAnalyticsPage() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [todayPv, setTodayPv] = useState(0);
@@ -119,15 +124,20 @@ export default function AdminAnalyticsPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loadingRef = useRef(false);
 
   const loadAllData = useCallback(async (showRefresh = false) => {
-    if (document.hidden) return; // 页面不可见时不刷新
+    if (document.hidden) return;
+    if (loadingRef.current) return; // 防止并发请求
+    loadingRef.current = true;
     if (showRefresh) setRefreshing(true);
-    else if (!loading) setLoading(true);
+    else setLoading(true);
+    setError(null);
 
     try {
-      const [oc, today, total, daily, hourly, pages, visitors] = await Promise.all([
+      const results = await Promise.allSettled([
         getOnlineCount(),
         getTodayStats(),
         getTotalStats(),
@@ -137,23 +147,36 @@ export default function AdminAnalyticsPage() {
         getOnlineVisitors(),
       ]);
 
-      setOnlineCount(oc);
+      const errors = results
+        .map((r, i) => (r.status === 'rejected' ? `[${i}] ${r.reason}` : null))
+        .filter(Boolean);
+      if (errors.length === results.length) {
+        setError('所有数据加载失败，请检查 Supabase 连接');
+      } else if (errors.length > 0) {
+        console.warn('[AdminAnalyticsPage] 部分请求失败:', errors);
+      }
+
+      setOnlineCount(settledValue(results[0], 0));
+      const today = settledValue(results[1], { pageViews: 0, uniqueVisitors: 0 });
       setTodayPv(today.pageViews);
       setTodayUv(today.uniqueVisitors);
+      const total = settledValue(results[2], { totalPv: 0, totalDays: 0, avgDailyPv: 0 });
       setTotalPv(total.totalPv);
       setTotalDays(total.totalDays);
       setAvgDailyPv(total.avgDailyPv);
-      setDailyData(daily);
-      setHourlyData(hourly);
-      setPageDist(pages);
-      setOnlineVisitors(visitors);
+      setDailyData(settledValue(results[3], []));
+      setHourlyData(settledValue(results[4], []));
+      setPageDist(settledValue(results[5], []));
+      setOnlineVisitors(settledValue(results[6], []));
     } catch (err) {
       console.error('[AdminAnalyticsPage] loadAllData error:', err);
+      setError('数据加载异常');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadingRef.current = false;
     }
-  }, [loading]);
+  }, []);
 
   useEffect(() => {
     loadAllData();
@@ -352,6 +375,10 @@ export default function AdminAnalyticsPage() {
     );
   }
 
+  const NoDataPlaceholder = ({ text = '暂无数据' }: { text?: string }) => (
+    <div className="flex h-full items-center justify-center text-[#666] text-sm">{text}</div>
+  );
+
   return (
     <div className="space-y-4 p-4 md:p-6 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -368,6 +395,13 @@ export default function AdminAnalyticsPage() {
           刷新
         </button>
       </div>
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
@@ -407,12 +441,16 @@ export default function AdminAnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4 md:col-span-2">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">近 30 天访问趋势</h3>
-          <ReactECharts
-            option={trendOption}
-            style={{ height: 280 }}
-            opts={{ renderer: 'svg' }}
-            notMerge
-          />
+          {dailyData.length > 0 ? (
+            <ReactECharts
+              option={trendOption}
+              style={{ height: 280 }}
+              opts={{ renderer: 'svg' }}
+              notMerge
+            />
+          ) : (
+            <NoDataPlaceholder />
+          )}
         </div>
 
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
@@ -435,12 +473,16 @@ export default function AdminAnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日每小时访问量</h3>
-          <ReactECharts
-            option={hourlyOption}
-            style={{ height: 260 }}
-            opts={{ renderer: 'svg' }}
-            notMerge
-          />
+          {hourlyData.some((h) => h.pv > 0) ? (
+            <ReactECharts
+              option={hourlyOption}
+              style={{ height: 260 }}
+              opts={{ renderer: 'svg' }}
+              notMerge
+            />
+          ) : (
+            <NoDataPlaceholder />
+          )}
         </div>
 
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-4">
