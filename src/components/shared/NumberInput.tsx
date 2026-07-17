@@ -1,9 +1,5 @@
 import { useState, useEffect, type ChangeEvent } from 'react';
 
-/**
- * 数字输入框（字符串状态 + 失焦转数值）
- * 解决输入 0 开头小数时 0 被吞掉的问题
- */
 export function NumberInput({
   value,
   onChange,
@@ -21,9 +17,7 @@ export function NumberInput({
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    if (!isEditing) {
-      setLocalValue(value === 0 ? '' : String(value));
-    }
+    if (!isEditing) setLocalValue(value === 0 ? '' : String(value));
   }, [value, isEditing]);
 
   const displayValue = isEditing ? localValue : value === 0 ? '' : String(value);

@@ -76,18 +76,14 @@ export default function AnalyticsTracker() {
   useEffect(() => {
     const handleVisibility = () => {
       visibleRef.current = !document.hidden;
-      if (!document.hidden) {
-        doHeartbeat();
-      }
+      if (!document.hidden) doHeartbeat();
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [doHeartbeat]);
 
   useEffect(() => {
-    const handleUnload = () => {
-      removeOnlineVisitor(visitorIdRef.current);
-    };
+    const handleUnload = () => removeOnlineVisitor(visitorIdRef.current);
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, []);
