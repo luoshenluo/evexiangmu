@@ -73,19 +73,19 @@ export default function HomePage() {
 
   // 持久化存储
   useEffect(() => {
-    lsSetItem(STORAGE_KEYS.activeTab, JSON.stringify(activeTab));
+    try { localStorage.setItem(STORAGE_KEYS.activeTab, JSON.stringify(activeTab)); } catch { /* ignore */ }
   }, [activeTab]);
   useEffect(() => {
-    lsSetItem(STORAGE_KEYS.minerals, JSON.stringify(minerals));
+    try { localStorage.setItem(STORAGE_KEYS.minerals, JSON.stringify(minerals)); } catch { /* ignore */ }
   }, [minerals]);
   useEffect(() => {
-    lsSetItem(STORAGE_KEYS.shipMaterials, JSON.stringify(shipMaterials));
+    try { localStorage.setItem(STORAGE_KEYS.shipMaterials, JSON.stringify(shipMaterials)); } catch { /* ignore */ }
   }, [shipMaterials]);
   useEffect(() => {
-    lsSetItem(STORAGE_KEYS.buildMaterials, JSON.stringify(buildMaterials));
+    try { localStorage.setItem(STORAGE_KEYS.buildMaterials, JSON.stringify(buildMaterials)); } catch { /* ignore */ }
   }, [buildMaterials]);
   useEffect(() => {
-    lsSetItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams));
+    try { localStorage.setItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams)); } catch { /* ignore */ }
   }, [calcParams]);
 
   // 仅追加后台新增材料（不覆盖用户已手动修改的已有数据）
