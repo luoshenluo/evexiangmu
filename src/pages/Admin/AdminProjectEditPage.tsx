@@ -23,9 +23,15 @@ import {
   addAdminProject,
   updateAdminProject,
 } from '@/lib/admin-projects';
-import { emptyMaterials } from '@/components/shared/emptyMaterials';
 
-/** 可折叠材料数量编辑组 */
+function emptyMaterials(): IProjectMaterials {
+  return {
+    minerals: new Array(PRESET_MINERALS.length).fill(0),
+    shipMaterials: new Array(PRESET_SHIP_MATERIALS.length).fill(0),
+    buildMaterials: new Array(PRESET_BUILD_MATERIALS.length).fill(0),
+  };
+}
+
 function MaterialGroup({
   title,
   icon: Icon,
@@ -48,7 +54,7 @@ function MaterialGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-[#3A3A3A]/30"
+        className="flex w-full items-center justify-between px-3 py-3 text-left transition-colors hover:bg-[#3A3A3A]/30 min-h-[44px]"
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${color}`} />
@@ -72,7 +78,7 @@ function MaterialGroup({
               <input
                 type="text"
                 inputMode="numeric"
-                value={(values[idx] ?? 0) === 0 ? '' : String(values[idx] ?? 0)}
+                value={values[idx] === 0 ? '' : String(values[idx])}
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw !== '' && !/^\d*$/.test(raw)) return;
@@ -94,7 +100,6 @@ export default function AdminProjectEditPage() {
   const { id } = useParams();
   const isNew = id === 'new';
 
-  // 加载项目数据（异步）
   const [existing, setExisting] = useState<IManufactureProject | null>(null);
   const [loading, setLoading] = useState(!isNew);
 
@@ -178,7 +183,6 @@ export default function AdminProjectEditPage() {
 
   return (
     <div className="p-4 md:p-6 pb-20">
-      {/* 顶部返回栏 */}
       <div className="mb-5 flex items-center gap-3">
         <button
           onClick={() => navigate('/admin/projects')}
@@ -194,7 +198,6 @@ export default function AdminProjectEditPage() {
       </div>
 
       <div className="space-y-5 max-w-2xl">
-        {/* 基本信息 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">基本信息</h3>
           <div>
@@ -219,7 +222,6 @@ export default function AdminProjectEditPage() {
           </div>
         </div>
 
-        {/* 材料数量明细 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
           <p className="text-[11px] text-[#888888] -mt-1">
@@ -269,10 +271,9 @@ export default function AdminProjectEditPage() {
           />
         </div>
 
-        {/* 价格参数 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
           <h3 className="text-sm font-semibold text-white">价格参数</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[#A0A0A0] mb-1 block">蓝图参考价（亿）</label>
               <input
@@ -336,11 +337,22 @@ export default function AdminProjectEditPage() {
           </div>
         </div>
 
-        {/* 保存按钮 */}
+      </div>
+
+      <div className="md:max-w-2xl md:mt-5">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98] disabled:opacity-50"
+          className="
+            fixed bottom-0 left-0 right-0 z-20
+            md:static
+            flex w-full items-center justify-center gap-2
+            rounded-none md:rounded-xl
+            bg-[#7C3AED] px-4 py-3.5 md:py-3
+            text-sm font-semibold text-white
+            shadow-[0_-4px_16px_rgba(0,0,0,0.3)] md:shadow-[0_4px_16px_rgba(124_58_237_0.35)]
+            transition-all hover:bg-[#6D28D9] active:scale-[0.98] disabled:opacity-50
+          "
         >
           <Save className="h-4 w-4" />
           {saving ? '保存中...' : '保存项目'}
