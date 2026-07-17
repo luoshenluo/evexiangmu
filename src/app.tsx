@@ -13,7 +13,6 @@ import AdminAccountsPage from '@/pages/Admin/AdminAccountsPage';
 import AdminMarketPage from '@/pages/Admin/AdminMarketPage';
 import AdminAnalyticsPage from '@/pages/Admin/AdminAnalyticsPage';
 import AdminAnnouncementPage from '@/pages/Admin/AdminAnnouncementPage';
-
 // 根路径快捷重定向（兼容直接访问 /projects /settings）
 function RedirectToProjects() {
   return <Navigate to="/admin/projects" replace />;
@@ -21,7 +20,6 @@ function RedirectToProjects() {
 function RedirectToSettings() {
   return <Navigate to="/admin/settings" replace />;
 }
-
 export default function App() {
   return (
     <Routes>
@@ -30,10 +28,8 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="market" element={<MarketPage />} />
       </Route>
-
       {/* 管理后台 - 登录页（独立，无侧边栏） */}
       <Route path="/admin/login" element={<AdminLoginPage />} />
-
       {/* 管理后台 - 受保护路由（带侧边栏） */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="/admin/projects" replace />} />
@@ -46,11 +42,9 @@ export default function App() {
         <Route path="announcement" element={<AdminAnnouncementPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
-
       {/* 根路径快捷重定向（兼容直接访问 /projects /settings） */}
       <Route path="/projects" element={<RedirectToProjects />} />
       <Route path="/settings" element={<RedirectToSettings />} />
-
       {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

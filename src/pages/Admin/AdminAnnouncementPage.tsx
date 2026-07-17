@@ -64,9 +64,7 @@ export default function AdminAnnouncementPage() {
         </div>
         <p className="mt-1 text-sm text-[#A0A0A0]">设置用户打开网站时显示的公告弹窗内容</p>
       </div>
-
       <div className="space-y-4">
-        {/* 开关 */}
         <div className="flex items-center justify-between rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] px-4 py-3">
           <div>
             <div className="text-sm font-medium text-white">启用公告</div>
@@ -79,8 +77,6 @@ export default function AdminAnnouncementPage() {
             <span className={"absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform " + (enabled ? 'translate-x-5' : 'translate-x-0.5')} />
           </button>
         </div>
-
-        {/* 标题 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-2">
           <label className="text-xs font-medium text-[#A0A0A0]">公告标题</label>
           <input
@@ -91,8 +87,6 @@ export default function AdminAnnouncementPage() {
             className="w-full rounded-md border border-[#444] bg-[#1E1E1E] px-3 py-2 text-sm text-white placeholder-[#666] outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
           />
         </div>
-
-        {/* 内容 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-2">
           <label className="text-xs font-medium text-[#A0A0A0]">公告内容</label>
           <textarea
@@ -104,8 +98,6 @@ export default function AdminAnnouncementPage() {
           />
           <p className="text-[11px] text-[#666]">提示：换行会自动保留显示</p>
         </div>
-
-        {/* 保存按钮 */}
         <button
           onClick={handleSave}
           disabled={saving}
