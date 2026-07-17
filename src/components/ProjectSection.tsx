@@ -19,6 +19,12 @@ import {
   Boxes,
   ChevronRight,
   Loader2,
+  Search,
+  Shield,
+  Swords,
+  Anchor,
+  Factory,
+  Crosshair,
 } from 'lucide-react';
 import type {
   IManufactureProject,
@@ -33,6 +39,17 @@ import {
 } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
 import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
+
+/** 分类配置 */
+const CATEGORY_CONFIG: Record<string, { icon: typeof Ship; color: string }> = {
+  '护卫舰级': { icon: Shield, color: 'text-[#22C55E]' },
+  '驱逐舰级': { icon: Swords, color: 'text-[#F59E0B]' },
+  '巡洋舰级': { icon: Crosshair, color: 'text-[#06B6D4]' },
+  '战巡舰级': { icon: Anchor, color: 'text-[#A78BFA]' },
+  '战列舰级': { icon: Ship, color: 'text-[#EF4444]' },
+  '工业舰':   { icon: Factory, color: 'text-[#FB923C]' },
+};
+const DEFAULT_CAT_CONFIG = { icon: Ship, color: 'text-[#888888]' };
 
 interface ProjectSectionProps {
   onImportCost: (project: IManufactureProject) => void;
@@ -143,7 +160,6 @@ export default function ProjectSection({
 }: ProjectSectionProps) {
   const [projects, setProjects] = useState<IManufactureProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOpen, setIsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -181,12 +197,10 @@ export default function ProjectSection({
 
   const handleSelect = (project: IManufactureProject) => {
     setSelectedId(project.id);
-    setIsOpen(false);
     setViewMode('detail');
   };
 
   const handleAddNew = () => {
-    setIsOpen(false);
     setFormName('');
     setFormCategory('');
     setFormBlueprint(0);
@@ -554,100 +568,151 @@ export default function ProjectSection({
   }
 
   // ========== 详情视图 ==========
+  // 按分类分组
+  const categories = useMemo(() => {
+    const map = new Map<string, IManufactureProject[]>();
+    projects.forEach((p) => {
+      const cat = p.category || '其他';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(p);
+    });
+    return map;
+  }, [projects]);
+
+  const categoryNames = useMemo(
+    () => [...categories.keys()],
+    [categories],
+  );
+
+  const [activeCat, setActiveCat] = useState<string>('');
+  const [searchText, setSearchText] = useState('');
+
+  // 首次加载或项目变更时，默认选中第一个分类
+  useEffect(() => {
+    if (categoryNames.length > 0 && !categoryNames.includes(activeCat)) {
+      setActiveCat(categoryNames[0]);
+    }
+  }, [categoryNames, activeCat]);
+
+  const currentCatProjects = useMemo(() => {
+    let list = categories.get(activeCat) ?? [];
+    if (searchText.trim()) {
+      const kw = searchText.trim().toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(kw));
+    }
+    return list;
+  }, [categories, activeCat, searchText]);
+
+  // 切换分类时自动选中该分类第一个项目
+  const handleCategoryChange = (cat: string) => {
+    setActiveCat(cat);
+    const list = categories.get(cat);
+    if (list && list.length > 0) {
+      setSelectedId(list[0].id);
+    }
+    setViewMode('detail');
+  };
+
   return (
     <div className="h-full overflow-y-auto pb-24">
       {/* 页面标题 */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="px-4 pt-4 pb-2">
         <h2 className="text-lg font-semibold text-white">制造项目</h2>
         <p className="mt-1 text-sm text-[#A0A0A0]">
           选择舰船项目，一键导入材料成本或材料明细
         </p>
       </div>
 
-      {/* 下拉选择器 */}
+      {/* 一级分类 Tab */}
       <div className="px-4 pt-2">
-        <div className="relative">
-          <div
-            onClick={() => setIsOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] px-4 py-3.5 text-left shadow-[0_2px_8px_rgba(0_0_0_0.2)] transition-all hover:border-[#555555] cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7C3AED]/15 text-[#A78BFA]">
-                <Ship className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-white truncate">
-                  {selected?.name ?? '请选择项目'}
-                </div>
-                <div className="text-[11px] text-[#888888]">{selected?.category}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {selected && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit();
-                  }}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#444444] bg-[#1E1E1E] text-[#A0A0A0] transition-colors hover:border-[#7C3AED] hover:text-[#A78BFA]"
-                >
-                  <Edit3 className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {selected && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(true);
-                  }}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#444444] bg-[#1E1E1E] text-[#A0A0A0] transition-colors hover:border-[#DC2626] hover:text-[#EF4444]"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {isOpen ? (
-                <ChevronUp className="h-5 w-5 shrink-0 text-[#888888]" />
-              ) : (
-                <ChevronDown className="h-5 w-5 shrink-0 text-[#888888]" />
-              )}
-            </div>
-          </div>
-
-          {/* 下拉列表 */}
-          {isOpen && (
-            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-96 overflow-y-auto rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_8px_24px_rgba(0_0_0_0.4)]">
-              {projects.map((project) => {
-                const isSelected = project.id === selectedId;
-                return (
-                  <button
-                    key={project.id}
-                    onClick={() => handleSelect(project)}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-[#3A3A3A]/50 last:border-b-0 ${
-                      isSelected
-                        ? 'bg-[#7C3AED]/15 text-white'
-                        : 'text-[#A0A0A0] hover:bg-[#3A3A3A]/50 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{project.name}</div>
-                      <div className="text-[11px] text-[#888888]">{project.category}</div>
-                    </div>
-                    {isSelected && <Check className="h-4 w-4 shrink-0 text-[#A78BFA]" />}
-                  </button>
-                );
-              })}
-
-              {/* 添加新项目 */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {categoryNames.map((cat) => {
+            const cfg = CATEGORY_CONFIG[cat] ?? DEFAULT_CAT_CONFIG;
+            const Icon = cfg.icon;
+            const count = categories.get(cat)?.length ?? 0;
+            const isActive = cat === activeCat;
+            return (
               <button
-                onClick={handleAddNew}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[#A78BFA] transition-colors border-t border-[#3A3A3A] hover:bg-[#7C3AED]/10"
+                key={cat}
+                onClick={() => handleCategoryChange(cat)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                  isActive
+                    ? `border-[#7C3AED] bg-[#7C3AED]/15 ${cfg.color}`
+                    : 'border-[#3A3A3A] bg-[#2C2C2C] text-[#888888] hover:border-[#555555] hover:text-white'
+                }`}
               >
-                <Plus className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-medium">添加新项目</span>
+                <Icon className="h-3.5 w-3.5" />
+                <span>{cat}</span>
+                <span className={`text-[10px] ${isActive ? 'text-white/70' : 'text-[#666666]'}`}>
+                  {count}
+                </span>
               </button>
-            </div>
-          )}
+            );
+          })}
         </div>
+      </div>
+
+      {/* 搜索框 + 新增按钮 */}
+      <div className="px-4 pt-3 flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#666666]" />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder={`在${activeCat || '全部'}中搜索...`}
+            className="w-full rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] py-2.5 pl-9 pr-3 text-sm text-white placeholder-[#666666] outline-none transition-all focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30"
+          />
+        </div>
+        <button
+          onClick={handleAddNew}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#7C3AED]/50 bg-[#7C3AED]/10 px-3 py-2.5 text-xs font-medium text-[#A78BFA] transition-all hover:bg-[#7C3AED]/20"
+        >
+          <Plus className="h-4 w-4" />
+          新建
+        </button>
+      </div>
+
+      {/* 舰船列表 */}
+      <div className="px-4 pt-3 space-y-2">
+        {currentCatProjects.length === 0 ? (
+          <div className="py-12 text-center text-sm text-[#666666]">
+            {searchText ? '没有匹配的项目' : '该分类暂无项目'}
+          </div>
+        ) : (
+          currentCatProjects.map((project) => {
+            const isSelected = project.id === selectedId;
+            return (
+              <button
+                key={project.id}
+                onClick={() => handleSelect(project)}
+                className={`flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all ${
+                  isSelected
+                    ? 'border-[#7C3AED] bg-[#7C3AED]/10 shadow-[0_0_12px_rgba(124_58_237_0.15)]'
+                    : 'border-[#3A3A3A] bg-[#2C2C2C] hover:border-[#555555] active:scale-[0.99]'
+                }`}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#1E1E1E] border border-[#3A3A3A]">
+                  <Ship className="h-5 w-5 text-[#A78BFA]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-[#E0E0E0]'}`}>
+                    {project.name}
+                  </div>
+                  <div className="text-[11px] text-[#888888] mt-0.5">
+                    制造费 {formatNumber(project.fixedManufactureFee)} 亿
+                    {project.materials && (
+                      <span className="ml-2">
+                        矿{project.materials.minerals?.reduce((a, b) => a + b, 0) || 0} 船{project.materials.shipMaterials?.reduce((a, b) => a + b, 0) || 0}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {isSelected && <Check className="h-5 w-5 shrink-0 text-[#A78BFA]" />}
+              </button>
+            );
+          })
+        )}
       </div>
 
       {/* 项目详情卡片 */}
