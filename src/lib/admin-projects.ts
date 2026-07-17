@@ -1068,3 +1068,58 @@ export async function getTotalStats(): Promise<{ totalPv: number; totalDays: num
     return { totalPv: 0, totalDays: 0, avgDailyPv: 0 };
   }
 }
+
+// ==================== 公告管理 ====================
+
+export interface Announcement {
+  content: string;
+  title: string;
+  enabled: boolean;
+  updated_at: string;
+}
+
+/** 获取公告内容 */
+export async function getAnnouncement(): Promise<Announcement | null> {
+  if (!hasSupabase()) {
+    // 本地回退
+    try {
+      const raw = localStorage.getItem('eve_announcement');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const supabase = getSupabaseClient()!;
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'announcement')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+  } catch (err) {
+    console.error('[getAnnouncement] Error:', err);
+    return null;
+  }
+}
+
+/** 保存公告内容 */
+export async function saveAnnouncement(announcement: Announcement): Promise<void> {
+  if (hasSupabase()) {
+    try {
+      const supabase = getSupabaseClient()!;
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({ key: 'announcement', value: announcement });
+      if (error) throw error;
+    } catch (err) {
+      console.error('[saveAnnouncement] Error:', err);
+    }
+  }
+  // 同步本地
+  try {
+    localStorage.setItem('eve_announcement', JSON.stringify(announcement));
+  } catch { /* ignore */ }
+}

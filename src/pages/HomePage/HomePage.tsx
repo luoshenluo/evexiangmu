@@ -17,7 +17,7 @@ import {
   type IManufactureProject,
 } from '@/data/materials';
 import { sumMaterials } from '@/lib/utils';
-import { loadMaterialPrices, type MarketDataItem } from '@/lib/admin-projects';
+import { loadMaterialPrices, getAnnouncement, type MarketDataItem, type Announcement } from '@/lib/admin-projects';
 import MarketPage from '@/pages/MarketPage/MarketPage';
 
 const STORAGE_KEYS = {
@@ -56,7 +56,8 @@ export default function HomePage() {
   const [calcParams, setCalcParams] = useState<ICalcParams>(() =>
     loadFromStorage<ICalcParams>(STORAGE_KEYS.calcParams, DEFAULT_CALC_PARAMS),
   );
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
   // 三页材料总价之和（自动联动到 150%效率市价材料成本）
   const linkedMaterialTotal = useMemo(() => {
@@ -137,6 +138,18 @@ export default function HomePage() {
     };
     syncMaterials();
   }, []);
+
+  // 加载公告内容
+  useEffect(() => {
+    getAnnouncement().then(setAnnouncement).catch(() => {});
+  }, []);
+
+  // 根据公告配置控制弹窗显示
+  useEffect(() => {
+    if (announcement && announcement.enabled && announcement.content) {
+      setShowWelcome(true);
+    }
+  }, [announcement]);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => {
     setCalcParams((prev) => ({ ...prev, [key]: value }));
@@ -262,22 +275,14 @@ export default function HomePage() {
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="relative w-full max-w-sm rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-5 shadow-2xl">
-            <button
-              onClick={() => setShowWelcome(false)}
-              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-[#888888] transition-colors hover:bg-[#3A3A3A] hover:text-white"
-              aria-label="关闭"
-            >
+            <button onClick={() => setShowWelcome(false)} className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-[#888888] transition-colors hover:bg-[#3A3A3A] hover:text-white" aria-label="关闭">
               <X className="h-4 w-4" />
             </button>
-            <h3 className="text-base font-semibold text-[#A78BFA] pr-6">提示</h3>
-            <div className="mt-3 space-y-2 text-sm text-[#A0A0A0]">
-              <p>有bug可以联系作者：2787045979（QQ）</p>
-              <p>此版本为测试版本。</p>
+            <h3 className="text-base font-semibold text-[#A78BFA] pr-6">{announcement?.title || '提示'}</h3>
+            <div className="mt-3 space-y-2 text-sm text-[#A0A0A0] whitespace-pre-line">
+              {announcement?.content}
             </div>
-            <button
-              onClick={() => setShowWelcome(false)}
-              className="mt-5 w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(124_58_237_0.3)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"
-            >
+            <button onClick={() => setShowWelcome(false)} className="mt-5 w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(124_58_237_0.3)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]">
               知道了
             </button>
           </div>

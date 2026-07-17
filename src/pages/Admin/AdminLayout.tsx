@@ -12,6 +12,7 @@ import {
   Home,
   ShieldAlert,
   BarChart3,
+  Megaphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -36,6 +37,7 @@ const SIDEBAR_ITEMS: {
   { key: 'materials', label: '材料管理', mobileLabel: '材料', icon: Beaker, path: '/admin/materials', permission: 'manage_materials' },
   { key: 'market', label: '市场管理', mobileLabel: '市场', icon: Store, path: '/admin/market', permission: 'manage_market' },
   { key: 'analytics', label: '数据分析', mobileLabel: '分析', icon: BarChart3, path: '/admin/analytics' },
+  { key: 'announcement', label: '公告管理', mobileLabel: '公告', icon: Megaphone, path: '/admin/announcement' },
   { key: 'accounts', label: '账号管理', mobileLabel: '账号', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
   { key: 'settings', label: '管理员设置', mobileLabel: '设置', icon: SettingsIcon, path: '/admin/settings' },
 ];

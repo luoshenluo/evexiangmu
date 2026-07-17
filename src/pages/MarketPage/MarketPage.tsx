@@ -1,42 +1,31 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Gem, Ship, Factory, Download, Loader2 } from 'lucide-react';
 import { loadMarketData, type MarketDataItem } from '@/lib/admin-projects';
 import { toast } from 'sonner';
-import { Download } from 'lucide-react';
 
 const CATEGORIES = [
   {
-    key: 'minerals',
+    key: 'minerals' as const,
     label: '矿物',
     sublabel: '8 项基础矿物',
-    icon: 'fa-gem',
+    icon: Gem,
     color: '#22d3ee',
-    border: 'border-cyan-500/20',
-    activeBorder: 'border-cyan-400/50',
-    shadow: 'shadow-cyan-500/10',
   },
   {
-    key: 'ship_materials',
+    key: 'ship_materials' as const,
     label: '船材',
     sublabel: '17 项舰船材料',
-    icon: 'fa-ship',
+    icon: Ship,
     color: '#a78bfa',
-    border: 'border-violet-500/20',
-    activeBorder: 'border-violet-400/50',
-    shadow: 'shadow-violet-500/10',
   },
   {
-    key: 'build_materials',
+    key: 'build_materials' as const,
     label: '建材',
     sublabel: '11 项建筑材料',
-    icon: 'fa-building',
+    icon: Factory,
     color: '#fbbf24',
-    border: 'border-amber-500/20',
-    activeBorder: 'border-amber-400/50',
-    shadow: 'shadow-amber-500/10',
   },
-] as const;
+];
 
 type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
@@ -67,7 +56,6 @@ export default function MarketPage({ onImport }: MarketPageProps) {
   }, [selectedCategory, loadItems]);
 
   const handleImport = () => {
-    // 只导入有数据的项（sell_price > 0 或 sell_quantity > 0）
     const validItems = items.filter((item) => (item.sell_price || 0) > 0);
     if (validItems.length === 0) {
       toast.info('当前分类没有可导入的市场价格');
@@ -79,6 +67,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
   };
 
   const currentCategory = CATEGORIES.find((c) => c.key === selectedCategory) || CATEGORIES[0];
+  const CatIcon = currentCategory.icon;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -89,72 +78,70 @@ export default function MarketPage({ onImport }: MarketPageProps) {
             <h2 className="text-2xl font-bold text-white tracking-tight">市场数据</h2>
             <p className="text-sm text-[#888] mt-1">查看市场出售与收购信息（仅后台可编辑）</p>
           </div>
-          <Button
+          <button
             onClick={handleImport}
             disabled={loading || items.length === 0}
-            className="gap-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-lg shadow-purple-500/20 transition-all"
+            className="flex items-center gap-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 text-white px-4 py-2.5 text-sm font-medium shadow-lg shadow-purple-500/20 transition-all active:scale-[0.98]"
           >
             <Download className="h-4 w-4" />
             导入单价
-          </Button>
+          </button>
         </div>
 
-        {/* 分类切换卡片 - Figma风格 */}
+        {/* 分类切换卡片 */}
         <div className="grid grid-cols-3 gap-3">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setSelectedCategory(cat.key)}
-              className={`relative rounded-2xl border p-4 text-left transition-all duration-300 ${
-                selectedCategory === cat.key
-                  ? `${cat.activeBorder} ${cat.shadow} shadow-lg scale-[1.02]`
-                  : `${cat.border} hover:scale-[1.01]`
-              }`}
-              style={{
-                background: selectedCategory === cat.key
-                  ? `linear-gradient(135deg, ${cat.color}15, transparent)`
-                  : 'rgba(26,26,26,0.8)',
-                borderColor: selectedCategory === cat.key ? `${cat.color}60` : undefined,
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: selectedCategory === cat.key ? `${cat.color}20` : 'rgba(44,44,44,0.8)',
-                  }}
-                >
-                  <i
-                    className={`fa-solid ${cat.icon} text-lg`}
-                    style={{ color: selectedCategory === cat.key ? cat.color : '#666' }}
-                  />
-                </div>
-                <div>
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = cat.key === selectedCategory;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setSelectedCategory(cat.key)}
+                className={`relative rounded-2xl border p-4 text-left transition-all duration-300 ${
+                  isActive ? 'shadow-lg scale-[1.02]' : 'hover:scale-[1.01]'
+                }`}
+                style={{
+                  background: isActive ? `linear-gradient(135deg, ${cat.color}15, transparent)` : 'rgba(26,26,26,0.8)',
+                  borderColor: isActive ? `${cat.color}60` : '#2C2C2C',
+                }}
+              >
+                <div className="flex items-center gap-3">
                   <div
-                    className={`text-sm font-semibold ${
-                      selectedCategory === cat.key ? 'text-white' : 'text-[#A0A0A0]'
-                    }`}
+                    className="flex h-11 w-11 items-center justify-center rounded-xl"
+                    style={{
+                      backgroundColor: isActive ? `${cat.color}20` : 'rgba(44,44,44,0.8)',
+                    }}
                   >
-                    {cat.label}
+                    <Icon className="h-5 w-5" style={{ color: isActive ? cat.color : '#666' }} />
                   </div>
-                  <div className="text-[11px] text-[#666] mt-0.5">{cat.sublabel}</div>
+                  <div>
+                    <div className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-[#A0A0A0]'}`}>
+                      {cat.label}
+                    </div>
+                    <div className="text-[11px] text-[#666] mt-0.5">{cat.sublabel}</div>
+                  </div>
                 </div>
-              </div>
-              {selectedCategory === cat.key && (
-                <div
-                  className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                />
-              )}
-            </button>
-          ))}
+                {isActive && (
+                  <div
+                    className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* 数据展示 - Figma风格卡片（只读） */}
+        {/* 数据展示 */}
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-[#666]">
-            <i className="fa-solid fa-circle-notch fa-spin mr-2 text-lg" />
+          <div className="flex items-center justify-center py-20 text-[#666] gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
             加载中...
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-[#666]">
+            <CatIcon className="h-10 w-10 opacity-30" />
+            <span className="mt-2 text-sm">暂无市场数据</span>
           </div>
         ) : (
           <div className="space-y-3">
@@ -169,10 +156,7 @@ export default function MarketPage({ onImport }: MarketPageProps) {
                     className="flex h-8 w-8 items-center justify-center rounded-lg"
                     style={{ backgroundColor: `${currentCategory.color}15` }}
                   >
-                    <i
-                      className={`fa-solid ${currentCategory.icon} text-sm`}
-                      style={{ color: currentCategory.color }}
-                    />
+                    <CatIcon className="h-4 w-4" style={{ color: currentCategory.color }} />
                   </div>
                   <span className="text-sm font-semibold text-white">{item.name}</span>
                 </div>
@@ -188,33 +172,32 @@ export default function MarketPage({ onImport }: MarketPageProps) {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label>
-                        <Input
-                          type="number"
+                        <input
+                          type="text"
                           value={item.sell_price || ''}
                           readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-green-400 text-center rounded-xl cursor-not-allowed opacity-70"
-                          step="0.01"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-green-400 text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">数量</label>
-                        <Input
-                          type="number"
+                        <input
+                          type="text"
                           value={item.sell_quantity || ''}
                           readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
-                          step="0.01"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label>
-                        <Input
+                        <input
+                          type="text"
                           value={item.sell_location || ''}
                           readOnly
                           placeholder="-"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                     </div>
@@ -229,33 +212,32 @@ export default function MarketPage({ onImport }: MarketPageProps) {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">价格(ISK)</label>
-                        <Input
-                          type="number"
+                        <input
+                          type="text"
                           value={item.buy_price || ''}
                           readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-blue-400 text-center rounded-xl cursor-not-allowed opacity-70"
-                          step="0.01"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-blue-400 text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">数量</label>
-                        <Input
-                          type="number"
+                        <input
+                          type="text"
                           value={item.buy_quantity || ''}
                           readOnly
                           placeholder="0"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
-                          step="0.01"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] text-[#555] block mb-1.5 font-medium">地点</label>
-                        <Input
+                        <input
+                          type="text"
                           value={item.buy_location || ''}
                           readOnly
                           placeholder="-"
-                          className="h-9 bg-[#0f0f0f] border-[#2a2a2a] text-sm text-white text-center rounded-xl cursor-not-allowed opacity-70"
+                          className="h-9 w-full rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-2 text-sm text-white text-center cursor-not-allowed opacity-70 outline-none"
                         />
                       </div>
                     </div>

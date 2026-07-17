@@ -112,13 +112,15 @@ export default function AdminProjectsPage() {
                 <th className="px-4 py-3">分类</th>
                 <th className="px-4 py-3 text-right">材料成本(亿)</th>
                 <th className="px-4 py-3 text-right">蓝图价(亿)</th>
+                <th className="px-4 py-3 text-right">制造费(亿)</th>
+                <th className="px-4 py-3 text-right">收购价(亿)</th>
                 <th className="px-4 py-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={7} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center gap-2 text-[#888888]">
                       <Package className="h-8 w-8 opacity-50" />
                       <span className="text-sm">暂无匹配的项目</span>
@@ -144,6 +146,12 @@ export default function AdminProjectsPage() {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-white">
                       {formatNumber(project.blueprintPrice)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-white">
+                      {formatNumber(project.fixedManufactureFee)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[#22C55E]">
+                      {formatNumber(project.buyOrderPrice)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -214,9 +222,11 @@ export default function AdminProjectsPage() {
                 </div>
               </div>
               {/* 第二行：成本数据 */}
-              <div className="mt-2 flex gap-4 text-xs text-[#A0A0A0]">
-                <span>材料成本: <span className="text-white tabular-nums">{formatNumber(project.materialCost150)}亿</span></span>
-                <span>蓝图价: <span className="text-white tabular-nums">{formatNumber(project.blueprintPrice)}亿</span></span>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#A0A0A0]">
+                <span>材料: <span className="text-white tabular-nums">{formatNumber(project.materialCost150)}亿</span></span>
+                <span>蓝图: <span className="text-white tabular-nums">{formatNumber(project.blueprintPrice)}亿</span></span>
+                <span>制造费: <span className="text-white tabular-nums">{formatNumber(project.fixedManufactureFee)}亿</span></span>
+                <span>收购: <span className="text-[#22C55E] tabular-nums">{formatNumber(project.buyOrderPrice)}亿</span></span>
               </div>
             </div>
           ))

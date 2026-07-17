@@ -16,6 +16,7 @@ const AdminMaterialsPage = lazy(() => import('@/pages/Admin/AdminMaterialsPage')
 const AdminAccountsPage = lazy(() => import('@/pages/Admin/AdminAccountsPage'));
 const AdminMarketPage = lazy(() => import('@/pages/Admin/AdminMarketPage'));
 const AdminAnalyticsPage = lazy(() => import('@/pages/Admin/AdminAnalyticsPage'));
+const AdminAnnouncementPage = lazy(() => import('@/pages/Admin/AdminAnnouncementPage'));
 
 // 全局加载占位
 function PageLoader() {
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="accounts" element={<AdminAccountsPage />} />
             <Route path="market" element={<AdminMarketPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="announcement" element={<AdminAnnouncementPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
 

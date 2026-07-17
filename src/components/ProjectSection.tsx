@@ -618,7 +618,9 @@ export default function ProjectSection({
   };
 
   return (
-    <div className="h-full overflow-y-auto pb-24">
+    <div className="h-full flex flex-col md:flex-row overflow-hidden">
+      {/* 左侧：项目列表 */}
+      <div className="w-full md:w-80 lg:w-96 md:border-r md:border-[#3A3A3A] md:flex-shrink-0 md:overflow-y-auto pb-24 md:pb-0">
       {/* 页面标题 */}
       <div className="px-4 pt-4 pb-2">
         <h2 className="text-lg font-semibold text-white">制造项目</h2>
@@ -718,10 +720,14 @@ export default function ProjectSection({
           })
         )}
       </div>
+      </div>
 
+      {/* 右侧：项目详情 */}
+      <div className="flex-1 overflow-y-auto pb-24 md:pb-0">
+      {selected ? (
+        <>
       {/* 项目详情卡片 */}
-      {selected && (
-        <div className="px-4 pt-5">
+      <div className="px-4 pt-4">
           <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_2px_8px_rgba(0_0_0_0.2)] overflow-hidden">
             {/* 卡片头部 */}
             <div className="border-b border-[#3A3A3A] px-4 py-4 bg-gradient-to-r from-[#7C3AED]/10 to-transparent">
@@ -736,42 +742,44 @@ export default function ProjectSection({
               </div>
             </div>
 
-            {/* 详情列表 */}
+            {/* 详情列表 - 桌面横排/手机竖排 */}
             <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-[#F59E0B]" />
-                  <span className="text-sm text-[#A0A0A0]">150%效率材料成本</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-[#F59E0B]" />
+                    <span className="text-xs text-[#A0A0A0]">材料成本</span>
+                  </div>
+                  <span className="text-sm font-semibold text-white tabular-nums">
+                    {formatNumber(selected.materialCost150)}
+                    <span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span>
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-white tabular-nums">
-                  {formatNumber(selected.materialCost150)}
-                  <span className="ml-1 text-[11px] font-normal text-[#888888]">亿ISK</span>
-                </span>
+
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-[#06B6D4]" />
+                    <span className="text-xs text-[#A0A0A0]">蓝图价</span>
+                  </div>
+                  <span className="text-sm font-semibold text-white tabular-nums">
+                    {formatNumber(selected.blueprintPrice)}
+                    <span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-[#EC4899]" />
+                    <span className="text-xs text-[#A0A0A0]">制造费</span>
+                  </div>
+                  <span className="text-sm font-semibold text-white tabular-nums">
+                    {formatNumber(selected.fixedManufactureFee)}
+                    <span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span>
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-[#06B6D4]" />
-                  <span className="text-sm text-[#A0A0A0]">蓝图市场参考价</span>
-                </div>
-                <span className="text-sm font-semibold text-white tabular-nums">
-                  {formatNumber(selected.blueprintPrice)}
-                  <span className="ml-1 text-[11px] font-normal text-[#888888]">亿ISK</span>
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-[#EC4899]" />
-                  <span className="text-sm text-[#A0A0A0]">固定制造费</span>
-                </div>
-                <span className="text-sm font-semibold text-white tabular-nums">
-                  {formatNumber(selected.fixedManufactureFee)}
-                  <span className="ml-1 text-[11px] font-normal text-[#888888]">亿ISK</span>
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
                   <div className="text-[11px] text-[#888888] mb-1">收购单参考价</div>
                   <div className="text-sm font-semibold text-[#22C55E] tabular-nums">
@@ -790,10 +798,9 @@ export default function ProjectSection({
             </div>
           </div>
         </div>
-      )}
 
       {/* 材料明细预览 */}
-      {selected?.materials && (
+      {selected.materials && (
         <div className="px-4 pt-4">
           <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
             <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
@@ -823,8 +830,7 @@ export default function ProjectSection({
       )}
 
       {/* 导入按钮 */}
-      {selected && (
-        <div className="px-4 pt-5 space-y-3">
+      <div className="px-4 pt-5 space-y-3">
           <button
             onClick={handleImportCost}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"
@@ -847,7 +853,16 @@ export default function ProjectSection({
             导入材料明细会保留你已设置的单价，自动填入数量并联动计算
           </p>
         </div>
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center text-[#666]">
+          <div className="text-center">
+            <Ship className="mx-auto h-12 w-12 opacity-30" />
+            <p className="mt-2 text-sm">请从左侧选择一个项目</p>
+          </div>
+        </div>
       )}
+      </div>
 
       {/* 删除确认弹层 */}
       {showDeleteConfirm && selected && (
