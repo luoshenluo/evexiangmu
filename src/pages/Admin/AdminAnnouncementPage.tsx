@@ -72,6 +72,7 @@ export default function AdminAnnouncementPage() {
       </div>
 
       <div className="space-y-4">
+        {/* 开关 */}
         <div className="flex items-center justify-between rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] px-4 py-3">
           <div>
             <div className="text-sm font-medium text-white">启用公告</div>
@@ -85,6 +86,7 @@ export default function AdminAnnouncementPage() {
           </button>
         </div>
 
+        {/* 标题 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-2">
           <label className="text-xs font-medium text-[#A0A0A0]">公告标题</label>
           <input
@@ -96,6 +98,7 @@ export default function AdminAnnouncementPage() {
           />
         </div>
 
+        {/* 内容 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-2">
           <label className="text-xs font-medium text-[#A0A0A0]">公告内容</label>
           <textarea
@@ -107,6 +110,7 @@ export default function AdminAnnouncementPage() {
           />
         </div>
 
+        {/* 日期范围 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="h-4 w-4 text-[#A78BFA]" />
@@ -135,6 +139,7 @@ export default function AdminAnnouncementPage() {
           <p className="mt-2 text-[11px] text-[#666]">不设置日期则一直显示；设置后仅在指定日期范围内显示</p>
         </div>
 
+        {/* 预览 */}
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-2">
           <label className="text-xs font-medium text-[#A0A0A0]">预览效果</label>
           <div className="rounded-lg bg-[#1E1E1E] p-4">
@@ -148,6 +153,7 @@ export default function AdminAnnouncementPage() {
           </div>
         </div>
 
+        {/* 保存按钮 */}
         <button
           onClick={handleSave}
           disabled={saving}

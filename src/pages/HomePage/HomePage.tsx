@@ -23,7 +23,7 @@ import {
   type IManufactureProject,
 } from '@/data/materials';
 import { sumMaterials } from '@/lib/utils';
-import { loadMaterialPrices } from '@/lib/admin-projects';
+import { loadMaterialPrices, getAnnouncement } from '@/lib/admin-projects';
 import MarketPage from '@/pages/MarketPage/MarketPage';
 
 const STORAGE_KEYS = {
@@ -62,7 +62,31 @@ export default function HomePage() {
   const [calcParams, setCalcParams] = useState<ICalcParams>(() =>
     loadFromStorage<ICalcParams>(STORAGE_KEYS.calcParams, DEFAULT_CALC_PARAMS),
   );
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState('提示');
+  const [announcementContent, setAnnouncementContent] = useState('');
+
+  // 从Supabase加载公告
+  useEffect(() => {
+    const loadAnnouncement = async () => {
+      try {
+        const data = await getAnnouncement();
+        if (!data || !data.enabled) return;
+
+        // 检查日期范围
+        const now = new Date();
+        if (data.start_date && new Date(data.start_date) > now) return;
+        if (data.end_date && new Date(data.end_date) < now) return;
+
+        setAnnouncementTitle(data.title || '提示');
+        setAnnouncementContent(data.content || '');
+        setShowAnnouncement(true);
+      } catch (err) {
+        console.warn('Failed to load announcement:', err);
+      }
+    };
+    loadAnnouncement();
+  }, []);
 
   // 三页材料总价之和（自动联动到 150%效率市价材料成本）
   const linkedMaterialTotal = useMemo(() => {
@@ -227,24 +251,23 @@ export default function HomePage() {
       </main>
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* 欢迎弹窗 */}
-      {showWelcome && (
+      {/* 公告弹窗 - 动态从Supabase读取 */}
+      {showAnnouncement && announcementContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="relative w-full max-w-sm rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-5 shadow-2xl">
             <button
-              onClick={() => setShowWelcome(false)}
+              onClick={() => setShowAnnouncement(false)}
               className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-[#888888] transition-colors hover:bg-[#3A3A3A] hover:text-white"
               aria-label="关闭"
             >
               <X className="h-4 w-4" />
             </button>
-            <h3 className="text-base font-semibold text-[#A78BFA] pr-6">提示</h3>
-            <div className="mt-3 space-y-2 text-sm text-[#A0A0A0]">
-              <p>有bug可以联系作者：2787045979（QQ）</p>
-              <p>此版本为测试版本。</p>
+            <h3 className="text-base font-semibold text-[#A78BFA] pr-6">{announcementTitle}</h3>
+            <div className="mt-3 space-y-2 text-sm text-[#A0A0A0] whitespace-pre-line">
+              {announcementContent}
             </div>
             <button
-              onClick={() => setShowWelcome(false)}
+              onClick={() => setShowAnnouncement(false)}
               className="mt-5 w-full rounded-lg bg-[#7C3AED] py-2.5 text-sm font-medium text-white shadow-[0_2px_8px_rgba(124_58_237_0.3)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"
             >
               知道了

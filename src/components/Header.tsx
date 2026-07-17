@@ -22,6 +22,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#3A3A3A] bg-[#1E1E1E]/90 backdrop-blur-md">
       <div className="flex h-14 items-center justify-between px-4">
+        {/* 桌面端 在线人数 */}
         <div className="hidden md:flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-md border border-[#3A3A3A] bg-[#2C2C2C] px-2.5 py-1">
             <div className="h-2 w-2 rounded-full bg-[#22C55E] animate-pulse" />
@@ -30,6 +31,7 @@ export default function Header() {
             </span>
           </div>
         </div>
+        {/* 移动端占位 */}
         <div className="md:hidden w-8" />
         <h1 className="text-base md:text-lg font-semibold text-white tracking-wide">
           EVE 造船成本计算器
