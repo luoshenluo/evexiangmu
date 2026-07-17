@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import AnalyticsTracker from '@/components/AnalyticsTracker';
 
+// 懒加载 - 管理后台页面按需加载
 const HomePage = lazy(() => import('@/pages/HomePage/HomePage'));
 const MarketPage = lazy(() => import('@/pages/MarketPage/MarketPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage/NotFoundPage'));
@@ -17,6 +18,7 @@ const AdminMarketPage = lazy(() => import('@/pages/Admin/AdminMarketPage'));
 const AdminAnalyticsPage = lazy(() => import('@/pages/Admin/AdminAnalyticsPage'));
 const AdminAnnouncementPage = lazy(() => import('@/pages/Admin/AdminAnnouncementPage'));
 
+// 全局加载占位
 function PageLoader() {
   return (
     <div className="flex h-64 items-center justify-center">
@@ -31,23 +33,34 @@ function PageLoader() {
   );
 }
 
+// Error Boundary - 防止组件崩溃导致白屏
 interface ErrorBoundaryState { hasError: boolean; error: Error | null; }
 class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false, error: null };
+
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
+
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary] 组件崩溃:', error, info.componentStack);
   }
+
   render() {
     if (this.state.hasError) {
       return (
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
           <div className="text-4xl">⚠️</div>
           <h2 className="text-lg font-semibold text-white">页面渲染出错</h2>
-          <p className="max-w-md text-sm text-[#A0A0A0]">{this.state.error?.message || '发生了未知错误'}</p>
-          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }} className="rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#6D28D9]">重新加载页面</button>
+          <p className="max-w-md text-sm text-[#A0A0A0]">
+            {this.state.error?.message || '发生了未知错误'}
+          </p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            className="rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#6D28D9]"
+          >
+            重新加载页面
+          </button>
         </div>
       );
     }
@@ -68,11 +81,16 @@ export default function App() {
       <AnalyticsTracker />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* 主应用 */}
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="market" element={<MarketPage />} />
           </Route>
+
+          {/* 管理后台 - 登录页（独立，无侧边栏） */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
+
+          {/* 管理后台 - 受保护路由（带侧边栏） */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/projects" replace />} />
             <Route path="projects" element={<AdminProjectsPage />} />
@@ -84,8 +102,12 @@ export default function App() {
             <Route path="announcement" element={<AdminAnnouncementPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
+
+          {/* 根路径快捷重定向（兼容直接访问 /projects /settings） */}
           <Route path="/projects" element={<RedirectToProjects />} />
           <Route path="/settings" element={<RedirectToSettings />} />
+
+          {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
