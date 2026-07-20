@@ -446,7 +446,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
                 <Trophy className="h-4 w-4 text-[#F59E0B]" />
                 <h3 className="text-sm font-semibold text-white">技能匹配</h3>
                 <span className="text-[11px] text-[#A78BFA]">{selected.category}</span>
-                <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(1.0, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
+                <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
               </div>
               <div className="p-4">
                 {skillMatched.matchedSkills.length > 0 ? (
@@ -605,9 +605,9 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
                     <Trophy className="h-4 w-4 text-[#F59E0B]" />
                     <h3 className="text-sm font-semibold text-white">技能匹配</h3>
                     <span className="text-[11px] text-[#A78BFA]">{selected.category}</span>
-                    <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(1.0, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="p-4">
+                    <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="p-4">
                     {skillMatched.matchedSkills.length > 0 ? (
                       <div className="space-y-1.5">
                         {skillMatched.matchedSkills.map((s) => (

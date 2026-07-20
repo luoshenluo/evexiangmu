@@ -23,7 +23,7 @@ interface CalcSectionProps {
 }
 
 const BASE_EFFICIENCY = 1.5;
-const MIN_EFFICIENCY = 1.0;
+const MIN_EFFICIENCY = 0.5;
 
 const PARAM_FIELDS: {
   key: keyof ICalcParams;
@@ -222,7 +222,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
                 {finalPct}%
               </div>
               <div className="text-[10px] text-[#666666]">
-                基础150%{skillResult.totalReduction > 0 ? ` - 技能${skillPct}%` : ''}{corpReduction > 0 ? ` - 军团${corpPct}%` : ''}
+                基础150%{skillResult.totalReduction > 0 ? ` - 技能${skillPct}%` : ''}{corpReduction > 0 ? ` - 军团${corpPct}%` : ''} = {finalPct}%
               </div>
             </div>
           </div>
