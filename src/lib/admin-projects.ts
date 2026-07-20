@@ -274,7 +274,7 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
         .eq('key', 'admin_password_hash')
         .maybeSingle();
       if (error) throw error;
-      if (data) {
+      if (data && data.value) {
         return data.value === hashPassword(password);
       }
     } catch (err) {

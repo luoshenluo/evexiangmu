@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { verifyAdminLogin, verifyAdminPassword, setAdminLoggedIn, setCurrentAdminAccount, type AdminSession } from '@/lib/admin-projects';
+import { verifyAdminLogin, verifyAdminPassword, setAdminLoggedIn, setCurrentAdminAccount, type AdminAccount } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 const MAX_ATTEMPTS = 5;
@@ -49,17 +49,17 @@ export default function AdminLoginPage() {
     try {
       const account = await verifyAdminLogin(username, password);
       if (account) {
-        const session: AdminSession = { id: account.id, username: account.username, role: account.role, permissions: account.permissions, ts: Date.now() };
-        setAdminLoggedIn(session);
-        setCurrentAdminAccount({ id: account.id, username: account.username, role: account.role, permissions: account.permissions });
+        const acc: AdminAccount = { id: account.id, username: account.username, password_hash: '', role: account.role, permissions: account.permissions };
+        setAdminLoggedIn(acc);
+        setCurrentAdminAccount(acc);
         clearAttempts();
         setSuccessOpen(true);
         return;
       }
       if (await verifyAdminPassword(password)) {
-        const session: AdminSession = { id: 'default_admin', username, role: 'super_admin', permissions: { manage_projects: true, manage_materials: true, manage_market: true, manage_admins: true }, ts: Date.now() };
-        setAdminLoggedIn(session);
-        setCurrentAdminAccount({ id: 'default_admin', username, role: 'super_admin', permissions: { manage_projects: true, manage_materials: true, manage_market: true, manage_admins: true } });
+        const acc: AdminAccount = { id: 'default_admin', username, password_hash: '', role: 'super_admin', permissions: { manage_projects: true, manage_materials: true, manage_market: true, manage_admins: true } };
+        setAdminLoggedIn(acc);
+        setCurrentAdminAccount(acc);
         clearAttempts();
         setSuccessOpen(true);
         return;
