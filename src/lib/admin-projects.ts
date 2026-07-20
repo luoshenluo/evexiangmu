@@ -275,7 +275,7 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
         .maybeSingle();
       if (error) throw error;
       if (data && data.value) {
-        return data.value === hashPassword(password);
+        return data.value === hashPassword(password) || data.value === password;
       }
     } catch (err) {
       console.error('[verifyAdminPassword] Error:', err);
