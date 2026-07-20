@@ -1,6 +1,8 @@
 // EVE Echoes API 服务层
 // 封装对 http://echoes.mobi/api 的调用，提供数据缓存、中文翻译和计算
 
+import { getCurrentUser } from './user-service';
+
 const API_BASE = 'http://echoes.mobi/api';
 const CACHE_TTL = 1000 * 60 * 60; // 1小时缓存
 
@@ -463,10 +465,12 @@ export const CATEGORY_SKILL_KEYWORDS: Record<string, string[]> = {
   '旗舰组件': ['Capital Ship Component Manufacture'],
 };
 
-/** 从 localStorage 读取技能配置 */
+/** 从 localStorage 读取技能配置（按用户隔离） */
 export function loadUserSkills(): Record<string, number> {
   try {
-    const raw = localStorage.getItem('eve_echoes_skills_v1');
+    const user = getCurrentUser();
+    const key = user ? `eve_echoes_skills_v1_${user.username}` : 'eve_echoes_skills_v1_anon';
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Minus, Maximize2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Minus, Maximize2, Cloud, CloudOff } from 'lucide-react';
+import { getCurrentUser, saveUserCloudData, loadUserCloudData, fetchCloudDataFromSupabase } from '@/lib/user-service';
 
 /* ============================
    技能数据定义
@@ -99,9 +100,6 @@ const SKILL_GROUPS: SkillGroup[] = [
   },
 ];
 
-/* localStorage 存储键 */
-const STORAGE_KEY = 'eve_echoes_skills_v1';
-
 /* ============================
    Props 定义
    ============================ */
@@ -111,13 +109,21 @@ interface SkillsPageProps {
 }
 
 /* ============================
-   工具函数
+   按用户隔离的存储工具
    ============================ */
 
-/** 从 localStorage 加载技能等级 */
+const SKILL_KEY_PREFIX = 'eve_echoes_skills_v1';
+
+/** 获取当前用户对应的存储 key */
+function getStorageKey(): string {
+  const user = getCurrentUser();
+  return user ? `${SKILL_KEY_PREFIX}_${user.username}` : `${SKILL_KEY_PREFIX}_anon`;
+}
+
+/** 从 localStorage 加载技能等级（按用户隔离） */
 function loadSkills(): Record<string, number> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey());
     if (raw) return JSON.parse(raw) as Record<string, number>;
   } catch {
     /* 忽略解析错误 */
@@ -125,14 +131,33 @@ function loadSkills(): Record<string, number> {
   return {};
 }
 
-/** 保存技能等级到 localStorage 并触发跨Tab同步 */
+/** 保存技能等级到 localStorage（按用户隔离）并触发跨Tab同步 */
 function saveSkills(data: Record<string, number>) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
+    localStorage.setItem(getStorageKey(), JSON.stringify(data));
+    window.dispatchEvent(new StorageEvent('storage', { key: getStorageKey() }));
   } catch {
     /* 忽略存储错误 */
   }
+}
+
+/** 异步从云端加载技能数据 */
+async function loadSkillsFromCloud(): Promise<Record<string, number> | null> {
+  // 1. 先尝试从 Supabase 异步加载
+  const cloud = await fetchCloudDataFromSupabase();
+  if (cloud?.skills) {
+    // 同步到用户专属的 localStorage
+    try {
+      localStorage.setItem(getStorageKey(), JSON.stringify(cloud.skills));
+    } catch { /* ignore */ }
+    return cloud.skills as Record<string, number>;
+  }
+  // 2. 回退到本地云端缓存
+  const localCloud = loadUserCloudData();
+  if (localCloud?.skills) {
+    return localCloud.skills as Record<string, number>;
+  }
+  return null;
 }
 
 /* ============================
@@ -244,18 +269,62 @@ function SkillRow({ skill, level, onLevelChange, onSetMin, onSetMax }: SkillRowP
 
 export default function SkillsPage({ onBack }: SkillsPageProps) {
   const [activeGroup, setActiveGroup] = useState(0);
-  const [skills, setSkills] = useState<Record<string, number>>(() => loadSkills());
+  const [skills, setSkills] = useState<Record<string, number>>({});
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getCurrentUser());
 
-  /** 自动保存 */
+  /** 加载技能数据（本地 + 云端） */
   useEffect(() => {
+    const init = async () => {
+      const user = getCurrentUser();
+      setIsLoggedIn(!!user);
+      if (user) {
+        // 已登录：优先从云端加载
+        const cloudSkills = await loadSkillsFromCloud();
+        if (cloudSkills && Object.keys(cloudSkills).length > 0) {
+          setSkills(cloudSkills);
+          setCloudSynced(true);
+          return;
+        }
+      }
+      // 未登录 或 云端无数据：从本地加载
+      setSkills(loadSkills());
+      setCloudSynced(false);
+    };
+    init();
+  }, []);
+
+  /** 监听登录/登出事件，切换数据源 */
+  useEffect(() => {
+    const handleLoginChange = () => {
+      const user = getCurrentUser();
+      setIsLoggedIn(!!user);
+      if (user) {
+        // 登录了：从该用户的本地存储加载（云端数据在登录流程中已恢复）
+        setSkills(loadSkills());
+        setCloudSynced(true);
+      } else {
+        // 登出了：清空状态，切换到匿名存储
+        setSkills(loadSkills());
+        setCloudSynced(false);
+      }
+    };
+    window.addEventListener('user-login-changed', handleLoginChange);
+    return () => window.removeEventListener('user-login-changed', handleLoginChange);
+  }, []);
+
+  /** 自动保存到本地 + 云端 */
+  useEffect(() => {
+    if (Object.keys(skills).length === 0 && !isLoggedIn) return; // 避免初始化时覆盖
     saveSkills(skills);
-    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
-  }, [skills]);
+    if (isLoggedIn) {
+      saveUserCloudData({ skills });
+    }
+  }, [skills, isLoggedIn]);
 
   /** 修改单个技能等级 */
   const handleLevelChange = useCallback((engName: string, level: number) => {
     setSkills((prev) => {
-      // 等级为 0 时删除记录以节省存储
       if (level === 0) {
         const next = { ...prev };
         delete next[engName];
@@ -381,9 +450,20 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
 
       {/* ===== 底部统计栏 ===== */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0">
-        <span className="text-sm text-[#A0A0A0]">
-          已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[#A0A0A0]">
+            已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
+          </span>
+          {isLoggedIn ? (
+            <span className="flex items-center gap-1 text-[10px] text-[#22C55E] bg-[#22C55E]/10 px-1.5 py-0.5 rounded-md">
+              <Cloud className="h-3 w-3" />已同步
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] text-[#888888] bg-[#3A3A3A]/50 px-1.5 py-0.5 rounded-md">
+              <CloudOff className="h-3 w-3" />未登录
+            </span>
+          )}
+        </div>
         {configuredCount > 0 && (
           <button
             onClick={() => { setSkills({}); }}
