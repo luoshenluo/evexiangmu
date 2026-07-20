@@ -390,7 +390,7 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
       </div>
 
       {/* ===== 底部操作栏 ===== */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0 gap-3">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0 gap-3 sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0_0_0_0.3)]">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm text-[#A0A0A0]">
             已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
