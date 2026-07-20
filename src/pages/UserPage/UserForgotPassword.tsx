@@ -35,7 +35,7 @@ export default function UserForgotPassword() {
 
     setLoading(true);
     try {
-      const result = resetPassword(username, newPassword);
+      const result = await resetPassword(username, newPassword);
       if (result.success) {
         toast.success('密码重置成功，请使用新密码登录');
         navigate('/user/login', { replace: true });

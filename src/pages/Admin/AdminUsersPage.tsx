@@ -10,10 +10,10 @@ export default function AdminUsersPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteUsername, setDeleteUsername] = useState('');
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = getAllUsers();
+      const data = await getAllUsers();
       // 按注册时间倒序排列
       data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setUsers(data);
@@ -34,10 +34,10 @@ export default function AdminUsersPage() {
     setDeleteOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteUsername) return;
     try {
-      deleteUser(deleteUsername);
+      await deleteUser(deleteUsername);
       toast.success('用户已删除');
       loadData();
     } catch (err) {

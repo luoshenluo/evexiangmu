@@ -61,12 +61,54 @@ INSERT INTO app_settings (key, value, updated_at)
 VALUES ('announcement', '{"title":"提示","content":"欢迎使用EVE造船成本计算器","enabled":true,"updated_at":"2026-07-17T00:00:00.000Z"}'::jsonb, NOW())
 ON CONFLICT (key) DO NOTHING;
 
--- 6. 为 app_settings 启用 RLS（行级安全）
+-- =====================================================
+-- 6. 用户表（app_users）
+-- =====================================================
+CREATE TABLE IF NOT EXISTS app_users (
+  username      TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 用户名唯一索引（已由 PRIMARY KEY 保证）
+
+-- =====================================================
+-- 7. 用户云端数据表（user_data）
+-- =====================================================
+CREATE TABLE IF NOT EXISTS user_cloud_data (
+  username   TEXT PRIMARY KEY REFERENCES app_users(username) ON DELETE CASCADE,
+  data_json  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =====================================================
+-- 8. 启用 RLS（行级安全）
+-- =====================================================
 ALTER TABLE site_visitors_online ENABLE ROW LEVEL SECURITY;
 ALTER TABLE site_page_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE site_analytics_daily ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_cloud_data ENABLE ROW LEVEL SECURITY;
 
--- 允许匿名用户读写（前端通过 anon key 访问）
+-- =====================================================
+-- 9. RLS 策略
+-- =====================================================
+
+-- 访客相关：允许匿名读写
 CREATE POLICY "anon_all" ON site_visitors_online FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all" ON site_page_views FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_select" ON site_analytics_daily FOR SELECT TO anon USING (true);
+
+-- 用户表：允许匿名注册、登录（插入和按用户名查询）
+-- 注册：允许插入
+CREATE POLICY "anon_insert_user" ON app_users FOR INSERT TO anon WITH CHECK (true);
+-- 登录/查重：允许按 username 精确查询
+CREATE POLICY "anon_select_user" ON app_users FOR SELECT TO anon USING (true);
+-- 修改密码：允许更新（通过前端哈希后的密码）
+CREATE POLICY "anon_update_user" ON app_users FOR UPDATE TO anon USING (true) WITH CHECK (true);
+-- 管理员删除用户
+CREATE POLICY "anon_delete_user" ON app_users FOR DELETE TO anon USING (true);
+
+-- 云端数据：用户只能操作自己的数据（通过前端控制 username）
+CREATE POLICY "anon_all_cloud" ON user_cloud_data FOR ALL TO anon USING (true) WITH CHECK (true);

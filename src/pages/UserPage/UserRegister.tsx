@@ -50,10 +50,10 @@ export default function UserRegister() {
 
     setLoading(true);
     try {
-      const result = registerUser(username, password);
+      const result = await registerUser(username, password);
       if (result.success) {
         // 注册成功后自动登录
-        setCurrentUser({ username, password, createdAt: new Date().toISOString() });
+        setCurrentUser({ username, password: '', createdAt: new Date().toISOString() });
         toast.success('注册成功');
         // 跳转到个人中心
         navigate('/user/profile', { replace: true });

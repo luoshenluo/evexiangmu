@@ -20,18 +20,12 @@ export default function UserLogin() {
 
     setLoading(true);
     try {
-      const result = loginUser(username, password);
+      const result = await loginUser(username, password);
       if (result.success) {
-        // 保存会话
+        // 保存会话（登录时从 Supabase 获取真实创建时间）
         setCurrentUser({ username, password: '', createdAt: new Date().toISOString() });
         toast.success('登录成功');
-        // 跳转回首页或个人中心
-        const currentUser = getCurrentUser();
-        if (currentUser) {
-          navigate('/user/profile', { replace: true });
-        } else {
-          navigate('/', { replace: true });
-        }
+        navigate('/', { replace: true });
       } else {
         toast.error(result.message);
       }

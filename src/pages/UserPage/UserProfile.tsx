@@ -57,7 +57,7 @@ export default function UserProfile() {
 
     setLoading(true);
     try {
-      const result = changePassword(currentUser.username, oldPassword, newPassword);
+      const result = await changePassword(currentUser.username, oldPassword, newPassword);
       if (result.success) {
         // 更新会话中的密码
         setCurrentUser({ ...currentUser, password: newPassword });
