@@ -17,6 +17,13 @@ const AdminAccountsPage = lazy(() => import('@/pages/Admin/AdminAccountsPage'));
 const AdminMarketPage = lazy(() => import('@/pages/Admin/AdminMarketPage'));
 const AdminAnalyticsPage = lazy(() => import('@/pages/Admin/AdminAnalyticsPage'));
 const AdminAnnouncementPage = lazy(() => import('@/pages/Admin/AdminAnnouncementPage'));
+const AdminUsersPage = lazy(() => import('@/pages/Admin/AdminUsersPage'));
+
+// 用户页面
+const UserLoginPage = lazy(() => import('@/pages/UserPage/UserLogin'));
+const UserRegisterPage = lazy(() => import('@/pages/UserPage/UserRegister'));
+const UserForgotPasswordPage = lazy(() => import('@/pages/UserPage/UserForgotPassword'));
+const UserProfilePage = lazy(() => import('@/pages/UserPage/UserProfile'));
 
 // 全局加载占位
 function PageLoader() {
@@ -97,11 +104,18 @@ export default function App() {
             <Route path="projects/:id" element={<AdminProjectEditPage />} />
             <Route path="materials" element={<AdminMaterialsPage />} />
             <Route path="accounts" element={<AdminAccountsPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
             <Route path="market" element={<AdminMarketPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="announcement" element={<AdminAnnouncementPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
+
+          {/* 用户页面（独立，无侧边栏） */}
+          <Route path="/user/login" element={<UserLoginPage />} />
+          <Route path="/user/register" element={<UserRegisterPage />} />
+          <Route path="/user/forgot-password" element={<UserForgotPasswordPage />} />
+          <Route path="/user/profile" element={<UserProfilePage />} />
 
           {/* 根路径快捷重定向（兼容直接访问 /projects /settings） */}
           <Route path="/projects" element={<RedirectToProjects />} />

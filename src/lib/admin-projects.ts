@@ -387,7 +387,14 @@ export async function loadAdminAccounts(): Promise<Omit<AdminAccount, 'password_
         .order('created_at', { ascending: true });
       if (error) throw error;
       if (data && data.length > 0) {
-        saveAdminAccountsToLocal(data as AdminAccount[]);
+        const local = loadAdminAccountsFromLocal();
+        const merged = [...data as AdminAccount[]];
+        for (const localAcc of local) {
+          if (!merged.find((m: AdminAccount) => m.id === localAcc.id)) {
+            merged.push(localAcc);
+          }
+        }
+        saveAdminAccountsToLocal(merged);
         return data as Omit<AdminAccount, 'password_hash'>[];
       }
     } catch (err) {

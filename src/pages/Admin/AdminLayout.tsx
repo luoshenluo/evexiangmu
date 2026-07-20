@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, Settings as SettingsIcon, LogOut, ArrowLeft, Beaker, Users, Store, Home, ShieldAlert, BarChart3, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Package, Settings as SettingsIcon, LogOut, ArrowLeft, Beaker, Users, Store, Home, ShieldAlert, BarChart3, Megaphone, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isAdminLoggedIn, clearAdminLogin, getCurrentAdminAccount, hasAdminPermission, type AdminAccount } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
@@ -12,6 +12,7 @@ const SIDEBAR_ITEMS: { key: string; label: string; mobileLabel: string; icon: Re
   { key: 'analytics', label: '数据分析', mobileLabel: '分析', icon: BarChart3, path: '/admin/analytics' },
   { key: 'announcement', label: '公告管理', mobileLabel: '公告', icon: Megaphone, path: '/admin/announcement' },
   { key: 'accounts', label: '账号管理', mobileLabel: '账号', icon: Users, path: '/admin/accounts', permission: 'manage_admins' },
+  { key: 'users', label: '用户管理', mobileLabel: '用户', icon: UserRound, path: '/admin/users', permission: 'manage_accounts' },
   { key: 'settings', label: '管理员设置', mobileLabel: '设置', icon: SettingsIcon, path: '/admin/settings' },
 ];
 

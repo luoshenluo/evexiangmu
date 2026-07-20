@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import ProjectSection from '@/components/ProjectSection';
 import { PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS, DEFAULT_CALC_PARAMS, type IMaterialItem, type ICalcParams, type IManufactureProject } from '@/data/materials';
 import { sumMaterials } from '@/lib/utils';
 import { loadMaterialPrices, getAnnouncement, type MarketDataItem, type Announcement } from '@/lib/admin-projects';
+import { getCurrentUser, saveUserCloudData, loadUserCloudData } from '@/lib/user-service';
 import MarketPage from '@/pages/MarketPage/MarketPage';
 import SkillsPage from '@/pages/SkillsPage/SkillsPage';
 import CorpPage from '@/pages/CorpPage/CorpPage';
@@ -53,6 +54,92 @@ export default function HomePage() {
 
   useEffect(() => { getAnnouncement().then(setAnnouncement).catch(() => {}); }, []);
   useEffect(() => { if (announcement && announcement.enabled && announcement.content) setShowWelcome(true); }, [announcement]);
+
+  // ==================== 云端存储同步 ====================
+
+  // 组件挂载时，如果用户已登录，尝试从云端恢复数据
+  const [cloudLoaded, setCloudLoaded] = useState(false);
+  const cloudLoadRef = useRef(false);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user || cloudLoadRef.current) return;
+    cloudLoadRef.current = true;
+
+    const loadCloud = async () => {
+      try {
+        const cloudData = await loadUserCloudData();
+        if (cloudData) {
+          // 只恢复有值的字段
+          if (cloudData.minerals && Array.isArray(cloudData.minerals)) {
+            setMinerals((prev) =>
+              cloudData.minerals.map((c: any) => {
+                const local = prev.find((p) => p.name === c.name);
+                return { name: c.name, price: c.price ?? local?.price ?? 0, quantity: c.quantity ?? local?.quantity ?? 0 };
+              })
+            );
+          }
+          if (cloudData.shipMaterials && Array.isArray(cloudData.shipMaterials)) {
+            setShipMaterials((prev) =>
+              cloudData.shipMaterials.map((c: any) => {
+                const local = prev.find((p) => p.name === c.name);
+                return { name: c.name, price: c.price ?? local?.price ?? 0, quantity: c.quantity ?? local?.quantity ?? 0 };
+              })
+            );
+          }
+          if (cloudData.buildMaterials && Array.isArray(cloudData.buildMaterials)) {
+            setBuildMaterials((prev) =>
+              cloudData.buildMaterials.map((c: any) => {
+                const local = prev.find((p) => p.name === c.name);
+                return { name: c.name, price: c.price ?? local?.price ?? 0, quantity: c.quantity ?? local?.quantity ?? 0 };
+              })
+            );
+          }
+          if (cloudData.calcParams) {
+            setCalcParams((prev) => ({ ...prev, ...cloudData.calcParams }));
+          }
+          setCloudLoaded(true);
+        }
+      } catch (err) {
+        console.error('[CloudSync] 加载云端数据失败:', err);
+      }
+    };
+    loadCloud();
+  }, []);
+
+  // 防抖保存到云端（500ms）
+  const cloudSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerCloudSave = useCallback(() => {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    if (cloudSaveTimerRef.current) {
+      clearTimeout(cloudSaveTimerRef.current);
+    }
+
+    cloudSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await saveUserCloudData({
+          minerals,
+          shipMaterials,
+          buildMaterials,
+          calcParams,
+        });
+      } catch (err) {
+        console.error('[CloudSync] 保存云端数据失败:', err);
+      }
+    }, 500);
+  }, [minerals, shipMaterials, buildMaterials, calcParams]);
+
+  useEffect(() => {
+    triggerCloudSave();
+    return () => {
+      if (cloudSaveTimerRef.current) {
+        clearTimeout(cloudSaveTimerRef.current);
+      }
+    };
+  }, [minerals, shipMaterials, buildMaterials, calcParams]);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => { setCalcParams((prev) => ({ ...prev, [key]: value })); };
   const handleImportProject = useCallback((project: IManufactureProject) => { setSelectedCategory(project.category || ''); setCalcParams((prev) => ({ ...prev, materialCost150: project.materialCost150, blueprintPrice: project.blueprintPrice, fixedManufactureFee: project.fixedManufactureFee, buyOrderPrice: project.buyOrderPrice, marketSellPrice: project.marketSellPrice })); }, []);
