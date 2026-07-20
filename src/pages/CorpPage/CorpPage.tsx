@@ -34,13 +34,13 @@ interface TechEntry {
 /** 所有模块定义 */
 const MODULES: ModuleEntry[] = [
   {
-    engName: 'assembly_workshop',
+    engName: 'Assembly Workshop Module',
     cnName: '装配车间模块',
     maxLevel: 3,
     desc: '每级 +1% 材料效率，-0.5% 时间',
   },
   {
-    engName: 'capital_ship_parts_factory',
+    engName: 'Capital Ship Parts Factory Module',
     cnName: '旗舰部件工厂模块',
     maxLevel: 3,
     desc: '每级 +1% 材料效率，-0.5% 时间',
@@ -50,19 +50,19 @@ const MODULES: ModuleEntry[] = [
 /** 所有科技定义 */
 const TECHS: TechEntry[] = [
   {
-    engName: 'manufacturing_technology',
+    engName: 'Manufacturing Technology',
     cnName: '制造技术',
     maxLevel: 3,
     desc: '每级 +1% ME，-1% TE',
   },
   {
-    engName: 'advanced_manufacturing_technology',
+    engName: 'Advanced Manufacturing Technology',
     cnName: '高级制造技术',
     maxLevel: 5,
     desc: '每级 +1% ME，-1% TE',
   },
   {
-    engName: 'advanced_manufacturing_technology_ii',
+    engName: 'Advanced Manufacturing Technology II',
     cnName: '高级制造技术 II',
     maxLevel: 5,
     desc: '每级 +1% ME，-1% TE',
@@ -86,9 +86,10 @@ function loadConfig(): CorpConfig {
   return { modules: {}, techs: {} };
 }
 
-/** 将军团配置写入 localStorage */
+/** 将军团配置写入 localStorage 并触发跨Tab同步 */
 function saveConfig(config: CorpConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
 }
 
 /* ========== 子组件 ========== */
@@ -124,7 +125,7 @@ const LevelButtons: React.FC<LevelButtonsProps> = ({ level, maxLevel, onChange }
   ];
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {buttons.map((btn) => {
         const isActive = !btn.isBoundary && btn.label !== '−' && btn.label !== '+' && btn.value === level;
         return (

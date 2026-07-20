@@ -15,7 +15,7 @@ export interface ICalcParams {
   blueprintPrice: number;
   /** 固定制造费（亿ISK） */
   fixedManufactureFee: number;
-  /** 当前制造效率（默认0.85） */
+  /** 当前制造效率（默认0.85，受技能和军团影响） */
   manufactureEfficiency: number;
   /** 材料收购折扣（默认0.85） */
   materialDiscount: number;

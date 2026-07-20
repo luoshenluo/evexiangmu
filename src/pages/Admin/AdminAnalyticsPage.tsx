@@ -45,7 +45,7 @@ export default function AdminAnalyticsPage() {
   const [totalDays, setTotalDays] = useState(0);
   const [avgDailyPv, setAvgDailyPv] = useState(0);
   const [dailyData, setDailyData] = useState<{ date: string; page_views: number; unique_visitors: number }[]>([]);
-  const [hourlyData, setHourlyData] = useState<{ hour: number; pv: number }[]>([]);
+  const [hourlyData, setHourlyData] = useState<{ hour: number; count: number }[]>([]);
   const [pageDist, setPageDist] = useState<{ page: string; count: number }[]>([]);
   const [onlineVisitors, setOnlineVisitors] = useState<OnlineVisitor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,8 +73,8 @@ export default function AdminAnalyticsPage() {
     try {
       const results = await Promise.allSettled([getOnlineCount(), getTodayStats(), getTotalStats(), getDailyAnalytics(30), getTodayHourlyDistribution(), getTodayPageDistribution(), getOnlineVisitors()]);
       setOnlineCount(settledValue(results[0], 0));
-      const today = settledValue(results[1], { pageViews: 0, uniqueVisitors: 0 });
-      setTodayPv(today.pageViews); setTodayUv(today.uniqueVisitors);
+      const today = settledValue(results[1], { pv: 0, uv: 0 });
+      setTodayPv(today.pv); setTodayUv(today.uv);
       const total = settledValue(results[2], { totalPV: 0, totalDays: 0, avgPV: 0 });
       setTotalPv(total.totalPV); setTotalDays(total.totalDays); setAvgDailyPv(total.avgPV);
       setDailyData(settledValue(results[3], [])); setHourlyData(settledValue(results[4], []));
@@ -111,7 +111,7 @@ export default function AdminAnalyticsPage() {
     grid: { left: isMobile ? 28 : 36, right: isMobile ? 8 : 12, top: 12, bottom: isMobile ? 20 : 24 },
     xAxis: { type: 'category' as const, data: hourlyData.map((h) => h.hour + ':00'), axisLine: { lineStyle: { color: '#2C2C2C' } }, axisLabel: { color: '#666', fontSize: 9, interval: isMobile ? 3 : 2 }, axisTick: { show: false } },
     yAxis: { type: 'value' as const, splitLine: { lineStyle: { color: '#2C2C2C', type: 'dashed' as const } }, axisLabel: { color: '#666', fontSize: 9 } },
-    series: [{ type: 'bar', data: hourlyData.map((h) => h.pv), itemStyle: { color: { type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#7C3AED' }, { offset: 1, color: 'rgba(124,58,237,0.3)' }] }, borderRadius: [3, 3, 0, 0] }, barMaxWidth: isMobile ? 10 : 16 }],
+    series: [{ type: 'bar', data: hourlyData.map((h) => h.count), itemStyle: { color: { type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#7C3AED' }, { offset: 1, color: 'rgba(124,58,237,0.3)' }] }, borderRadius: [3, 3, 0, 0] }, barMaxWidth: isMobile ? 10 : 16 }],
   }), [hourlyData, isMobile]);
 
   const pageDistOption = useMemo(() => ({
@@ -150,7 +150,7 @@ export default function AdminAnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4">
           <h3 className="mb-3 text-sm font-medium text-[#ccc]">今日每小时访问量</h3>
-          {hourlyData.some((h) => h.pv > 0) ? <ReactECharts option={hourlyOption} style={{ height: smallChartH }} opts={{ renderer: 'svg' }} notMerge /> : <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: smallChartH }}>暂无数据</div>}
+          {hourlyData.some((h) => h.count > 0) ? <ReactECharts option={hourlyOption} style={{ height: smallChartH }} opts={{ renderer: 'svg' }} notMerge /> : <div className="flex items-center justify-center text-[#666] text-sm" style={{ height: smallChartH }}>暂无数据</div>}
         </div>
         <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4">
           <div className="mb-3 flex items-center justify-between">

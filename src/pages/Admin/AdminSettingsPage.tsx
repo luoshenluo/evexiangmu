@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, LogOut, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { clearAdminLogin, setCurrentAdminAccount, updateCurrentAccountPassword } from '@/lib/admin-projects';
+import { clearAdminLogin, updateCurrentAccountPassword } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 export default function AdminSettingsPage() {
@@ -34,7 +34,6 @@ export default function AdminSettingsPage() {
 
   const handleLogout = () => {
     clearAdminLogin();
-    setCurrentAdminAccount(null);
     setLogoutOpen(false);
     toast.success('已退出登录');
     navigate('/admin/login');

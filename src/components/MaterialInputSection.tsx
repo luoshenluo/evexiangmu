@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { toast } from 'sonner';
 import { Eraser, Calculator as CalcIcon } from 'lucide-react';
 import { NumberInput } from '@/components/shared/NumberInput';

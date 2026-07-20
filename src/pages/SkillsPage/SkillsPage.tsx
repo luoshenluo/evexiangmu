@@ -125,10 +125,11 @@ function loadSkills(): Record<string, number> {
   return {};
 }
 
-/** 保存技能等级到 localStorage */
+/** 保存技能等级到 localStorage 并触发跨Tab同步 */
 function saveSkills(data: Record<string, number>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
   } catch {
     /* 忽略存储错误 */
   }
@@ -218,16 +219,21 @@ interface SkillRowProps {
 
 function SkillRow({ skill, level, onLevelChange, onSetMin, onSetMax }: SkillRowProps) {
   return (
-    <div className="flex items-center justify-between gap-3 py-3 px-4 rounded-xl bg-[#1E1E1E]/80 border border-[#2C2C2C] hover:border-[#3A3A3A] transition-colors duration-200">
-      {/* 技能名称区域 */}
-      <div className="flex-1 min-w-0 mr-2">
-        <div className="text-sm font-medium text-white truncate">{skill.name}</div>
-        <div className="text-[11px] text-[#888888] truncate mt-0.5">{skill.engName}</div>
+    <div className="py-2.5 px-3 sm:px-4 rounded-xl bg-[#1E1E1E]/80 border border-[#2C2C2C] hover:border-[#3A3A3A] transition-colors duration-200">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">{skill.name}</div>
+          <div className="text-[10px] text-[#666666] truncate mt-0.5 hidden sm:block">{skill.engName}</div>
+        </div>
+        <LevelButtonGroup currentLevel={level} onChange={onLevelChange} engName={skill.engName} />
       </div>
-      {/* 快捷按钮 */}
-      <QuickButtons engName={skill.engName} onSetMin={onSetMin} onSetMax={onSetMax} />
-      {/* 等级按钮组 */}
-      <LevelButtonGroup currentLevel={level} onChange={onLevelChange} engName={skill.engName} />
+      <div className="flex items-center gap-1.5 mt-1.5 sm:hidden">
+        <QuickButtons engName={skill.engName} onSetMin={onSetMin} onSetMax={onSetMax} />
+        <span className="text-[10px] text-[#666666]">{skill.engName}</span>
+      </div>
+      <div className="hidden sm:flex items-center gap-1.5 mt-1.5">
+        <QuickButtons engName={skill.engName} onSetMin={onSetMin} onSetMax={onSetMax} />
+      </div>
     </div>
   );
 }

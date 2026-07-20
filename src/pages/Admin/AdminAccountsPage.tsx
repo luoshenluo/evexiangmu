@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Users, UserPlus, Check, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Users, UserPlus, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadAdminAccounts,
@@ -57,12 +57,14 @@ export default function AdminAccountsPage() {
     setFormData({
       username: '',
       password: '',
-      role: 'admin',
+      role: 'admin' as 'super_admin' | 'admin',
       permissions: {
         manage_projects: false,
         manage_materials: false,
         manage_market: false,
+        manage_accounts: false,
         manage_admins: false,
+        view_analytics: false,
       },
     });
     setModalOpen(true);
@@ -73,7 +75,7 @@ export default function AdminAccountsPage() {
     setFormData({
       username: account.username,
       password: '',
-      role: account.role,
+      role: account.role as 'super_admin' | 'admin',
       permissions: { ...account.permissions },
     });
     setModalOpen(true);
@@ -107,6 +109,8 @@ export default function AdminAccountsPage() {
           password_hash: hashPassword(formData.password.trim()),
           role: formData.role,
           permissions: formData.permissions,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
         await saveAdminAccount(account);
       }

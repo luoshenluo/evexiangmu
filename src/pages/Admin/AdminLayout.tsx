@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Package, Settings as SettingsIcon, LogOut, ArrowLeft, Beaker, Users, Store, Home, ShieldAlert, BarChart3, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isAdminLoggedIn, clearAdminLogin, getCurrentAdminAccount, setCurrentAdminAccount, hasAdminPermission, type AdminAccount } from '@/lib/admin-projects';
+import { isAdminLoggedIn, clearAdminLogin, getCurrentAdminAccount, hasAdminPermission, type AdminAccount } from '@/lib/admin-projects';
 import AdminModal from '@/components/admin/AdminModal';
 
 const SIDEBAR_ITEMS: { key: string; label: string; mobileLabel: string; icon: React.ElementType; path: string; permission?: keyof AdminAccount['permissions']; }[] = [
@@ -32,7 +32,7 @@ export default function AdminLayout() {
   const currentPage = SIDEBAR_ITEMS.find((i) => location.pathname.startsWith(i.path));
   const hasPageAccess = !currentPage || isSuper || !currentPage.permission || hasAdminPermission(currentPage.permission);
 
-  const handleConfirmLogout = () => { clearAdminLogin(); setCurrentAdminAccount(null); setLogoutConfirmOpen(false); navigate('/admin/login'); };
+  const handleConfirmLogout = () => { clearAdminLogin(); setLogoutConfirmOpen(false); navigate('/admin/login'); };
 
   return (
     <div className="flex h-screen bg-[#1E1E1E] text-white">

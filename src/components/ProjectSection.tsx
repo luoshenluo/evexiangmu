@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
-  ChevronDown, ChevronUp, Check, Plus, Trash2, Edit3, ArrowLeft, Save,
+  ChevronDown, ChevronUp, Check, Trash2, Edit3, ArrowLeft, Save,
   Ship, Coins, FileText, Tag, TrendingUp, Gem, Rocket, Boxes, ChevronRight,
-  Loader2, Search, Shield, Swords, Anchor, Factory, Crosshair,
+  Search, Shield, Swords, Anchor, Factory, Crosshair,
 } from 'lucide-react';
 import type { IManufactureProject, IProjectMaterials, IMaterialItem } from '@/data/materials';
-import { MANUFACTURE_PROJECTS, PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS } from '@/data/materials';
+import { PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
 import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
 import { emptyMaterials } from '@/components/shared/emptyMaterials';
@@ -73,7 +73,7 @@ function MaterialGroup({ title, icon: Icon, items, quantities, onChange, color }
 
 export default function ProjectSection({ onImportCost, onImportMaterials, onSwitchToCalc, onSwitchToMinerals, currentMinerals, currentShipMaterials, currentBuildMaterials }: ProjectSectionProps) {
   const [projects, setProjects] = useState<IManufactureProject[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -101,8 +101,6 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
   const [formMaterials, setFormMaterials] = useState<IProjectMaterials>(emptyMaterials());
 
   const selected = useMemo(() => projects.find((p) => p.id === selectedId) ?? projects[0], [projects, selectedId]);
-
-  const handleSelect = (project: IManufactureProject) => { setSelectedId(project.id); setViewMode('detail'); };
 
   const handleAddNew = () => {
     setFormName(''); setFormCategory(''); setFormBlueprint(0); setFormFixedFee(0);
@@ -282,6 +280,74 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     setViewMode('detail');
   };
 
+  // 手机端选中后切换视图，避免上下滚动
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const handleMobileSelect = (project: IManufactureProject) => {
+    setSelectedId(project.id);
+    setViewMode('detail');
+    setMobileShowDetail(true);
+  };
+
+  if (mobileShowDetail && selected) {
+    return (
+      <div className="h-full overflow-y-auto pb-24">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+          <button onClick={() => setMobileShowDetail(false)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] text-white transition-colors hover:border-[#555555] md:hidden"><ArrowLeft className="h-4 w-4" /></button>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-white truncate">{selected.name}</h2>
+            <p className="text-xs text-[#A0A0A0]">{selected.category}</p>
+          </div>
+          <button onClick={handleEdit} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] text-white transition-colors hover:border-[#555555] md:hidden"><Edit3 className="h-4 w-4" /></button>
+        </div>
+        <div className="px-4 pt-1">
+          <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_2px_8px_rgba(0_0_0_0.2)] overflow-hidden">
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2"><Coins className="h-4 w-4 text-[#F59E0B]" /><span className="text-xs text-[#A0A0A0]">材料成本</span></div>
+                  <span className="text-sm font-semibold text-white tabular-nums">{formatNumber(selected.materialCost150)}<span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span></span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-[#06B6D4]" /><span className="text-xs text-[#A0A0A0]">蓝图价</span></div>
+                  <span className="text-sm font-semibold text-white tabular-nums">{formatNumber(selected.blueprintPrice)}<span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span></span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="flex items-center gap-2"><Tag className="h-4 w-4 text-[#EC4899]" /><span className="text-xs text-[#A0A0A0]">制造费</span></div>
+                  <span className="text-sm font-semibold text-white tabular-nums">{formatNumber(selected.fixedManufactureFee)}<span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span></span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="text-[11px] text-[#888888] mb-1">收购单参考价</div>
+                  <div className="text-sm font-semibold text-[#22C55E] tabular-nums">{formatNumber(selected.buyOrderPrice)}<span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span></div>
+                </div>
+                <div className="rounded-lg bg-[#1E1E1E]/60 border border-[#3A3A3A] px-3 py-2.5">
+                  <div className="text-[11px] text-[#888888] mb-1">挂单参考价</div>
+                  <div className="text-sm font-semibold text-[#F59E0B] tabular-nums">{formatNumber(selected.marketSellPrice)}<span className="ml-0.5 text-[10px] font-normal text-[#888888]">亿</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {selected.materials && (
+          <div className="px-4 pt-4">
+            <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
+              <MaterialGroup title="矿物明细" icon={Gem} color="text-[#F59E0B]" items={PRESET_MINERALS} quantities={selected.materials.minerals} />
+              <MaterialGroup title="船材明细" icon={Rocket} color="text-[#06B6D4]" items={PRESET_SHIP_MATERIALS} quantities={selected.materials.shipMaterials} />
+              <MaterialGroup title="建材明细" icon={Boxes} color="text-[#22C55E]" items={PRESET_BUILD_MATERIALS} quantities={selected.materials.buildMaterials} />
+            </div>
+          </div>
+        )}
+        <div className="px-4 pt-5 space-y-3">
+          <button onClick={handleImportCost} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"><TrendingUp className="h-4 w-4" />导入总成本到计算页<ChevronRight className="h-4 w-4" /></button>
+          <button onClick={handleImportMaterials} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#7C3AED]/50 bg-[#7C3AED]/10 px-4 py-3.5 text-sm font-semibold text-[#A78BFA] transition-all hover:bg-[#7C3AED]/20 active:scale-[0.98]"><Boxes className="h-4 w-4" />导入材料明细到录入页<ChevronRight className="h-4 w-4" /></button>
+          <p className="text-center text-[11px] text-[#888888]">导入材料明细会保留你已设置的单价，自动填入数量并联动计算</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col md:flex-row overflow-hidden">
       <div className="w-full md:w-80 lg:w-96 md:border-r md:border-[#3A3A3A] md:flex-shrink-0 md:overflow-y-auto pb-24 md:pb-0">
@@ -322,7 +388,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
             currentCatProjects.map((project) => {
               const isSelected = project.id === selectedId;
               return (
-                <button key={project.id} onClick={() => handleSelect(project)}
+                <button key={project.id} onClick={() => handleMobileSelect(project)}
                   className={`flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all ${isSelected ? 'border-[#7C3AED] bg-[#7C3AED]/10 shadow-[0_0_12px_rgba(124_58_237_0.15)]' : 'border-[#3A3A3A] bg-[#2C2C2C] hover:border-[#555555] active:scale-[0.99]'}`}>
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#1E1E1E] border border-[#3A3A3A]"><Ship className="h-5 w-5 text-[#A78BFA]" /></div>
                   <div className="flex-1 min-w-0">
@@ -337,7 +403,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24 md:pb-0">
+      <div className="hidden md:flex md:flex-1 overflow-y-auto md:pb-0">
         {selected ? (
           <>
             <div className="px-4 pt-4">

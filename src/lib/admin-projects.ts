@@ -37,6 +37,7 @@ export interface AdminAccount {
     manage_materials?: boolean;
     manage_market?: boolean;
     manage_accounts?: boolean;
+    manage_admins?: boolean;
     view_analytics?: boolean;
   };
   created_at: string;
@@ -504,10 +505,10 @@ export async function loadAdminProjects(): Promise<IManufactureProject[]> {
         for (const localItem of local) {
           const exists = merged.findIndex((r) => r.id === localItem.id);
           if (exists >= 0) {
-            if (localItem.updated_at && (merged[exists] as any).updated_at) {
-              if (new Date(localItem.updated_at) > new Date((merged[exists] as any).updated_at)) {
-                merged[exists] = localItem;
-              }
+            const localTs = (localItem as any).updated_at;
+            const remoteTs = (merged[exists] as any).updated_at;
+            if (localTs && remoteTs && new Date(localTs) > new Date(remoteTs)) {
+              merged[exists] = localItem;
             }
           } else {
             merged.push(localItem);
@@ -526,25 +527,40 @@ export async function loadAdminProjects(): Promise<IManufactureProject[]> {
   return [];
 }
 
-export async function addAdminProject(project: IManufactureProject): Promise<void> {
+export async function addAdminProject(project: Omit<IManufactureProject, 'id'>): Promise<IManufactureProject> {
+  const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const fullProject: IManufactureProject = { ...project, id };
   if (hasSupabase()) {
     try {
       const supabase = getSupabaseClient()!;
-      const { error } = await supabase.from('manufacture_projects').insert(project);
+      const { error } = await supabase.from('manufacture_projects').insert(fullProject);
       if (error) throw error;
     } catch (err) {
       console.error('[addAdminProject] Error:', err);
     }
   }
   const all = await loadAdminProjects();
-  const idx = all.findIndex((p) => p.id === project.id);
-  if (idx >= 0) all[idx] = project;
-  else all.push(project);
+  all.push(fullProject);
   try { localStorage.setItem('eve_admin_projects', JSON.stringify(all)); } catch {}
+  return fullProject;
 }
 
-export async function updateAdminProject(project: IManufactureProject): Promise<void> {
-  return addAdminProject(project);
+export async function updateAdminProject(id: string, updates: Partial<IManufactureProject>): Promise<void> {
+  if (hasSupabase()) {
+    try {
+      const supabase = getSupabaseClient()!;
+      const { error } = await supabase.from('manufacture_projects').update(updates).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[updateAdminProject] Error:', err);
+    }
+  }
+  const all = await loadAdminProjects();
+  const idx = all.findIndex((p) => p.id === id);
+  if (idx >= 0) {
+    all[idx] = { ...all[idx], ...updates };
+    try { localStorage.setItem('eve_admin_projects', JSON.stringify(all)); } catch {}
+  }
 }
 
 export async function deleteAdminProject(id: string): Promise<void> {
@@ -744,17 +760,16 @@ export async function getTodayHourlyDistribution(): Promise<{ hour: number; coun
 }
 
 let _lastAggregateTime = 0;
-function triggerDailyAggregation(): void {
+async function triggerDailyAggregation(): Promise<void> {
   const now = Date.now();
   if (now - _lastAggregateTime < 3_600_000) return;
   _lastAggregateTime = now;
   if (!hasSupabase()) return;
-  getSupabaseClient()!
-    .rpc('aggregate_daily_stats')
-    .then(() => {})
-    .catch((err) => {
-      console.warn('[triggerDailyAggregation] rpc not available:', err.message);
-    });
+  try {
+    await getSupabaseClient()!.rpc('aggregate_daily_stats');
+  } catch (err: any) {
+    console.warn('[triggerDailyAggregation] rpc not available:', err?.message);
+  }
 }
 
 // ==================== 公告管理 ====================

@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
     try {
       const account = await verifyAdminLogin(username, password);
       if (account) {
-        const acc: AdminAccount = { id: account.id, username: account.username, password_hash: '', role: account.role, permissions: account.permissions };
+        const acc: AdminAccount = { id: account.id, username: account.username, password_hash: '', role: account.role, permissions: account.permissions, created_at: account.created_at, updated_at: account.updated_at };
         setAdminLoggedIn(acc);
         setCurrentAdminAccount(acc);
         clearAttempts();
@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
         return;
       }
       if (await verifyAdminPassword(password)) {
-        const acc: AdminAccount = { id: 'default_admin', username, password_hash: '', role: 'super_admin', permissions: { manage_projects: true, manage_materials: true, manage_market: true, manage_admins: true } };
+        const acc: AdminAccount = { id: 'default_admin', username, password_hash: '', role: 'super_admin', permissions: { manage_projects: true, manage_materials: true, manage_market: true, manage_admins: true }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
         setAdminLoggedIn(acc);
         setCurrentAdminAccount(acc);
         clearAttempts();
