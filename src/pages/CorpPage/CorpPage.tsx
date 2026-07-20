@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Save, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, ChevronRight, Gem, Wrench, FlaskConical, Globe, Edit3 } from 'lucide-react';
 
 /* ========== 类型定义 ========== */
 
@@ -200,20 +199,10 @@ const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
 
 const CorpPage: React.FC<CorpPageProps> = ({ onBack }) => {
   const [config, setConfig] = useState<CorpConfig>(loadConfig);
-  const [savedConfig, setSavedConfig] = useState<CorpConfig>(loadConfig);
-  const [showSaved, setShowSaved] = useState(false);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hasChanges = JSON.stringify(config) !== JSON.stringify(savedConfig);
-
-  /* ---- 保存配置 ---- */
-  const handleSave = useCallback(() => {
+  /* ---- 自动保存 ---- */
+  useEffect(() => {
     saveConfig(config);
-    setSavedConfig({ ...config });
-    setShowSaved(true);
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = setTimeout(() => setShowSaved(false), 2000);
-    toast.success('军团配置已保存');
   }, [config]);
 
   /* ---- 模块等级变更 ---- */
@@ -304,28 +293,9 @@ const CorpPage: React.FC<CorpPageProps> = ({ onBack }) => {
           </div>
         </section>
 
-        {/* ========== 底部保存栏 ========== */}
-        <div className="sticky bottom-0 z-10 flex items-center justify-between rounded-xl border border-[#3A3A3A] bg-[#1E1E1E] px-4 py-3 shadow-[0_-4px_12px_rgba(0_0_0_0.3)]">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#A0A0A0]">
-              已配置 <span className="font-bold text-[#A78BFA]">{Object.values(config.modules).filter((v) => v > 0).length + Object.values(config.techs).filter((v) => v > 0).length}</span> 项
-            </span>
-            {hasChanges && <span className="text-[10px] text-[#F59E0B] bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-md">未保存</span>}
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges}
-            className={`
-              flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95
-              ${hasChanges
-                ? 'bg-[#7C3AED] text-white shadow-[0_4px_12px_rgba(124_58_237_0.35)] hover:bg-[#6D28D9]'
-                : 'bg-[#2C2C2C] text-[#888888] cursor-not-allowed'
-              }
-            `}
-          >
-            {showSaved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {showSaved ? '已保存' : '保存配置'}
-          </button>
+        {/* ========== 底部信息 ========== */}
+        <div className="mt-4 text-center text-xs text-[#888888]">
+          数据保存在本地浏览器中，修改即自动保存
         </div>
       </div>
     </div>
