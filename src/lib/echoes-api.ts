@@ -434,3 +434,95 @@ export function getBestSkillTE(blueprintSkills: string[], userSkillLevels: Recor
   }
   return bestTE;
 }
+
+// ==================== 分类 → 技能映射 ====================
+
+/** 项目分类 → 技能关键词（用于匹配 Base/Advanced/Expert 三级技能） */
+export const CATEGORY_SKILL_KEYWORDS: Record<string, string[]> = {
+  '护卫舰级': ['Frigate Manufacture'],
+  '驱逐舰级': ['Destroyer Manufacture'],
+  '巡洋舰级': ['Cruiser Manufacture'],
+  '战巡舰级': ['Battlecruiser Manufacture'],
+  '战列舰级': ['Battleship Manufacture'],
+  '工业舰': ['Industrial Ship Manufacture'],
+  '运输舰': ['Freighter Manufacture'],
+  '旗舰级': ['Capital Ship Manufacture'],
+  '航母级': ['Carrier Manufacture'],
+  '无畏舰级': ['Dreadnought Manufacture'],
+  '旗舰工业舰': ['Capital Industrial Ship Manufacture'],
+  '跳跃货舰级': ['Jump Freighter Manufacture'],
+  '模块': ['Module Manufacture'],
+  '旗舰模块': ['Capital Module Manufacture'],
+  '弹药': ['Ammunition Manufacture'],
+  '芯片': ['Chip Manufacture'],
+  '植入体': ['Implant Manufacture'],
+  '改装件': ['Rig Manufacture'],
+  '旗舰改装件': ['Capital Rig Manufacture'],
+  '建筑': ['Structure Construction'],
+  '聚合物材料': ['Polymer Material Manufacture'],
+  '旗舰组件': ['Capital Ship Component Manufacture'],
+};
+
+/** 从 localStorage 读取技能配置 */
+export function loadUserSkills(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem('eve_echoes_skills_v1');
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+/** 判断技能是否与分类匹配 */
+export function isSkillRelevant(skillEngName: string, category: string): boolean {
+  if (!category) return false;
+  const keywords = CATEGORY_SKILL_KEYWORDS[category];
+  if (!keywords) return false;
+  return keywords.some((kw) => skillEngName.includes(kw));
+}
+
+/** 计算指定分类的技能ME总减免（正数=减少的百分比点） */
+export function calcCategorySkillMEReduction(
+  category: string,
+  userSkills: Record<string, number>,
+  apiSkills: EchoesIndustrySkill[],
+): { totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] } {
+  let totalReduction = 0;
+  const matchedSkills: { name: string; level: number; reduction: number }[] = [];
+  Object.entries(userSkills).forEach(([engName, level]) => {
+    if (level > 0 && isSkillRelevant(engName, category)) {
+      const zhName = toSkillChineseName(engName);
+      const apiSkill = apiSkills.find((s) => s.name === engName || s.name === zhName);
+      if (apiSkill && level <= apiSkill.efficiencyPerLevel.length) {
+        const reduction = (apiSkill.efficiencyPerLevel[level - 1] || 0) / 100;
+        totalReduction += reduction;
+        matchedSkills.push({ name: zhName, level, reduction });
+      }
+    }
+  });
+  return { totalReduction, matchedSkills };
+}
+
+/** 从 localStorage 读取军团配置 */
+export function loadCorpConfig(): { modules: Record<string, number>; techs: Record<string, number> } {
+  try {
+    const raw = localStorage.getItem('eve_echoes_corp_v1');
+    if (raw) {
+      const data = JSON.parse(raw);
+      return { modules: data.modules || {}, techs: data.techs || {} };
+    }
+  } catch { /* ignore */ }
+  return { modules: {}, techs: {} };
+}
+
+/** 计算军团总材料效率减少量（正数=减少的百分比点） */
+export function calcCorpMEReduction(corp: ReturnType<typeof loadCorpConfig>): number {
+  let reduction = 0;
+  for (const mod of CORP_MODULES) {
+    const lv = corp.modules[mod.name] || 0;
+    reduction += mod.meBonusPerLevel * lv;
+  }
+  for (const tech of CORP_TECHS) {
+    const lv = corp.techs[tech.name] || 0;
+    reduction += tech.meBonusPerLevel * lv;
+  }
+  return reduction;
+}

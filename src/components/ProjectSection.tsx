@@ -3,13 +3,21 @@ import { toast } from 'sonner';
 import {
   ChevronDown, ChevronUp, Check, Trash2, Edit3, ArrowLeft, Save, Plus,
   Ship, Coins, FileText, Tag, TrendingUp, Gem, Rocket, Boxes, ChevronRight,
-  Search, Shield, Swords, Anchor, Factory, Crosshair,
+  Search, Shield, Swords, Anchor, Factory, Crosshair, Trophy, Info,
 } from 'lucide-react';
 import type { IManufactureProject, IProjectMaterials, IMaterialItem } from '@/data/materials';
 import { PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
 import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
 import { emptyMaterials } from '@/components/shared/emptyMaterials';
+import {
+  fetchIndustrySkills,
+  loadUserSkills,
+  calcCategorySkillMEReduction,
+  loadCorpConfig,
+  calcCorpMEReduction,
+  type EchoesIndustrySkill,
+} from '@/lib/echoes-api';
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Ship; color: string }> = {
   '护卫舰级': { icon: Shield, color: 'text-[#22C55E]' },
@@ -282,6 +290,30 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
 
   // 手机端选中后切换视图，避免上下滚动
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  // 技能/军团数据（用于显示匹配的技能）
+  const [apiSkills, setApiSkills] = useState<EchoesIndustrySkill[]>([]);
+  const [skillMatched, setSkillMatched] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
+  const [corpReduction, setCorpReduction] = useState(0);
+
+  useEffect(() => {
+    fetchIndustrySkills().then(setApiSkills).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      const skills = loadUserSkills();
+      const corp = loadCorpConfig();
+      if (apiSkills.length > 0 && selected?.category) {
+        setSkillMatched(calcCategorySkillMEReduction(selected.category, skills, apiSkills));
+      } else {
+        setSkillMatched({ totalReduction: 0, matchedSkills: [] });
+      }
+      setCorpReduction(calcCorpMEReduction(corp) / 100);
+    };
+    window.addEventListener('storage', refresh);
+    refresh();
+    return () => window.removeEventListener('storage', refresh);
+  }, [apiSkills, selected?.category]);
   const handleMobileSelect = (project: IManufactureProject) => {
     setSelectedId(project.id);
     setViewMode('detail');
@@ -329,6 +361,49 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
             </div>
           </div>
         </div>
+        {/* 技能匹配面板 */}
+        {selected.category && (
+          <div className="px-4 pt-3">
+            <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-[#3A3A3A] px-4 py-3">
+                <Trophy className="h-4 w-4 text-[#F59E0B]" />
+                <h3 className="text-sm font-semibold text-white">技能匹配</h3>
+                <span className="text-[11px] text-[#A78BFA]">{selected.category}</span>
+                <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(1.0, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
+              </div>
+              <div className="p-4">
+                {skillMatched.matchedSkills.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {skillMatched.matchedSkills.map((s) => (
+                      <div key={s.name} className="flex items-center justify-between rounded-lg bg-[#1E1E1E] border border-[#3A3A3A] px-3 py-2">
+                        <span className="text-xs text-[#A0A0A0] truncate flex-1">{s.name}</span>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="text-xs font-medium text-[#A78BFA]">Lv.{s.level}</span>
+                          <span className="text-xs font-semibold text-[#22C55E]">-{(s.reduction * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                    {corpReduction > 0 && (
+                      <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E] border border-[#3A3A3A] px-3 py-2">
+                        <span className="text-xs text-[#A0A0A0]">军团总减免</span>
+                        <span className="text-xs font-semibold text-[#06B6D4]">-{(corpReduction * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between rounded-lg bg-[#7C3AED]/10 border border-[#7C3AED]/30 px-3 py-2 mt-1">
+                      <span className="text-xs text-[#A0A0A0]">总材料效率减免</span>
+                      <span className="text-sm font-bold text-[#A78BFA]">-{((skillMatched.totalReduction + corpReduction) * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-[#888888]">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <span>未配置{selected.category}相关制造技能，请在「技能」页设置</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {selected.materials && (
           <div className="px-4 pt-4">
             <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
@@ -445,6 +520,49 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
                 </div>
               </div>
             </div>
+            {/* 桌面端：技能匹配面板 */}
+            {selected.category && (
+              <div className="px-4 pt-3">
+                <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] overflow-hidden">
+                  <div className="flex items-center gap-2 border-b border-[#3A3A3A] px-4 py-3">
+                    <Trophy className="h-4 w-4 text-[#F59E0B]" />
+                    <h3 className="text-sm font-semibold text-white">技能匹配</h3>
+                    <span className="text-[11px] text-[#A78BFA]">{selected.category}</span>
+                    <span className="text-[11px] text-[#666666] ml-auto">综合效率 {Math.max(1.0, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="p-4">
+                    {skillMatched.matchedSkills.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {skillMatched.matchedSkills.map((s) => (
+                          <div key={s.name} className="flex items-center justify-between rounded-lg bg-[#1E1E1E] border border-[#3A3A3A] px-3 py-2">
+                            <span className="text-xs text-[#A0A0A0] truncate flex-1">{s.name}</span>
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <span className="text-xs font-medium text-[#A78BFA]">Lv.{s.level}</span>
+                              <span className="text-xs font-semibold text-[#22C55E]">-{(s.reduction * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        ))}
+                        {corpReduction > 0 && (
+                          <div className="flex items-center justify-between rounded-lg bg-[#1E1E1E] border border-[#3A3A3A] px-3 py-2">
+                            <span className="text-xs text-[#A0A0A0]">军团总减免</span>
+                            <span className="text-xs font-semibold text-[#06B6D4]">-{(corpReduction * 100).toFixed(0)}%</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between rounded-lg bg-[#7C3AED]/10 border border-[#7C3AED]/30 px-3 py-2 mt-1">
+                          <span className="text-xs text-[#A0A0A0]">总材料效率减免</span>
+                          <span className="text-sm font-bold text-[#A78BFA]">-{((skillMatched.totalReduction + corpReduction) * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-[#888888]">
+                        <Info className="h-4 w-4 shrink-0" />
+                        <span>未配置{selected.category}相关制造技能，请在「技能」页设置</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {selected.materials && (
               <div className="px-4 pt-4">
                 <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">

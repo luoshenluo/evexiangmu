@@ -7,7 +7,14 @@ import {
 import type { ICalcParams, IPlanResult, PlanVariant } from '@/data/materials';
 import { calculatePlans, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { CORP_MODULES, CORP_TECHS, fetchIndustrySkills, type EchoesIndustrySkill, toSkillChineseName } from '@/lib/echoes-api';
+import {
+  fetchIndustrySkills,
+  loadUserSkills,
+  loadCorpConfig,
+  calcCategorySkillMEReduction,
+  calcCorpMEReduction,
+  type EchoesIndustrySkill,
+} from '@/lib/echoes-api';
 
 interface CalcSectionProps {
   params: ICalcParams;
@@ -17,34 +24,8 @@ interface CalcSectionProps {
   selectedCategory: string;
 }
 
-/** 项目分类 → 技能关键词映射（用于匹配 Base/Advanced/Expert 三级技能） */
-const CATEGORY_SKILL_KEYWORDS: Record<string, string[]> = {
-  '护卫舰级': ['Frigate Manufacture'],
-  '驱逐舰级': ['Destroyer Manufacture'],
-  '巡洋舰级': ['Cruiser Manufacture'],
-  '战巡舰级': ['Battlecruiser Manufacture'],
-  '战列舰级': ['Battleship Manufacture'],
-  '工业舰': ['Industrial Ship Manufacture'],
-  '运输舰': ['Freighter Manufacture'],
-  '旗舰级': ['Capital Ship Manufacture'],
-  '航母级': ['Carrier Manufacture'],
-  '无畏舰级': ['Dreadnought Manufacture'],
-  '旗舰工业舰': ['Capital Industrial Ship Manufacture'],
-  '跳跃货舰级': ['Jump Freighter Manufacture'],
-  '模块': ['Module Manufacture'],
-  '旗舰模块': ['Capital Module Manufacture'],
-  '弹药': ['Ammunition Manufacture'],
-  '芯片': ['Chip Manufacture'],
-  '植入体': ['Implant Manufacture'],
-  '改装件': ['Rig Manufacture'],
-  '旗舰改装件': ['Capital Rig Manufacture'],
-  '建筑': ['Structure Construction'],
-  '聚合物材料': ['Polymer Material Manufacture'],
-  '旗舰组件': ['Capital Ship Component Manufacture'],
-};
-
-const BASE_EFFICIENCY = 1.5; // 基础150%材料效率
-const MIN_EFFICIENCY = 1.0;  // 最低100%材料效率
+const BASE_EFFICIENCY = 1.5;
+const MIN_EFFICIENCY = 1.0;
 
 const PARAM_FIELDS: {
   key: keyof ICalcParams;
@@ -65,48 +46,6 @@ const PARAM_FIELDS: {
   { key: 'marketTaxRate', label: '市场交易总税率', step: '0.001', placeholder: '默认 0.121' },
   { key: 'ownBlueprintDiscount', label: '自有蓝图折扣', step: '0.01', placeholder: '默认 0.8' },
 ];
-
-/** 从 localStorage 读取技能配置 */
-function loadUserSkills(): Record<string, number> {
-  try {
-    const raw = localStorage.getItem('eve_echoes_skills_v1');
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-/** 从 localStorage 读取军团配置 */
-function loadCorpConfig(): { modules: Record<string, number>; techs: Record<string, number> } {
-  try {
-    const raw = localStorage.getItem('eve_echoes_corp_v1');
-    if (raw) {
-      const data = JSON.parse(raw);
-      return { modules: data.modules || {}, techs: data.techs || {} };
-    }
-  } catch { /* ignore */ }
-  return { modules: {}, techs: {} };
-}
-
-/** 判断技能是否与当前选中的项目分类匹配 */
-function isSkillRelevant(skillEngName: string, category: string): boolean {
-  if (!category) return false;
-  const keywords = CATEGORY_SKILL_KEYWORDS[category];
-  if (!keywords) return false;
-  return keywords.some((kw) => skillEngName.includes(kw));
-}
-
-/** 计算军团总材料效率减少量（正数=减少的百分比点） */
-function calcCorpMEReduction(corp: ReturnType<typeof loadCorpConfig>): number {
-  let reduction = 0;
-  for (const mod of CORP_MODULES) {
-    const lv = corp.modules[mod.name] || 0;
-    reduction += mod.meBonusPerLevel * lv;
-  }
-  for (const tech of CORP_TECHS) {
-    const lv = corp.techs[tech.name] || 0;
-    reduction += tech.meBonusPerLevel * lv;
-  }
-  return reduction;
-}
 
 function ProfitBadge({ value }: { value: number }) {
   const isPositive = value > 0;
@@ -174,65 +113,35 @@ function PlanCard({ plan, highlighted }: { plan: IPlanResult; highlighted?: bool
 
 export default function CalcSection({ params, onParamChange, linkedMaterialTotal, selectedCategory }: CalcSectionProps) {
   const [apiSkills, setApiSkills] = useState<EchoesIndustrySkill[]>([]);
-  const [userSkills, setUserSkills] = useState<Record<string, number>>({});
-  const [corpConfig, setCorpConfig] = useState<ReturnType<typeof loadCorpConfig>>({ modules: {}, techs: {} });
-  const [skillReduction, setSkillReduction] = useState(0);
+  const [skillResult, setSkillResult] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
   const [corpReduction, setCorpReduction] = useState(0);
-  const [matchedSkills, setMatchedSkills] = useState<{ name: string; reduction: number }[]>([]);
 
-  // 加载API技能数据
   useEffect(() => {
     fetchIndustrySkills().then(setApiSkills).catch(() => {});
   }, []);
 
-  // 监听 localStorage 变化（其他Tab页修改技能/军团后自动刷新）
   useEffect(() => {
     const handler = () => {
-      setUserSkills(loadUserSkills());
-      setCorpConfig(loadCorpConfig());
+      const skills = loadUserSkills();
+      const corp = loadCorpConfig();
+      if (apiSkills.length > 0) {
+        setSkillResult(calcCategorySkillMEReduction(selectedCategory, skills, apiSkills));
+      }
+      setCorpReduction(calcCorpMEReduction(corp) / 100);
     };
     window.addEventListener('storage', handler);
     handler();
     return () => window.removeEventListener('storage', handler);
-  }, [apiSkills]);
+  }, [apiSkills, selectedCategory]);
 
-  // 计算技能ME减少量（仅匹配当前项目分类的技能，三级叠加）
+  // 计算综合效率并同步
   useEffect(() => {
-    if (apiSkills.length === 0) {
-      setSkillReduction(0);
-      setMatchedSkills([]);
-      return;
-    }
-    let totalReduction = 0;
-    const matched: { name: string; reduction: number }[] = [];
-    Object.entries(userSkills).forEach(([engName, level]) => {
-      if (level > 0 && isSkillRelevant(engName, selectedCategory)) {
-        const zhName = toSkillChineseName(engName);
-        const apiSkill = apiSkills.find((s) => s.name === engName || s.name === zhName);
-        if (apiSkill && level <= apiSkill.efficiencyPerLevel.length) {
-          const reduction = (apiSkill.efficiencyPerLevel[level - 1] || 0) / 100;
-          totalReduction += reduction;
-          matched.push({ name: zhName, reduction });
-        }
-      }
-    });
-    setSkillReduction(totalReduction);
-    setMatchedSkills(matched);
-  }, [userSkills, apiSkills, selectedCategory]);
-
-  // 计算军团ME减少量
-  useEffect(() => {
-    setCorpReduction(calcCorpMEReduction(corpConfig) / 100);
-  }, [corpConfig]);
-
-  // 计算综合效率并同步到 manufactureEfficiency
-  useEffect(() => {
-    const total = Math.max(MIN_EFFICIENCY, Math.min(BASE_EFFICIENCY, BASE_EFFICIENCY - skillReduction - corpReduction));
+    const total = Math.max(MIN_EFFICIENCY, Math.min(BASE_EFFICIENCY, BASE_EFFICIENCY - skillResult.totalReduction - corpReduction));
     const rounded = Math.round(total * 1000) / 1000;
     if (Math.abs(params.manufactureEfficiency - rounded) > 0.0005) {
       onParamChange('manufactureEfficiency', rounded);
     }
-  }, [skillReduction, corpReduction]);
+  }, [skillResult.totalReduction, corpReduction]);
 
   const plans = useMemo(() => calculatePlans(params), [params]);
   const baseMaterial = params.materialCost150 / BASE_EFFICIENCY;
@@ -240,7 +149,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
 
   const handleParamChange = (key: keyof ICalcParams, num: number) => onParamChange(key, num);
 
-  const skillPct = (skillReduction * 100).toFixed(0);
+  const skillPct = (skillResult.totalReduction * 100).toFixed(0);
   const corpPct = (corpReduction * 100).toFixed(0);
   const finalPct = (params.manufactureEfficiency * 100).toFixed(1);
 
@@ -251,11 +160,11 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
         <Link2 className="h-4 w-4 shrink-0 text-[#A78BFA]" />
         <div className="text-xs text-[#A0A0A0]">
           材料录入页总价已自动同步至「150%效率市价材料成本」
-          <span className="ml-1 font-semibold text-[#A78BFA] tabular-nums">{formatNumber(linkedMaterialTotal)} 亿ISK</span>
+          <span className="ml-1 font-semibold text-[#A78BFA] tabular-nums">{formatNumber(linkedMaterialTotal)}</span>
         </div>
       </div>
 
-      {/* 技能和军团结成加成面板 */}
+      {/* 技能和军团结成面板 */}
       <div className="px-4 pt-3">
         <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] overflow-hidden">
           <div className="flex items-center gap-2 border-b border-[#3A3A3A] px-4 py-3">
@@ -273,15 +182,15 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
                 </span>
                 {selectedCategory && <span className="text-[10px] text-[#F59E0B]">{selectedCategory}</span>}
               </div>
-              <div className="text-lg font-bold tabular-nums" style={{ color: skillReduction > 0 ? '#22C55E' : '#888888' }}>
-                {skillReduction > 0 ? '-' : ''}{skillPct}%
+              <div className="text-lg font-bold tabular-nums" style={{ color: skillResult.totalReduction > 0 ? '#22C55E' : '#888888' }}>
+                {skillResult.totalReduction > 0 ? '-' : ''}{skillPct}%
               </div>
               <div className="text-[10px] text-[#666666]">材料效率</div>
-              {matchedSkills.length > 0 && (
+              {skillResult.matchedSkills.length > 0 && (
                 <div className="mt-1.5 space-y-0.5">
-                  {matchedSkills.map((s) => (
+                  {skillResult.matchedSkills.map((s) => (
                     <div key={s.name} className="text-[10px] text-[#888888] truncate">
-                      {s.name} <span className="text-[#22C55E]">-{(s.reduction * 100).toFixed(0)}%</span>
+                      {s.name} <span className="text-[#A78BFA]">Lv.{s.level}</span> <span className="text-[#22C55E]">-{(s.reduction * 100).toFixed(0)}%</span>
                     </div>
                   ))}
                 </div>
@@ -290,6 +199,12 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
                 <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[#666666]">
                   <Info className="h-3 w-3" />
                   选择制造项目以匹配技能
+                </div>
+              )}
+              {selectedCategory && skillResult.matchedSkills.length === 0 && (
+                <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[#666666]">
+                  <Info className="h-3 w-3" />
+                  未配置{selectedCategory}相关技能
                 </div>
               )}
             </div>
@@ -316,7 +231,7 @@ export default function CalcSection({ params, onParamChange, linkedMaterialTotal
                 {finalPct}%
               </div>
               <div className="text-[10px] text-[#666666]">
-                基础150%{skillReduction > 0 ? ` - 技能${skillPct}%` : ''}{corpReduction > 0 ? ` - 军团${corpPct}%` : ''}
+                基础150%{skillResult.totalReduction > 0 ? ` - 技能${skillPct}%` : ''}{corpReduction > 0 ? ` - 军团${corpPct}%` : ''}
               </div>
             </div>
           </div>

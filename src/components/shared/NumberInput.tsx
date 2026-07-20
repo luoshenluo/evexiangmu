@@ -1,12 +1,13 @@
 import { useState, useEffect, type ChangeEvent } from 'react';
 
 export function NumberInput({ value, onChange, step = '0.01', placeholder = '', className = '' }: { value: number; onChange: (num: number) => void; step?: string; placeholder?: string; className?: string; }) {
-  const [localValue, setLocalValue] = useState<string>(value === 0 ? '' : String(value));
+  const safeValue = typeof value === 'number' && isFinite(value) ? value : 0;
+  const [localValue, setLocalValue] = useState<string>(safeValue === 0 ? '' : String(safeValue));
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => { if (!isEditing) setLocalValue(value === 0 ? '' : String(value)); }, [value, isEditing]);
+  useEffect(() => { if (!isEditing) setLocalValue(safeValue === 0 ? '' : String(safeValue)); }, [safeValue, isEditing]);
 
-  const displayValue = isEditing ? localValue : value === 0 ? '' : String(value);
+  const displayValue = isEditing ? localValue : safeValue === 0 ? '' : String(safeValue);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
