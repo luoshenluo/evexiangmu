@@ -215,13 +215,13 @@ const SKILL_ZH_MAP: Record<string, string> = {
   'Dreadnought Manufacture': '无畏舰制造', 'Freighter Manufacture': '货舰制造',
   'Jump Freighter Manufacture': '跳跃货舰制造',
   'Capital Industrial Ship Manufacture': '旗舰工业舰制造',
-  'Advanced Frigate Manufacture': '高级护卫舰制造', 'Advanced Destroyer Manufacture': '高级驱逐舰制造',
-  'Advanced Cruiser Manufacture': '高级巡洋舰制造', 'Advanced Battlecruiser Manufacture': '高级战列巡洋舰制造',
-  'Advanced Battleship Manufacture': '高级战列舰制造', 'Advanced Industrial Ship Manufacture': '高级工业舰制造',
-  'Advanced Capital Ship Manufacture': '高级旗舰制造', 'Advanced Carrier Manufacture': '高级航母制造',
-  'Advanced Dreadnought Manufacture': '高级无畏舰制造', 'Advanced Freighter Manufacture': '高级货舰制造',
-  'Advanced Jump Freighter Manufacture': '高级跳跃货舰制造',
-  'Advanced Capital Industrial Ship Manufacture': '高级旗舰工业舰制造',
+  'Advanced Frigate Manufacture': '进阶护卫舰制造', 'Advanced Destroyer Manufacture': '进阶驱逐舰制造',
+  'Advanced Cruiser Manufacture': '进阶巡洋舰制造', 'Advanced Battlecruiser Manufacture': '进阶战列巡洋舰制造',
+  'Advanced Battleship Manufacture': '进阶战列舰制造', 'Advanced Industrial Ship Manufacture': '进阶工业舰制造',
+  'Advanced Capital Ship Manufacture': '进阶旗舰制造', 'Advanced Carrier Manufacture': '进阶航母制造',
+  'Advanced Dreadnought Manufacture': '进阶无畏舰制造', 'Advanced Freighter Manufacture': '进阶货舰制造',
+  'Advanced Jump Freighter Manufacture': '进阶跳跃货舰制造',
+  'Advanced Capital Industrial Ship Manufacture': '进阶旗舰工业舰制造',
   'Expert Frigate Manufacture': '专家护卫舰制造', 'Expert Destroyer Manufacture': '专家驱逐舰制造',
   'Expert Cruiser Manufacture': '专家巡洋舰制造', 'Expert Battlecruiser Manufacture': '专家战列巡洋舰制造',
   'Expert Battleship Manufacture': '专家战列舰制造', 'Expert Industrial Ship Manufacture': '专家工业舰制造',
@@ -229,29 +229,29 @@ const SKILL_ZH_MAP: Record<string, string> = {
   'Expert Dreadnought Manufacture': '专家无畏舰制造', 'Expert Freighter Manufacture': '专家货舰制造',
   'Expert Jump Freighter Manufacture': '专家跳跃货舰制造',
   'Expert Capital Industrial Ship Manufacture': '专家旗舰工业舰制造',
-  'Module Manufacture': '模块制造', 'Advanced Module Manufacture': '高级模块制造',
+  'Module Manufacture': '模块制造', 'Advanced Module Manufacture': '进阶模块制造',
   'Capital Module Manufacture': '旗舰模块制造',
-  'Advanced Capital Module Manufacture': '高级旗舰模块制造',
+  'Advanced Capital Module Manufacture': '进阶旗舰模块制造',
   'Expert Module Manufacture': '专家模块制造',
   'Expert Capital Module Manufacture': '专家旗舰模块制造',
-  'Ammunition Manufacture': '弹药制造', 'Advanced Ammunition Manufacture': '高级弹药制造',
+  'Ammunition Manufacture': '弹药制造', 'Advanced Ammunition Manufacture': '进阶弹药制造',
   'Expert Ammunition Manufacture': '专家弹药制造',
-  'Chip Manufacture': '芯片制造', 'Advanced Chip Manufacture': '高级芯片制造',
+  'Chip Manufacture': '芯片制造', 'Advanced Chip Manufacture': '进阶芯片制造',
   'Expert Chip Manufacture': '专家芯片制造',
-  'Implant Manufacture': '植入体制造', 'Advanced Implant Manufacture': '高级植入体制造',
+  'Implant Manufacture': '植入体制造', 'Advanced Implant Manufacture': '进阶植入体制造',
   'Expert Implant Manufacture': '专家植入体制造',
-  'Rig Manufacture': '改装件制造', 'Advanced Rig Manufacture': '高级改装件制造',
+  'Rig Manufacture': '改装件制造', 'Advanced Rig Manufacture': '进阶改装件制造',
   'Expert Rig Manufacture': '专家改装件制造',
   'Capital Rig Manufacture': '旗舰改装件制造',
-  'Advanced Capital Rig Manufacture': '高级旗舰改装件制造',
+  'Advanced Capital Rig Manufacture': '进阶旗舰改装件制造',
   'Expert Capital Rig Manufacture': '专家旗舰改装件制造',
-  'Structure Construction': '建筑建造', 'Advanced Structure Construction': '高级建筑建造',
+  'Structure Construction': '建筑建造', 'Advanced Structure Construction': '进阶建筑建造',
   'Expert Structure Construction': '专家建筑建造',
   'Polymer Material Manufacture': '聚合物材料制造',
-  'Advanced Polymer Material Manufacture': '高级聚合物材料制造',
+  'Advanced Polymer Material Manufacture': '进阶聚合物材料制造',
   'Expert Polymer Material Manufacture': '专家聚合物材料制造',
   'Capital Ship Component Manufacture': '旗舰组件制造',
-  'Advanced Capital Ship Component Manufacture': '高级旗舰组件制造',
+  'Advanced Capital Ship Component Manufacture': '进阶旗舰组件制造',
   'Expert Capital Ship Component Manufacture': '专家旗舰组件制造',
 };
 
@@ -365,8 +365,8 @@ export const CORP_MODULES: CorpModule[] = [
 /** 军团科技数据 */
 export const CORP_TECHS: CorpTech[] = [
   { name: 'Manufacturing Technology', nameZh: '制造技术', maxLevel: 3, meBonusPerLevel: 1, teBonusPerLevel: -1 },
-  { name: 'Advanced Manufacturing Technology', nameZh: '高级制造技术', maxLevel: 5, meBonusPerLevel: 1, teBonusPerLevel: -1 },
-  { name: 'Advanced Manufacturing Technology II', nameZh: '高级制造技术 II', maxLevel: 5, meBonusPerLevel: 1, teBonusPerLevel: -1 },
+  { name: 'Advanced Manufacturing Technology', nameZh: '进阶制造技术', maxLevel: 5, meBonusPerLevel: 1, teBonusPerLevel: -1 },
+  { name: 'Advanced Manufacturing Technology II', nameZh: '进阶制造技术 II', maxLevel: 5, meBonusPerLevel: 1, teBonusPerLevel: -1 },
 ];
 
 // ==================== Decryptor 数据 ====================
@@ -479,23 +479,25 @@ export function isSkillRelevant(skillEngName: string, category: string): boolean
   return keywords.some((kw) => skillEngName.includes(kw));
 }
 
-/** 计算指定分类的技能ME总减免（正数=减少的百分比点） */
+/** 计算指定分类的技能ME总减免（正数=减少的百分比点）
+ * 规则：Base 技能每级 -6%，Advanced 每级 -4%，Expert 每级 -3%
+ * 不再依赖 API 数据，直接根据技能英文名关键词判定
+ */
 export function calcCategorySkillMEReduction(
   category: string,
   userSkills: Record<string, number>,
-  apiSkills: EchoesIndustrySkill[],
 ): { totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] } {
   let totalReduction = 0;
   const matchedSkills: { name: string; level: number; reduction: number }[] = [];
   Object.entries(userSkills).forEach(([engName, level]) => {
     if (level > 0 && isSkillRelevant(engName, category)) {
       const zhName = toSkillChineseName(engName);
-      const apiSkill = apiSkills.find((s) => s.name === engName || s.name === zhName);
-      if (apiSkill && level <= apiSkill.efficiencyPerLevel.length) {
-        const reduction = (apiSkill.efficiencyPerLevel[level - 1] || 0) / 100;
-        totalReduction += reduction;
-        matchedSkills.push({ name: zhName, level, reduction });
-      }
+      let reductionPerLevel = 0.06; // Base: 6%
+      if (engName.includes('Advanced')) reductionPerLevel = 0.04;
+      else if (engName.includes('Expert')) reductionPerLevel = 0.03;
+      const reduction = reductionPerLevel * level;
+      totalReduction += reduction;
+      matchedSkills.push({ name: zhName, level, reduction });
     }
   });
   return { totalReduction, matchedSkills };

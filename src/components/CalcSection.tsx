@@ -8,12 +8,10 @@ import type { ICalcParams, IPlanResult, PlanVariant } from '@/data/materials';
 import { calculatePlans, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
-  fetchIndustrySkills,
   loadUserSkills,
   loadCorpConfig,
   calcCategorySkillMEReduction,
   calcCorpMEReduction,
-  type EchoesIndustrySkill,
 } from '@/lib/echoes-api';
 
 interface CalcSectionProps {
@@ -112,27 +110,20 @@ function PlanCard({ plan, highlighted }: { plan: IPlanResult; highlighted?: bool
 }
 
 export default function CalcSection({ params, onParamChange, linkedMaterialTotal, selectedCategory }: CalcSectionProps) {
-  const [apiSkills, setApiSkills] = useState<EchoesIndustrySkill[]>([]);
   const [skillResult, setSkillResult] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
   const [corpReduction, setCorpReduction] = useState(0);
-
-  useEffect(() => {
-    fetchIndustrySkills().then(setApiSkills).catch(() => {});
-  }, []);
 
   useEffect(() => {
     const handler = () => {
       const skills = loadUserSkills();
       const corp = loadCorpConfig();
-      if (apiSkills.length > 0) {
-        setSkillResult(calcCategorySkillMEReduction(selectedCategory, skills, apiSkills));
-      }
+      setSkillResult(calcCategorySkillMEReduction(selectedCategory, skills));
       setCorpReduction(calcCorpMEReduction(corp) / 100);
     };
     window.addEventListener('storage', handler);
     handler();
     return () => window.removeEventListener('storage', handler);
-  }, [apiSkills, selectedCategory]);
+  }, [selectedCategory]);
 
   // 计算综合效率并同步
   useEffect(() => {

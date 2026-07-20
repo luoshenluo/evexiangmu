@@ -57,13 +57,13 @@ const TECHS: TechEntry[] = [
   },
   {
     engName: 'Advanced Manufacturing Technology',
-    cnName: '高级制造技术',
+    cnName: '进阶制造技术',
     maxLevel: 5,
     desc: '每级 +1% ME，-1% TE',
   },
   {
     engName: 'Advanced Manufacturing Technology II',
-    cnName: '高级制造技术 II',
+    cnName: '进阶制造技术 II',
     maxLevel: 5,
     desc: '每级 +1% ME，-1% TE',
   },

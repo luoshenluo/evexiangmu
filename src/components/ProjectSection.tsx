@@ -11,12 +11,10 @@ import { formatNumber } from '@/lib/utils';
 import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
 import { emptyMaterials } from '@/components/shared/emptyMaterials';
 import {
-  fetchIndustrySkills,
   loadUserSkills,
   calcCategorySkillMEReduction,
   loadCorpConfig,
   calcCorpMEReduction,
-  type EchoesIndustrySkill,
 } from '@/lib/echoes-api';
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Ship; color: string }> = {
@@ -292,20 +290,15 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [mobileView, setMobileView] = useState<'categories' | 'list'>('categories');
   // 技能/军团数据（用于显示匹配的技能）
-  const [apiSkills, setApiSkills] = useState<EchoesIndustrySkill[]>([]);
   const [skillMatched, setSkillMatched] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
   const [corpReduction, setCorpReduction] = useState(0);
-
-  useEffect(() => {
-    fetchIndustrySkills().then(setApiSkills).catch(() => {});
-  }, []);
 
   useEffect(() => {
     const refresh = () => {
       const skills = loadUserSkills();
       const corp = loadCorpConfig();
-      if (apiSkills.length > 0 && selected?.category) {
-        setSkillMatched(calcCategorySkillMEReduction(selected.category, skills, apiSkills));
+      if (selected?.category) {
+        setSkillMatched(calcCategorySkillMEReduction(selected.category, skills));
       } else {
         setSkillMatched({ totalReduction: 0, matchedSkills: [] });
       }
@@ -314,7 +307,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     window.addEventListener('storage', refresh);
     refresh();
     return () => window.removeEventListener('storage', refresh);
-  }, [apiSkills, selected?.category]);
+  }, [selected?.category]);
   const handleMobileSelect = (project: IManufactureProject) => {
     setSelectedId(project.id);
     setViewMode('detail');
