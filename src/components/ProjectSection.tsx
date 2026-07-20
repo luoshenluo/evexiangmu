@@ -39,12 +39,18 @@ interface ProjectSectionProps {
 
 type ViewMode = 'detail' | 'create' | 'edit';
 
-function MaterialGroup({ title, icon: Icon, items, quantities, onChange, color }: {
-  title: string; icon: typeof Gem; items: { name: string }[]; quantities: number[]; onChange?: (index: number, value: number) => void; defaultOpen?: boolean; color: string;
+function MaterialGroup({ title, icon: Icon, items, quantities, onChange, color, efficiency }: {
+  title: string; icon: typeof Gem; items: { name: string }[]; quantities: number[]; onChange?: (index: number, value: number) => void; defaultOpen?: boolean; color: string; efficiency?: number;
 }) {
   const [open, setOpen] = useState(false);
   const isEditable = !!onChange;
-  const getQty = (idx: number): number => (quantities[idx] ?? 0);
+  const getQty = (idx: number): number => {
+    const raw = quantities[idx] ?? 0;
+    if (isEditable || !efficiency) return raw;
+    // 预设数量是150%效率下的数量，先算出白板基准，再乘以当前效率
+    const base = raw / 1.5;
+    return Math.max(0, Math.round(base * efficiency));
+  };
 
   return (
     <div className="rounded-lg border border-[#3A3A3A] bg-[#1E1E1E]/60 overflow-hidden">
@@ -484,10 +490,13 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
         {selected.materials && (
           <div className="px-4 pt-4">
             <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
-              <MaterialGroup title="矿物明细" icon={Gem} color="text-[#F59E0B]" items={PRESET_MINERALS} quantities={selected.materials.minerals} />
-              <MaterialGroup title="船材明细" icon={Rocket} color="text-[#06B6D4]" items={PRESET_SHIP_MATERIALS} quantities={selected.materials.shipMaterials} />
-              <MaterialGroup title="建材明细" icon={Boxes} color="text-[#22C55E]" items={PRESET_BUILD_MATERIALS} quantities={selected.materials.buildMaterials} />
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
+                <span className="text-[11px] text-[#A78BFA]">按 {(Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction)) * 100).toFixed(1)}% 效率显示</span>
+              </div>
+              <MaterialGroup title="矿物明细" icon={Gem} color="text-[#F59E0B]" items={PRESET_MINERALS} quantities={selected.materials.minerals} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
+              <MaterialGroup title="船材明细" icon={Rocket} color="text-[#06B6D4]" items={PRESET_SHIP_MATERIALS} quantities={selected.materials.shipMaterials} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
+              <MaterialGroup title="建材明细" icon={Boxes} color="text-[#22C55E]" items={PRESET_BUILD_MATERIALS} quantities={selected.materials.buildMaterials} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
             </div>
           </div>
         )}
@@ -643,10 +652,13 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
             {selected.materials && (
               <div className="px-4 pt-4">
                 <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
-                  <MaterialGroup title="矿物明细" icon={Gem} color="text-[#F59E0B]" items={PRESET_MINERALS} quantities={selected.materials.minerals} />
-                  <MaterialGroup title="船材明细" icon={Rocket} color="text-[#06B6D4]" items={PRESET_SHIP_MATERIALS} quantities={selected.materials.shipMaterials} />
-                  <MaterialGroup title="建材明细" icon={Boxes} color="text-[#22C55E]" items={PRESET_BUILD_MATERIALS} quantities={selected.materials.buildMaterials} />
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white">材料数量明细</h3>
+                    <span className="text-[11px] text-[#A78BFA]">按 {(Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction)) * 100).toFixed(1)}% 效率显示</span>
+                  </div>
+                  <MaterialGroup title="矿物明细" icon={Gem} color="text-[#F59E0B]" items={PRESET_MINERALS} quantities={selected.materials.minerals} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
+                  <MaterialGroup title="船材明细" icon={Rocket} color="text-[#06B6D4]" items={PRESET_SHIP_MATERIALS} quantities={selected.materials.shipMaterials} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
+                  <MaterialGroup title="建材明细" icon={Boxes} color="text-[#22C55E]" items={PRESET_BUILD_MATERIALS} quantities={selected.materials.buildMaterials} efficiency={Math.max(0.5, Math.min(1.5, 1.5 - skillMatched.totalReduction - corpReduction))} />
                 </div>
               </div>
             )}
