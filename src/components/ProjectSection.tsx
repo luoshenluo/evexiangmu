@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
-  ChevronDown, ChevronUp, Check, Trash2, Edit3, ArrowLeft, Save,
+  ChevronDown, ChevronUp, Check, Trash2, Edit3, ArrowLeft, Save, Plus,
   Ship, Coins, FileText, Tag, TrendingUp, Gem, Rocket, Boxes, ChevronRight,
   Search, Shield, Swords, Anchor, Factory, Crosshair,
 } from 'lucide-react';
