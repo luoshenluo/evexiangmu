@@ -11,6 +11,8 @@ import { PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS, DEFAULT
 import { sumMaterials } from '@/lib/utils';
 import { loadMaterialPrices, getAnnouncement, type MarketDataItem, type Announcement } from '@/lib/admin-projects';
 import MarketPage from '@/pages/MarketPage/MarketPage';
+import SkillsPage from '@/pages/SkillsPage/SkillsPage';
+import CorpPage from '@/pages/CorpPage/CorpPage';
 
 const STORAGE_KEYS = { minerals: 'eve_minerals_v3', shipMaterials: 'eve_ship_materials_v3', buildMaterials: 'eve_build_materials_v3', calcParams: 'eve_calc_params_v3', activeTab: 'eve_active_tab_v3' };
 
@@ -71,6 +73,8 @@ export default function HomePage() {
       case 'ship': return <MaterialInputSection title="船材录入" subtitle="输入舰船材料单价和数量，自动计算每项总价（单位：亿 ISK）" materials={shipMaterials} onChange={setShipMaterials} />;
       case 'build': return <MaterialInputSection title="建材录入" subtitle="输入建筑材料单价和数量，自动计算每项总价（单位：亿 ISK）" materials={buildMaterials} onChange={setBuildMaterials} />;
       case 'market': return <MarketPage onImport={handleImportMarket} />;
+      case 'skills': return <SkillsPage />;
+      case 'corp': return <CorpPage />;
       default: return null;
     }
   };

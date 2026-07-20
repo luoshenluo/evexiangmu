@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Users, Calculator, Ship, Gem, Rocket, Boxes, Store } from 'lucide-react';
+import { Settings, Users, Calculator, Ship, Gem, Rocket, Boxes, Store, Trophy, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getOnlineCount } from '@/lib/admin-projects';
 import type { TabKey } from '@/components/BottomTabBar';
@@ -12,6 +12,8 @@ const DESKTOP_TABS: { key: TabKey; label: string; Icon: typeof Calculator }[] = 
   { key: 'ship', label: '船材', Icon: Rocket },
   { key: 'build', label: '建材', Icon: Boxes },
   { key: 'market', label: '市场', Icon: Store },
+  { key: 'skills', label: '技能', Icon: Trophy },
+  { key: 'corp', label: '军团', Icon: Building2 },
 ];
 
 interface HeaderProps {
