@@ -292,7 +292,7 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
   const currentGroup = SKILL_GROUPS[activeGroup];
 
   return (
-    <div className="flex flex-col h-full bg-[#0D0D0D] text-white">
+    <div className="flex flex-col min-h-full bg-[#0D0D0D] text-white">
       {/* ===== 顶部标题栏 ===== */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-[#2C2C2C] bg-[#0D0D0D] shrink-0">
         {onBack && (
@@ -342,7 +342,6 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
           })}
         </nav>
 
-        {/* ----- 移动端 + 桌面端右侧：技能列表 ----- */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* 移动端顶部 Tab */}
           <div className="flex md:hidden gap-1 px-3 py-2.5 border-b border-[#2C2C2C] overflow-x-auto shrink-0">
@@ -374,7 +373,7 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
           </div>
 
           {/* 技能列表 */}
-          <div className="flex-1 overflow-y-auto px-3 md:px-5 py-3 md:py-4 space-y-2">
+          <div className="flex-1 px-3 md:px-5 py-3 md:py-4 space-y-2">
             {currentGroup.skills.map((skill) => (
               <SkillRow
                 key={skill.engName}
@@ -390,7 +389,7 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
       </div>
 
       {/* ===== 底部操作栏 ===== */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0 gap-3 sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0_0_0_0.3)]">
+      <div className="sticky bottom-0 z-10 flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0 gap-3 shadow-[0_-4px_12px_rgba(0_0_0_0.3)]">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm text-[#A0A0A0]">
             已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
