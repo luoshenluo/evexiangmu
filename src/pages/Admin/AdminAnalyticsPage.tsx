@@ -75,8 +75,8 @@ export default function AdminAnalyticsPage() {
       setOnlineCount(settledValue(results[0], 0));
       const today = settledValue(results[1], { pageViews: 0, uniqueVisitors: 0 });
       setTodayPv(today.pageViews); setTodayUv(today.uniqueVisitors);
-      const total = settledValue(results[2], { totalPv: 0, totalDays: 0, avgDailyPv: 0 });
-      setTotalPv(total.totalPv); setTotalDays(total.totalDays); setAvgDailyPv(total.avgDailyPv);
+      const total = settledValue(results[2], { totalPV: 0, totalDays: 0, avgPV: 0 });
+      setTotalPv(total.totalPV); setTotalDays(total.totalDays); setAvgDailyPv(total.avgPV);
       setDailyData(settledValue(results[3], [])); setHourlyData(settledValue(results[4], []));
       setPageDist(settledValue(results[5], [])); setOnlineVisitors(settledValue(results[6], []));
     } catch (err) { console.error(err); setError('数据加载异常'); } finally { setLoading(false); setRefreshing(false); loadingRef.current = false; }

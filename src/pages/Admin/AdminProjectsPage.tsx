@@ -64,6 +64,31 @@ export default function AdminProjectsPage() {
           </div>
         )}
       </div>
+
+      {!loading && <div className="md:hidden space-y-2">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-[#888]"><Package className="h-8 w-8 opacity-50" /><span className="text-sm">暂无匹配的项目</span></div>
+        ) : filtered.map((project) => (
+          <div key={project.id} className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-medium text-white truncate">{project.name}</span>
+                <span className="shrink-0 rounded-md bg-[#7C3AED]/15 px-2 py-0.5 text-[10px] text-[#A78BFA]">{project.category}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => navigate('/admin/projects/' + project.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-[#A0A0A0] transition-colors hover:bg-[#7C3AED]/15 hover:text-[#A78BFA]"><Edit3 className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setDeleteTarget(project)} className="flex h-7 w-7 items-center justify-center rounded-md text-[#A0A0A0] transition-colors hover:bg-[#DC2626]/15 hover:text-[#EF4444]"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <div className="rounded bg-[#1a1a1a] px-1.5 py-1"><div className="text-[9px] text-[#666]">材料</div><div className="text-xs text-white tabular-nums">{formatNumber(project.materialCost150)}</div></div>
+              <div className="rounded bg-[#1a1a1a] px-1.5 py-1"><div className="text-[9px] text-[#666]">蓝图</div><div className="text-xs text-white tabular-nums">{formatNumber(project.blueprintPrice)}</div></div>
+              <div className="rounded bg-[#1a1a1a] px-1.5 py-1"><div className="text-[9px] text-[#666]">制造费</div><div className="text-xs text-white tabular-nums">{formatNumber(project.fixedManufactureFee)}</div></div>
+              <div className="rounded bg-[#1a1a1a] px-1.5 py-1"><div className="text-[9px] text-[#666]">收购价</div><div className="text-xs text-[#22C55E] tabular-nums">{formatNumber(project.buyOrderPrice)}</div></div>
+            </div>
+          </div>
+        ))}
+      </div>}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="w-full max-w-sm rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-5 shadow-2xl">

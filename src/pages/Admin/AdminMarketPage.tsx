@@ -87,6 +87,37 @@ export default function AdminMarketPage() {
           </tbody>
         </table>
       </div>
+
+      <div className="md:hidden space-y-2">
+        {items.length === 0 ? (
+          <div className="py-10 text-center text-sm text-[#666]">暂无数据</div>
+        ) : items.map((item) => (
+          <div key={item.id} className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <TabIcon className="h-4 w-4 shrink-0" style={{ color: currentTab.color }} />
+              <span className="text-sm font-medium text-white">{item.name}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-[#111] p-2 space-y-1.5">
+                <span className="text-[10px] text-green-400 flex items-center gap-1"><TrendingUp className="h-3 w-3" />市场出售</span>
+                <div className="grid grid-cols-3 gap-1">
+                  <div><span className="text-[9px] text-[#666]">价格</span><input type="number" value={item.sell_price || ''} onChange={e => handleChange(item.id, 'sell_price', parseFloat(e.target.value) || 0)} className={inputClsGreen + ' h-6 text-xs'} /></div>
+                  <div><span className="text-[9px] text-[#666]">数量</span><input type="number" value={item.sell_quantity || ''} onChange={e => handleChange(item.id, 'sell_quantity', parseFloat(e.target.value) || 0)} className={inputCls + ' h-6 text-xs'} /></div>
+                  <div><span className="text-[9px] text-[#666]">地点</span><input value={item.sell_location || ''} onChange={e => handleChange(item.id, 'sell_location', e.target.value)} className={inputCls + ' h-6 text-xs'} /></div>
+                </div>
+              </div>
+              <div className="rounded-lg bg-[#111] p-2 space-y-1.5">
+                <span className="text-[10px] text-blue-400 flex items-center gap-1"><TrendingDown className="h-3 w-3" />收购订单</span>
+                <div className="grid grid-cols-3 gap-1">
+                  <div><span className="text-[9px] text-[#666]">价格</span><input type="number" value={item.buy_price || ''} onChange={e => handleChange(item.id, 'buy_price', parseFloat(e.target.value) || 0)} className={inputClsBlue + ' h-6 text-xs'} /></div>
+                  <div><span className="text-[9px] text-[#666]">数量</span><input type="number" value={item.buy_quantity || ''} onChange={e => handleChange(item.id, 'buy_quantity', parseFloat(e.target.value) || 0)} className={inputCls + ' h-6 text-xs'} /></div>
+                  <div><span className="text-[9px] text-[#666]">地点</span><input value={item.buy_location || ''} onChange={e => handleChange(item.id, 'buy_location', e.target.value)} className={inputCls + ' h-6 text-xs'} /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
