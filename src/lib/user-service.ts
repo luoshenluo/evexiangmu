@@ -278,7 +278,8 @@ export async function deleteUser(username: string): Promise<void> {
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabaseClient()!;
-      await supabase.from('app_users').delete().eq('username', username);
+      const { error } = await supabase.from('app_users').delete().eq('username', username);
+      if (error) throw error;
       return;
     } catch (err) {
       console.error('[deleteUser] Supabase error, falling back:', err);

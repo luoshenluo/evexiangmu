@@ -3,6 +3,31 @@ import ReactECharts from 'echarts-for-react';
 import { Users, Eye, UserCheck, TrendingUp, RefreshCw, Monitor, Globe, Clock, Loader2 } from 'lucide-react';
 import { getOnlineCount, getOnlineVisitors, getTodayStats, getDailyAnalytics, getTodayPageDistribution, getTodayHourlyDistribution, getTotalStats, type OnlineVisitor } from '@/lib/admin-projects';
 
+/** 页面路径 → 中文名称 */
+const PAGE_NAME_MAP: Record<string, string> = {
+  '/': '首页',
+  '/admin': '管理后台',
+  '/user/login': '用户登录',
+  '/user/register': '用户注册',
+  '/user/forgot-password': '忘记密码',
+  '/user/profile': '个人中心',
+  '/skills': '技能配置',
+  '/corp': '军团配置',
+  '/materials': '材料录入',
+  '/calc': '成本计算',
+  '/projects': '制造项目',
+  '/market': '市场数据',
+  '/admin/projects': '项目管理',
+  '/admin/materials': '材料管理',
+  '/admin/accounts': '账号管理',
+  '/admin/analytics': '数据分析',
+  '/admin/settings': '公告管理',
+  '/admin/users': '用户管理',
+};
+function getPageName(page: string): string {
+  return PAGE_NAME_MAP[page] || page;
+}
+
 function StatCard({ icon, label, value, sub, color, bgColor }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string; bgColor: string; }) {
   return (
     <div className="rounded-xl border border-[#2C2C2C] bg-[#1a1a1a] p-3 md:p-4 transition-colors hover:bg-[#222]">
@@ -117,7 +142,7 @@ export default function AdminAnalyticsPage() {
   const pageDistOption = useMemo(() => ({
     backgroundColor: 'transparent',
     tooltip: { trigger: 'item' as const, backgroundColor: '#2C2C2C', borderColor: '#3A3A3A', textStyle: { color: '#fff', fontSize: 11 }, confine: true, formatter: '{b}: {c} ({d}%)' },
-    series: [{ type: 'pie', radius: isMobile ? ['40%', '65%'] : ['45%', '70%'], center: ['50%', '55%'], avoidLabelOverlap: true, label: { color: '#aaa', fontSize: isMobile ? 9 : 11, formatter: isMobile ? '{d}%' : '{b}\n{d}%' }, labelLine: { length: isMobile ? 8 : 15, length2: isMobile ? 5 : 10, lineStyle: { color: '#555' } }, data: pageDist.map((p) => ({ name: p.page, value: p.count })), color: ['#7C3AED', '#22d3ee', '#fbbf24', '#34d399', '#f472b6', '#fb923c', '#a78bfa', '#38bdf8'], itemStyle: { borderColor: '#1a1a1a', borderWidth: 2 } }],
+    series: [{ type: 'pie', radius: isMobile ? ['40%', '65%'] : ['45%', '70%'], center: ['50%', '55%'], avoidLabelOverlap: true, label: { color: '#aaa', fontSize: isMobile ? 9 : 11, formatter: isMobile ? '{d}%' : '{b}\n{d}%' }, labelLine: { length: isMobile ? 8 : 15, length2: isMobile ? 5 : 10, lineStyle: { color: '#555' } }, data: pageDist.map((p) => ({ name: getPageName(p.page), value: p.count })), color: ['#7C3AED', '#22d3ee', '#fbbf24', '#34d399', '#f472b6', '#fb923c', '#a78bfa', '#38bdf8'], itemStyle: { borderColor: '#1a1a1a', borderWidth: 2 } }],
   }), [pageDist, isMobile]);
 
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="text-[#888] flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />加载中...</div></div>;
