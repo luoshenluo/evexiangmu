@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Minus, Maximize2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, ChevronRight, Minus, Maximize2, Save, Check } from 'lucide-react';
 
 /* ============================
    技能数据定义
@@ -245,10 +245,20 @@ function SkillRow({ skill, level, onLevelChange, onSetMin, onSetMax }: SkillRowP
 export default function SkillsPage({ onBack }: SkillsPageProps) {
   const [activeGroup, setActiveGroup] = useState(0);
   const [skills, setSkills] = useState<Record<string, number>>(() => loadSkills());
+  const [savedSkills, setSavedSkills] = useState<Record<string, number>>(() => loadSkills());
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 持久化技能数据
-  useEffect(() => {
+  const hasChanges = JSON.stringify(skills) !== JSON.stringify(savedSkills);
+
+  /** 手动保存 */
+  const handleSave = useCallback(() => {
     saveSkills(skills);
+    setSavedSkills({ ...skills });
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
+    setShowSaved(true);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setShowSaved(false), 2000);
   }, [skills]);
 
   /** 修改单个技能等级 */
@@ -379,21 +389,38 @@ export default function SkillsPage({ onBack }: SkillsPageProps) {
         </div>
       </div>
 
-      {/* ===== 底部统计栏 ===== */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0">
-        <span className="text-sm text-[#A0A0A0]">
-          已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
-        </span>
-        {configuredCount > 0 && (
+      {/* ===== 底部操作栏 ===== */}
+      <div className="flex items-center justify-between px-4 py-3 border-t border-[#2C2C2C] bg-[#1E1E1E] shrink-0 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm text-[#A0A0A0]">
+            已配置 <span className="font-bold text-[#A78BFA]">{configuredCount}</span> / {totalSkills} 项技能
+          </span>
+          {hasChanges && <span className="text-[10px] text-[#F59E0B] bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-md shrink-0">未保存</span>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {configuredCount > 0 && (
+            <button
+              onClick={() => { setSkills({}); }}
+              className="text-xs text-[#888888] hover:text-red-400 transition-colors duration-200 px-2 py-1.5 rounded-lg hover:bg-[#2C2C2C]"
+            >
+              全部清空
+            </button>
+          )}
           <button
-            onClick={() => {
-              setSkills({});
-            }}
-            className="text-xs text-[#888888] hover:text-red-400 transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-[#2C2C2C]"
+            onClick={handleSave}
+            disabled={!hasChanges}
+            className={`
+              flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95
+              ${hasChanges
+                ? 'bg-[#7C3AED] text-white shadow-[0_4px_12px_rgba(124_58_237_0.35)] hover:bg-[#6D28D9]'
+                : 'bg-[#2C2C2C] text-[#888888] cursor-not-allowed'
+              }
+            `}
           >
-            全部清空
+            {showSaved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+            {showSaved ? '已保存' : '保存配置'}
           </button>
-        )}
+        </div>
       </div>
     </div>
   );

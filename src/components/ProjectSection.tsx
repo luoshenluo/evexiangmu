@@ -290,6 +290,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
 
   // 手机端选中后切换视图，避免上下滚动
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [mobileView, setMobileView] = useState<'categories' | 'list'>('categories');
   // 技能/军团数据（用于显示匹配的技能）
   const [apiSkills, setApiSkills] = useState<EchoesIndustrySkill[]>([]);
   const [skillMatched, setSkillMatched] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
@@ -319,6 +320,89 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     setViewMode('detail');
     setMobileShowDetail(true);
   };
+  const handleMobileCategorySelect = (cat: string) => {
+    setActiveCat(cat);
+    setMobileView('list');
+  };
+
+  // ========== 移动端：大类网格视图 ==========
+  if (!mobileShowDetail && mobileView === 'categories') {
+    return (
+      <div className="h-full overflow-y-auto pb-24">
+        <div className="px-4 pt-4 pb-3">
+          <h2 className="text-lg font-semibold text-white">制造项目</h2>
+          <p className="mt-1 text-sm text-[#A0A0A0]">选择舰船大类，查看可制造的舰船</p>
+        </div>
+        <div className="px-4 grid grid-cols-2 gap-3">
+          {categoryNames.map((cat) => {
+            const cfg = CATEGORY_CONFIG[cat] ?? DEFAULT_CAT_CONFIG;
+            const Icon = cfg.icon;
+            const count = categories.get(cat)?.length ?? 0;
+            return (
+              <button key={cat} onClick={() => handleMobileCategorySelect(cat)}
+                className="flex flex-col items-center gap-2 rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-4 transition-all hover:border-[#7C3AED]/60 active:scale-[0.97]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1E1E1E] border border-[#3A3A3A]">
+                  <Icon className={`h-6 w-6 ${cfg.color}`} />
+                </div>
+                <div className="text-sm font-medium text-white">{cat}</div>
+                <div className="text-[11px] text-[#888888]">{count} 个项目</div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="px-4 pt-4">
+          <button onClick={handleAddNew} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#7C3AED]/50 bg-[#7C3AED]/10 px-4 py-3.5 text-sm font-semibold text-[#A78BFA] transition-all hover:bg-[#7C3AED]/20 active:scale-[0.98]"><Plus className="h-4 w-4" />新建自定义项目</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ========== 移动端：舰船列表视图 ==========
+  if (!mobileShowDetail && mobileView === 'list') {
+    const catCfg = CATEGORY_CONFIG[activeCat] ?? DEFAULT_CAT_CONFIG;
+    const CatIcon = catCfg.icon;
+    return (
+      <div className="h-full overflow-y-auto pb-24">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+          <button onClick={() => setMobileView('categories')} className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2C2C2C] border border-[#3A3A3A] text-white transition-colors hover:border-[#555555]"><ArrowLeft className="h-4 w-4" /></button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <CatIcon className={`h-5 w-5 ${catCfg.color}`} />
+              <h2 className="text-lg font-semibold text-white truncate">{activeCat}</h2>
+              <span className="text-xs text-[#888888]">{currentCatProjects.length} 项</span>
+            </div>
+          </div>
+          <button onClick={handleAddNew} className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#7C3AED]/50 bg-[#7C3AED]/10 text-[#A78BFA] transition-colors hover:bg-[#7C3AED]/20"><Plus className="h-4 w-4" /></button>
+        </div>
+        <div className="px-4 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#666666]" />
+            <input type="text" value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder={`在${activeCat}中搜索...`}
+              className="w-full rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] py-2.5 pl-9 pr-3 text-sm text-white placeholder-[#666666] outline-none transition-all focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/30" />
+          </div>
+        </div>
+        <div className="px-4 space-y-2">
+          {currentCatProjects.length === 0 ? (
+            <div className="py-12 text-center text-sm text-[#666666]">{searchText ? '没有匹配的项目' : '该分类暂无项目'}</div>
+          ) : (
+            currentCatProjects.map((project) => {
+              return (
+                <button key={project.id} onClick={() => handleMobileSelect(project)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] p-3.5 text-left transition-all hover:border-[#555555] active:scale-[0.99]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#1E1E1E] border border-[#3A3A3A]"><Ship className="h-5 w-5 text-[#A78BFA]" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-[#E0E0E0] truncate">{project.name}</div>
+                    <div className="text-[11px] text-[#888888] mt-0.5">材料 {formatNumber(project.materialCost150)} 亿</div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#888888]" />
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (mobileShowDetail && selected) {
     return (
