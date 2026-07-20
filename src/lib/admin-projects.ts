@@ -630,9 +630,11 @@ export async function getOnlineCount(): Promise<number> {
   if (!hasSupabase()) return 0;
   try {
     const supabase = getSupabaseClient()!;
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { count, error } = await supabase
       .from('site_visitors_online')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .gte('last_heartbeat', twoMinutesAgo);
     if (error) throw error;
     return count ?? 0;
   } catch (err) {
@@ -645,9 +647,11 @@ export async function getOnlineVisitors(): Promise<OnlineVisitor[]> {
   if (!hasSupabase()) return [];
   try {
     const supabase = getSupabaseClient()!;
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('site_visitors_online')
       .select('*')
+      .gte('last_heartbeat', twoMinutesAgo)
       .order('last_heartbeat', { ascending: false });
     if (error) throw error;
     return (data as OnlineVisitor[]) || [];

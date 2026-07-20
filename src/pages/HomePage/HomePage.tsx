@@ -16,14 +16,15 @@ import CorpPage from '@/pages/CorpPage/CorpPage';
 
 const STORAGE_KEYS = { minerals: 'eve_minerals_v3', shipMaterials: 'eve_ship_materials_v3', buildMaterials: 'eve_build_materials_v3', calcParams: 'eve_calc_params_v3', activeTab: 'eve_active_tab_v3' };
 
-function loadFromStorage<T>(key: string, fallback: T): T { try { const raw = localStorage.getItem(key); if (raw) return JSON.parse(raw) as T; } catch { /* ignore */ } return fallback; }
+function loadFromStorage<T>(key: string, fallback: T, useSession = false): T { try { const raw = useSession ? sessionStorage.getItem(key) : localStorage.getItem(key); if (raw) return JSON.parse(raw) as T; } catch { /* ignore */ } return fallback; }
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<TabKey>(() => loadFromStorage<TabKey>(STORAGE_KEYS.activeTab, 'calc'));
-  const [minerals, setMinerals] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.minerals, PRESET_MINERALS));
-  const [shipMaterials, setShipMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.shipMaterials, PRESET_SHIP_MATERIALS));
-  const [buildMaterials, setBuildMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.buildMaterials, PRESET_BUILD_MATERIALS));
-  const [calcParams, setCalcParams] = useState<ICalcParams>(() => loadFromStorage<ICalcParams>(STORAGE_KEYS.calcParams, DEFAULT_CALC_PARAMS));
+  // 用户个人数据使用 sessionStorage，确保同一浏览器不同 Tab 之间互不干扰
+  const [activeTab, setActiveTab] = useState<TabKey>(() => loadFromStorage<TabKey>(STORAGE_KEYS.activeTab, 'calc', true));
+  const [minerals, setMinerals] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.minerals, PRESET_MINERALS, true));
+  const [shipMaterials, setShipMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.shipMaterials, PRESET_SHIP_MATERIALS, true));
+  const [buildMaterials, setBuildMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.buildMaterials, PRESET_BUILD_MATERIALS, true));
+  const [calcParams, setCalcParams] = useState<ICalcParams>(() => loadFromStorage<ICalcParams>(STORAGE_KEYS.calcParams, DEFAULT_CALC_PARAMS, true));
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showWelcome, setShowWelcome] = useState(false);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -32,11 +33,11 @@ export default function HomePage() {
 
   useEffect(() => { setCalcParams((prev) => { if (Math.abs(prev.materialCost150 - linkedMaterialTotal) < 0.0001) return prev; return { ...prev, materialCost150: linkedMaterialTotal }; }); }, [linkedMaterialTotal]);
 
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEYS.activeTab, JSON.stringify(activeTab)); } catch { /* ignore */ } }, [activeTab]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEYS.minerals, JSON.stringify(minerals)); } catch { /* ignore */ } }, [minerals]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEYS.shipMaterials, JSON.stringify(shipMaterials)); } catch { /* ignore */ } }, [shipMaterials]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEYS.buildMaterials, JSON.stringify(buildMaterials)); } catch { /* ignore */ } }, [buildMaterials]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams)); } catch { /* ignore */ } }, [calcParams]);
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEYS.activeTab, JSON.stringify(activeTab)); } catch { /* ignore */ } }, [activeTab]);
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEYS.minerals, JSON.stringify(minerals)); } catch { /* ignore */ } }, [minerals]);
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEYS.shipMaterials, JSON.stringify(shipMaterials)); } catch { /* ignore */ } }, [shipMaterials]);
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEYS.buildMaterials, JSON.stringify(buildMaterials)); } catch { /* ignore */ } }, [buildMaterials]);
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEYS.calcParams, JSON.stringify(calcParams)); } catch { /* ignore */ } }, [calcParams]);
 
   useEffect(() => {
     const syncMaterials = async () => {
