@@ -15,7 +15,7 @@ export interface ICalcParams {
   blueprintPrice: number;
   /** 固定制造费（亿ISK） */
   fixedManufactureFee: number;
-  /** 当前制造效率（默认0.85，受技能和军团影响） */
+  /** 当前制造效率（默认1.5即150%，受技能和军团影响减少） */
   manufactureEfficiency: number;
   /** 材料收购折扣（默认0.85） */
   materialDiscount: number;
@@ -88,7 +88,7 @@ export const DEFAULT_CALC_PARAMS: ICalcParams = {
   materialCost150: 4.4,
   blueprintPrice: 1.0,
   fixedManufactureFee: 0.2,
-  manufactureEfficiency: 0.85,
+  manufactureEfficiency: 1.5,
   materialDiscount: 0.85,
   buyOrderPrice: 5.0,
   marketSellPrice: 5.5,

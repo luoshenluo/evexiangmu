@@ -24,6 +24,7 @@ export default function HomePage() {
   const [shipMaterials, setShipMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.shipMaterials, PRESET_SHIP_MATERIALS));
   const [buildMaterials, setBuildMaterials] = useState<IMaterialItem[]>(() => loadFromStorage<IMaterialItem[]>(STORAGE_KEYS.buildMaterials, PRESET_BUILD_MATERIALS));
   const [calcParams, setCalcParams] = useState<ICalcParams>(() => loadFromStorage<ICalcParams>(STORAGE_KEYS.calcParams, DEFAULT_CALC_PARAMS));
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showWelcome, setShowWelcome] = useState(false);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
@@ -53,7 +54,7 @@ export default function HomePage() {
   useEffect(() => { if (announcement && announcement.enabled && announcement.content) setShowWelcome(true); }, [announcement]);
 
   const handleParamChange = <K extends keyof ICalcParams>(key: K, value: number) => { setCalcParams((prev) => ({ ...prev, [key]: value })); };
-  const handleImportProject = useCallback((project: IManufactureProject) => { setCalcParams((prev) => ({ ...prev, materialCost150: project.materialCost150, blueprintPrice: project.blueprintPrice, fixedManufactureFee: project.fixedManufactureFee, buyOrderPrice: project.buyOrderPrice, marketSellPrice: project.marketSellPrice })); }, []);
+  const handleImportProject = useCallback((project: IManufactureProject) => { setSelectedCategory(project.category || ''); setCalcParams((prev) => ({ ...prev, materialCost150: project.materialCost150, blueprintPrice: project.blueprintPrice, fixedManufactureFee: project.fixedManufactureFee, buyOrderPrice: project.buyOrderPrice, marketSellPrice: project.marketSellPrice })); }, []);
   const switchToCalc = useCallback(() => { setActiveTab('calc'); }, []);
 
   const handleImportMarket = useCallback((category: 'minerals' | 'ship_materials' | 'build_materials', items: MarketDataItem[]) => {
@@ -67,7 +68,7 @@ export default function HomePage() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'calc': return <CalcSection params={calcParams} onParamChange={handleParamChange} linkedMaterialTotal={linkedMaterialTotal} />;
+      case 'calc': return <CalcSection params={calcParams} onParamChange={handleParamChange} linkedMaterialTotal={linkedMaterialTotal} selectedCategory={selectedCategory} />;
       case 'project': return <ProjectSection onImportCost={handleImportProject} onImportMaterials={(mats) => { setMinerals(mats.minerals); setShipMaterials(mats.shipMaterials); setBuildMaterials(mats.buildMaterials); }} onSwitchToCalc={switchToCalc} onSwitchToMinerals={() => setActiveTab('minerals')} currentMinerals={minerals} currentShipMaterials={shipMaterials} currentBuildMaterials={buildMaterials} />;
       case 'minerals': return <MaterialInputSection title="矿物录入" subtitle="输入矿物单价和数量，自动计算每项总价（单位：亿 ISK）" materials={minerals} onChange={setMinerals} />;
       case 'ship': return <MaterialInputSection title="船材录入" subtitle="输入舰船材料单价和数量，自动计算每项总价（单位：亿 ISK）" materials={shipMaterials} onChange={setShipMaterials} />;
