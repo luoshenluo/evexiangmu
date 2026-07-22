@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, ChevronRight, Minus, Maximize2, Cloud, CloudOff } from 'lucide-react';
 import { getCurrentUser, saveUserCloudData, loadUserCloudData, fetchCloudDataFromSupabase } from '@/lib/user-service';
 
