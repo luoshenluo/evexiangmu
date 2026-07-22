@@ -54,19 +54,19 @@ const TECHS: TechEntry[] = [
     engName: 'Manufacturing Technology',
     cnName: '制造技术',
     maxLevel: 3,
-    desc: '每级 +1% ME，-1% TE',
+    desc: '每级 +1% 材料效率，-1% 制造时间',
   },
   {
     engName: 'Advanced Manufacturing Technology',
     cnName: '进阶制造技术',
     maxLevel: 5,
-    desc: '每级 +1% ME，-1% TE',
+    desc: '每级 +1% 材料效率，-1% 制造时间',
   },
   {
     engName: 'Advanced Manufacturing Technology II',
     cnName: '进阶制造技术 II',
     maxLevel: 5,
-    desc: '每级 +1% ME，-1% TE',
+    desc: '每级 +1% 材料效率，-1% 制造时间',
   },
 ];
 
@@ -118,11 +118,11 @@ const LevelButtons: React.FC<LevelButtonsProps> = ({ level, maxLevel, onChange }
 
   /** 构造按钮列表 */
   const buttons: { label: string; value: number; isBoundary?: boolean }[] = [
-    { label: 'Min', value: 0, isBoundary: true },
+    { label: '最小', value: 0, isBoundary: true },
     { label: '−', value: Math.max(0, level - 1) },
     ...Array.from({ length: maxLevel + 1 }, (_, i) => ({ label: `${i}`, value: i })),
     { label: '+', value: Math.min(maxLevel, level + 1) },
-    { label: 'Max', value: maxLevel, isBoundary: true },
+    { label: '最大', value: maxLevel, isBoundary: true },
   ];
 
   return (
@@ -259,7 +259,7 @@ const CorpPage: React.FC<CorpPageProps> = ({ onBack }) => {
 
         {/* ========== 分区1：模块 ========== */}
         <section className="mb-8">
-          <SectionTitle title="模块 (Modules)" />
+          <SectionTitle title="模块" />
           <div className="flex flex-col gap-3">
             {MODULES.map((mod) => (
               <ConfigRow
@@ -277,7 +277,7 @@ const CorpPage: React.FC<CorpPageProps> = ({ onBack }) => {
 
         {/* ========== 分区2：军团科技 ========== */}
         <section className="mb-8">
-          <SectionTitle title="军团科技 (Corp Technology)" />
+          <SectionTitle title="军团科技" />
           <div className="flex flex-col gap-3">
             {TECHS.map((tech) => (
               <ConfigRow

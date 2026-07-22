@@ -216,7 +216,7 @@ function QuickButtons({ engName, onSetMin, onSetMax }: QuickButtonsProps) {
         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#2C2C2C] text-[#888888] hover:bg-[#3A3A3A] hover:text-white text-[11px] font-medium transition-all duration-200 active:scale-95"
       >
         <Minus className="h-3 w-3" />
-        Min
+        最小
       </button>
       <button
         onClick={() => onSetMax(engName)}
@@ -224,7 +224,7 @@ function QuickButtons({ engName, onSetMin, onSetMax }: QuickButtonsProps) {
         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#2C2C2C] text-[#888888] hover:bg-[#3A3A3A] hover:text-white text-[11px] font-medium transition-all duration-200 active:scale-95"
       >
         <Maximize2 className="h-3 w-3" />
-        Max
+        最大
       </button>
     </div>
   );
@@ -248,13 +248,11 @@ function SkillRow({ skill, level, onLevelChange, onSetMin, onSetMax }: SkillRowP
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-white truncate">{skill.name}</div>
-          <div className="text-[10px] text-[#666666] truncate mt-0.5 hidden sm:block">{skill.engName}</div>
         </div>
         <LevelButtonGroup currentLevel={level} onChange={onLevelChange} engName={skill.engName} />
       </div>
       <div className="flex items-center gap-1.5 mt-1.5 sm:hidden">
         <QuickButtons engName={skill.engName} onSetMin={onSetMin} onSetMax={onSetMax} />
-        <span className="text-[10px] text-[#666666]">{skill.engName}</span>
       </div>
       <div className="hidden sm:flex items-center gap-1.5 mt-1.5">
         <QuickButtons engName={skill.engName} onSetMin={onSetMin} onSetMax={onSetMax} />
