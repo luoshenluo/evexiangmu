@@ -498,7 +498,7 @@ export function calcCategorySkillMEReduction(
       const zhName = toSkillChineseName(engName);
       let reductionPerLevel = 0.06; // Base: 每级 -6%
       if (engName.includes('Advanced')) reductionPerLevel = 0.04; // Advanced: 每级 -4%
-      else if (engName.includes('Expert')) reductionPerLevel = 0.03; // Expert: 每级 -3%
+      else if (engName.includes('Expert')) reductionPerLevel = 0.01; // Expert: 每级 -1%
       const reduction = reductionPerLevel * level;
       totalReduction += reduction;
       matchedSkills.push({ name: zhName, level, reduction });
