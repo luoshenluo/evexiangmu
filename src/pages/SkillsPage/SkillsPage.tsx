@@ -269,27 +269,32 @@ function SkillRow({ skill, level, onLevelChange, onSetMin, onSetMax }: SkillRowP
 
 export default function SkillsPage({ onBack }: SkillsPageProps) {
   const [activeGroup, setActiveGroup] = useState(0);
-  const [skills, setSkills] = useState<Record<string, number>>({});
+  const [skills, setSkills] = useState<Record<string, number>>(() => loadSkills());
   const [cloudSynced, setCloudSynced] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!getCurrentUser());
+  const initializedRef = useRef(false);
 
-  /** 加载技能数据（本地 + 云端） */
+  /** 加载技能数据（本地 + 云端），但不覆盖用户已手动设置的值 */
   useEffect(() => {
+    if (initializedRef.current) return;
     const init = async () => {
       const user = getCurrentUser();
       setIsLoggedIn(!!user);
       if (user) {
-        // 已登录：优先从云端加载
         const cloudSkills = await loadSkillsFromCloud();
         if (cloudSkills && Object.keys(cloudSkills).length > 0) {
-          setSkills(cloudSkills);
+          setSkills((prev) => {
+            // 如果用户已经手动设置过技能，不要覆盖
+            if (Object.keys(prev).length > 0) return prev;
+            return cloudSkills;
+          });
           setCloudSynced(true);
+          initializedRef.current = true;
           return;
         }
       }
-      // 未登录 或 云端无数据：从本地加载
-      setSkills(loadSkills());
       setCloudSynced(false);
+      initializedRef.current = true;
     };
     init();
   }, []);

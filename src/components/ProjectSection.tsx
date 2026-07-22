@@ -215,6 +215,55 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     toast.success(`已导入「${selected.name}」材料明细到录入页`);
   };
 
+  // ===== 所有 hooks 必须在任何条件 return 之前调用 =====
+  const categories = useMemo(() => {
+    const map = new Map<string, IManufactureProject[]>();
+    projects.forEach((p) => { const cat = p.category || '其他'; if (!map.has(cat)) map.set(cat, []); map.get(cat)!.push(p); });
+    return map;
+  }, [projects]);
+  const categoryNames = useMemo(() => [...categories.keys()], [categories]);
+  const [activeCat, setActiveCat] = useState<string>('');
+  const [searchText, setSearchText] = useState('');
+
+  useEffect(() => { if (categoryNames.length > 0 && !categoryNames.includes(activeCat)) setActiveCat(categoryNames[0]); }, [categoryNames, activeCat]);
+
+  const currentCatProjects = useMemo(() => {
+    let list = categories.get(activeCat) ?? [];
+    if (searchText.trim()) { const kw = searchText.trim().toLowerCase(); list = list.filter((p) => p.name.toLowerCase().includes(kw)); }
+    return list;
+  }, [categories, activeCat, searchText]);
+
+  const handleCategoryChange = (cat: string) => {
+    setActiveCat(cat);
+    const list = categories.get(cat);
+    if (list && list.length > 0) setSelectedId(list[0].id);
+    setViewMode('detail');
+  };
+
+  // 手机端选中后切换视图，避免上下滚动
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [mobileView, setMobileView] = useState<'categories' | 'list'>('categories');
+  // 技能/军团数据（用于显示匹配的技能）
+  const [skillMatched, setSkillMatched] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
+  const [corpReduction, setCorpReduction] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      const skills = loadUserSkills();
+      const corp = loadCorpConfig();
+      if (selected?.category) {
+        setSkillMatched(calcCategorySkillMEReduction(selected.category, skills));
+      } else {
+        setSkillMatched({ totalReduction: 0, matchedSkills: [] });
+      }
+      setCorpReduction(calcCorpMEReduction(corp) / 100);
+    };
+    window.addEventListener('storage', refresh);
+    refresh();
+    return () => window.removeEventListener('storage', refresh);
+  }, [selected?.category]);
+
+  // ===== 条件 return（所有 hooks 已调用完毕）=====
   if (viewMode !== 'detail') {
     return (
       <div className="h-full overflow-y-auto pb-24">
@@ -287,53 +336,6 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
       </div>
     );
   }
-
-  const categories = useMemo(() => {
-    const map = new Map<string, IManufactureProject[]>();
-    projects.forEach((p) => { const cat = p.category || '其他'; if (!map.has(cat)) map.set(cat, []); map.get(cat)!.push(p); });
-    return map;
-  }, [projects]);
-  const categoryNames = useMemo(() => [...categories.keys()], [categories]);
-  const [activeCat, setActiveCat] = useState<string>('');
-  const [searchText, setSearchText] = useState('');
-
-  useEffect(() => { if (categoryNames.length > 0 && !categoryNames.includes(activeCat)) setActiveCat(categoryNames[0]); }, [categoryNames, activeCat]);
-
-  const currentCatProjects = useMemo(() => {
-    let list = categories.get(activeCat) ?? [];
-    if (searchText.trim()) { const kw = searchText.trim().toLowerCase(); list = list.filter((p) => p.name.toLowerCase().includes(kw)); }
-    return list;
-  }, [categories, activeCat, searchText]);
-
-  const handleCategoryChange = (cat: string) => {
-    setActiveCat(cat);
-    const list = categories.get(cat);
-    if (list && list.length > 0) setSelectedId(list[0].id);
-    setViewMode('detail');
-  };
-
-  // 手机端选中后切换视图，避免上下滚动
-  const [mobileShowDetail, setMobileShowDetail] = useState(false);
-  const [mobileView, setMobileView] = useState<'categories' | 'list'>('categories');
-  // 技能/军团数据（用于显示匹配的技能）
-  const [skillMatched, setSkillMatched] = useState<{ totalReduction: number; matchedSkills: { name: string; level: number; reduction: number }[] }>({ totalReduction: 0, matchedSkills: [] });
-  const [corpReduction, setCorpReduction] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => {
-      const skills = loadUserSkills();
-      const corp = loadCorpConfig();
-      if (selected?.category) {
-        setSkillMatched(calcCategorySkillMEReduction(selected.category, skills));
-      } else {
-        setSkillMatched({ totalReduction: 0, matchedSkills: [] });
-      }
-      setCorpReduction(calcCorpMEReduction(corp) / 100);
-    };
-    window.addEventListener('storage', refresh);
-    refresh();
-    return () => window.removeEventListener('storage', refresh);
-  }, [selected?.category]);
   const handleMobileSelect = (project: IManufactureProject) => {
     setSelectedId(project.id);
     setViewMode('detail');
