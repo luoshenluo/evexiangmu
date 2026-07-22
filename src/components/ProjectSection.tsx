@@ -30,7 +30,7 @@ const DEFAULT_CAT_CONFIG = { icon: Ship, color: 'text-[#888888]' };
 
 interface ProjectSectionProps {
   onImportCost: (project: IManufactureProject) => void;
-  onImportMaterials: (materials: { minerals: IMaterialItem[]; shipMaterials: IMaterialItem[]; buildMaterials: IMaterialItem[] }) => void;
+  onImportMaterials: (materials: { minerals: IMaterialItem[]; shipMaterials: IMaterialItem[]; buildMaterials: IMaterialItem[] }, category: string) => void;
   onSwitchToCalc: () => void;
   onSwitchToMinerals: () => void;
   currentMinerals: IMaterialItem[];
@@ -211,7 +211,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
       minerals: PRESET_MINERALS.map((m, i) => ({ ...m, price: mineralPrices[i] ?? 0, quantity: mats.minerals[i] ?? 0 })),
       shipMaterials: PRESET_SHIP_MATERIALS.map((m, i) => ({ ...m, price: shipPrices[i] ?? 0, quantity: mats.shipMaterials[i] ?? 0 })),
       buildMaterials: PRESET_BUILD_MATERIALS.map((m, i) => ({ ...m, price: buildPrices[i] ?? 0, quantity: mats.buildMaterials[i] ?? 0 })),
-    });
+    }, selected.category || '');
     toast.success(`已导入「${selected.name}」材料明细到录入页`);
   };
 

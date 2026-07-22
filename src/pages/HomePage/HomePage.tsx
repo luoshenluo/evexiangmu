@@ -157,7 +157,7 @@ export default function HomePage() {
   const renderContent = () => {
     switch (activeTab) {
       case 'calc': return <CalcSection params={calcParams} onParamChange={handleParamChange} linkedMaterialTotal={linkedMaterialTotal} selectedCategory={selectedCategory} />;
-      case 'project': return <ProjectSection onImportCost={handleImportProject} onImportMaterials={(mats) => { setMinerals(mats.minerals); setShipMaterials(mats.shipMaterials); setBuildMaterials(mats.buildMaterials); }} onSwitchToCalc={switchToCalc} onSwitchToMinerals={() => setActiveTab('minerals')} currentMinerals={minerals} currentShipMaterials={shipMaterials} currentBuildMaterials={buildMaterials} />;
+      case 'project': return <ProjectSection onImportCost={handleImportProject} onImportMaterials={(mats, category) => { setMinerals(mats.minerals); setShipMaterials(mats.shipMaterials); setBuildMaterials(mats.buildMaterials); if (category) setSelectedCategory(category); }} onSwitchToCalc={switchToCalc} onSwitchToMinerals={() => setActiveTab('minerals')} currentMinerals={minerals} currentShipMaterials={shipMaterials} currentBuildMaterials={buildMaterials} />;
       case 'minerals': return <MaterialInputSection title="矿物录入" subtitle="输入矿物单价和数量，自动计算每项总价（单位：亿 ISK）" materials={minerals} onChange={setMinerals} />;
       case 'ship': return <MaterialInputSection title="船材录入" subtitle="输入舰船材料单价和数量，自动计算每项总价（单位：亿 ISK）" materials={shipMaterials} onChange={setShipMaterials} />;
       case 'build': return <MaterialInputSection title="建材录入" subtitle="输入建筑材料单价和数量，自动计算每项总价（单位：亿 ISK）" materials={buildMaterials} onChange={setBuildMaterials} />;
