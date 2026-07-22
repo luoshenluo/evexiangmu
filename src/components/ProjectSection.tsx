@@ -8,7 +8,8 @@ import {
 import type { IManufactureProject, IProjectMaterials, IMaterialItem } from '@/data/materials';
 import { PRESET_MINERALS, PRESET_SHIP_MATERIALS, PRESET_BUILD_MATERIALS } from '@/data/materials';
 import { formatNumber } from '@/lib/utils';
-import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject } from '@/lib/admin-projects';
+import { loadAdminProjects, addAdminProject, updateAdminProject, deleteAdminProject, loadMarketData } from '@/lib/admin-projects';
+import type { MarketDataItem } from '@/lib/admin-projects';
 import { emptyMaterials } from '@/components/shared/emptyMaterials';
 import {
   loadUserSkills,
@@ -182,16 +183,38 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     setTimeout(() => onSwitchToCalc(), 300);
   };
 
-  const handleImportMaterials = () => {
+  const handleImportMaterials = async () => {
     if (!selected) return;
     const mats = selected.materials;
     if (!mats) { toast.error('该项目没有材料明细数据'); return; }
+
+    // 从市场数据获取最新单价，若失败则回退到当前录入页的价格
+    let mineralPrices: number[] = [];
+    let shipPrices: number[] = [];
+    let buildPrices: number[] = [];
+
+    try {
+      const [mineralMarket, shipMarket, buildMarket] = await Promise.all([
+        loadMarketData('minerals'),
+        loadMarketData('ship_materials'),
+        loadMarketData('build_materials'),
+      ]);
+      mineralPrices = mineralMarket.map((m: MarketDataItem) => m.sell_price ?? 0);
+      shipPrices = shipMarket.map((m: MarketDataItem) => m.sell_price ?? 0);
+      buildPrices = buildMarket.map((m: MarketDataItem) => m.sell_price ?? 0);
+    } catch {
+      // 市场数据加载失败，回退到当前录入页价格
+      mineralPrices = currentMinerals.map((m) => m.price ?? 0);
+      shipPrices = currentShipMaterials.map((m) => m.price ?? 0);
+      buildPrices = currentBuildMaterials.map((m) => m.price ?? 0);
+    }
+
     onImportMaterials({
-      minerals: PRESET_MINERALS.map((m, i) => ({ ...m, price: currentMinerals[i]?.price ?? 0, quantity: mats.minerals[i] ?? 0 })),
-      shipMaterials: PRESET_SHIP_MATERIALS.map((m, i) => ({ ...m, price: currentShipMaterials[i]?.price ?? 0, quantity: mats.shipMaterials[i] ?? 0 })),
-      buildMaterials: PRESET_BUILD_MATERIALS.map((m, i) => ({ ...m, price: currentBuildMaterials[i]?.price ?? 0, quantity: mats.buildMaterials[i] ?? 0 })),
+      minerals: PRESET_MINERALS.map((m, i) => ({ ...m, price: mineralPrices[i] ?? currentMinerals[i]?.price ?? 0, quantity: mats.minerals[i] ?? 0 })),
+      shipMaterials: PRESET_SHIP_MATERIALS.map((m, i) => ({ ...m, price: shipPrices[i] ?? currentShipMaterials[i]?.price ?? 0, quantity: mats.shipMaterials[i] ?? 0 })),
+      buildMaterials: PRESET_BUILD_MATERIALS.map((m, i) => ({ ...m, price: buildPrices[i] ?? currentBuildMaterials[i]?.price ?? 0, quantity: mats.buildMaterials[i] ?? 0 })),
     });
-    toast.success(`已导入「${selected.name}」材料数量到录入页`);
+    toast.success(`已导入「${selected.name}」材料明细到录入页（含市场单价）`);
     setTimeout(() => onSwitchToMinerals(), 300);
   };
 
@@ -501,9 +524,8 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
           </div>
         )}
         <div className="px-4 pt-5 space-y-3">
-          <button onClick={handleImportCost} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"><TrendingUp className="h-4 w-4" />导入总成本到计算页<ChevronRight className="h-4 w-4" /></button>
-          <button onClick={handleImportMaterials} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#7C3AED]/50 bg-[#7C3AED]/10 px-4 py-3.5 text-sm font-semibold text-[#A78BFA] transition-all hover:bg-[#7C3AED]/20 active:scale-[0.98]"><Boxes className="h-4 w-4" />导入材料明细到录入页<ChevronRight className="h-4 w-4" /></button>
-          <p className="text-center text-[11px] text-[#888888]">导入材料明细会保留你已设置的单价，自动填入数量并联动计算</p>
+          <button onClick={handleImportMaterials} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"><Boxes className="h-4 w-4" />导入材料明细到录入页<ChevronRight className="h-4 w-4" /></button>
+          <p className="text-center text-[11px] text-[#888888]">导入材料明细会自动获取市场单价并填入数量，直接生效</p>
         </div>
       </div>
     );
@@ -571,6 +593,13 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
               <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_2px_8px_rgba(0_0_0_0.2)] overflow-hidden">
                 <div className="border-b border-[#3A3A3A] px-4 py-4 bg-gradient-to-r from-[#7C3AED]/10 to-transparent">
                   <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setSelectedId('')}
+                      className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] text-white transition-colors hover:border-[#555555]"
+                      title="返回项目列表"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#7C3AED]/20 text-[#A78BFA]"><Ship className="h-6 w-6" /></div>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-lg font-bold text-white truncate">{selected.name}</h3>
@@ -663,9 +692,8 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
               </div>
             )}
             <div className="px-4 pt-5 space-y-3">
-              <button onClick={handleImportCost} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"><TrendingUp className="h-4 w-4" />导入总成本到计算页<ChevronRight className="h-4 w-4" /></button>
-              <button onClick={handleImportMaterials} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#7C3AED]/50 bg-[#7C3AED]/10 px-4 py-3.5 text-sm font-semibold text-[#A78BFA] transition-all hover:bg-[#7C3AED]/20 active:scale-[0.98]"><Boxes className="h-4 w-4" />导入材料明细到录入页<ChevronRight className="h-4 w-4" /></button>
-              <p className="text-center text-[11px] text-[#888888]">导入材料明细会保留你已设置的单价，自动填入数量并联动计算</p>
+              <button onClick={handleImportMaterials} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#7C3AED] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124_58_237_0.35)] transition-all hover:bg-[#6D28D9] active:scale-[0.98]"><Boxes className="h-4 w-4" />导入材料明细到录入页<ChevronRight className="h-4 w-4" /></button>
+              <p className="text-center text-[11px] text-[#888888]">导入材料明细会自动获取市场单价并填入数量，直接生效</p>
             </div>
           </>
         ) : (
