@@ -188,7 +188,7 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
     const mats = selected.materials;
     if (!mats) { toast.error('该项目没有材料明细数据'); return; }
 
-    // 从市场数据获取最新单价，若失败则回退到当前录入页的价格
+    // 从市场数据获取最新单价
     let mineralPrices: number[] = [];
     let shipPrices: number[] = [];
     let buildPrices: number[] = [];
@@ -203,19 +203,16 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
       shipPrices = shipMarket.map((m: MarketDataItem) => m.sell_price ?? 0);
       buildPrices = buildMarket.map((m: MarketDataItem) => m.sell_price ?? 0);
     } catch {
-      // 市场数据加载失败，回退到当前录入页价格
-      mineralPrices = currentMinerals.map((m) => m.price ?? 0);
-      shipPrices = currentShipMaterials.map((m) => m.price ?? 0);
-      buildPrices = currentBuildMaterials.map((m) => m.price ?? 0);
+      // 市场数据加载失败，单价全部设为0
+      toast.error('市场数据加载失败，单价已置空，请手动填入');
     }
 
     onImportMaterials({
-      minerals: PRESET_MINERALS.map((m, i) => ({ ...m, price: mineralPrices[i] ?? currentMinerals[i]?.price ?? 0, quantity: mats.minerals[i] ?? 0 })),
-      shipMaterials: PRESET_SHIP_MATERIALS.map((m, i) => ({ ...m, price: shipPrices[i] ?? currentShipMaterials[i]?.price ?? 0, quantity: mats.shipMaterials[i] ?? 0 })),
-      buildMaterials: PRESET_BUILD_MATERIALS.map((m, i) => ({ ...m, price: buildPrices[i] ?? currentBuildMaterials[i]?.price ?? 0, quantity: mats.buildMaterials[i] ?? 0 })),
+      minerals: PRESET_MINERALS.map((m, i) => ({ ...m, price: mineralPrices[i] ?? 0, quantity: mats.minerals[i] ?? 0 })),
+      shipMaterials: PRESET_SHIP_MATERIALS.map((m, i) => ({ ...m, price: shipPrices[i] ?? 0, quantity: mats.shipMaterials[i] ?? 0 })),
+      buildMaterials: PRESET_BUILD_MATERIALS.map((m, i) => ({ ...m, price: buildPrices[i] ?? 0, quantity: mats.buildMaterials[i] ?? 0 })),
     });
-    toast.success(`已导入「${selected.name}」材料明细到录入页（含市场单价）`);
-    setTimeout(() => onSwitchToMinerals(), 300);
+    toast.success(`已导入「${selected.name}」材料明细到录入页`);
   };
 
   if (viewMode !== 'detail') {
@@ -429,13 +426,16 @@ export default function ProjectSection({ onImportCost, onImportMaterials, onSwit
   if (mobileShowDetail && selected) {
     return (
       <div className="h-full overflow-y-auto pb-24">
-        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-          <button onClick={() => setMobileShowDetail(false)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] text-white transition-colors hover:border-[#555555] md:hidden"><ArrowLeft className="h-4 w-4" /></button>
-          <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+          <button onClick={() => { setMobileShowDetail(false); setSelectedId(''); }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2C2C2C] border border-[#3A3A3A] text-white transition-colors hover:border-[#555555]"><ArrowLeft className="h-4 w-4" /></button>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-white truncate">{selected.name}</h2>
             <p className="text-xs text-[#A0A0A0]">{selected.category}</p>
           </div>
-          <button onClick={handleEdit} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3A3A3A] bg-[#2C2C2C] text-white transition-colors hover:border-[#555555] md:hidden"><Edit3 className="h-4 w-4" /></button>
+          <div className="flex gap-1 shrink-0">
+            <button onClick={handleEdit} className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] text-[#888888] transition-colors hover:border-[#555555] hover:text-white"><Edit3 className="h-4 w-4" /></button>
+            <button onClick={() => setShowDeleteConfirm(true)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-800/50 bg-red-900/20 text-red-400 transition-colors hover:border-red-500/50"><Trash2 className="h-4 w-4" /></button>
+          </div>
         </div>
         <div className="px-4 pt-1">
           <div className="rounded-xl border border-[#3A3A3A] bg-[#2C2C2C] shadow-[0_2px_8px_rgba(0_0_0_0.2)] overflow-hidden">
