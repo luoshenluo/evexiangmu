@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: 20 40 20;
+  --background: 240 253 244;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 30%, #dcfce7 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #86efac;
+    border-radius: 2px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-garden-500 hover:bg-garden-600 text-white font-medium rounded-lg px-4 py-2 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white hover:bg-garden-50 text-garden-700 border border-garden-200 font-medium rounded-lg px-4 py-2 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg px-4 py-2 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .card {
+    @apply bg-white/90 backdrop-blur rounded-xl shadow-sm border border-garden-100;
+  }
+  .input {
+    @apply w-full px-4 py-2 rounded-lg border border-garden-200 focus:border-garden-400 focus:ring-2 focus:ring-garden-200 outline-none transition-all bg-white;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* 花园地块动画 */
+.plot-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.plot-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px -5px rgba(34, 197, 94, 0.3);
+}
+
+/* 花朵生长动画 */
+@keyframes bloom {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.bloom-anim {
+  animation: bloom 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 抖动动画 - 虫灾 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px) rotate(-2deg); }
+  75% { transform: translateX(3px) rotate(2deg); }
+}
+.shake-anim {
+  animation: shake 0.3s infinite;
+}
+
+/* 聊天弹入 */
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* 金币增加动画 */
+@keyframes coinBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); color: #facc15; }
+  100% { transform: scale(1); }
+}
+.coin-bounce {
+  animation: coinBounce 0.5s ease;
+}
+
+/* Toast 动画 */
+@keyframes toastIn {
+  from { transform: translateY(-20px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.toast-anim {
+  animation: toastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 加载骨架 */
+.skeleton {
+  background: linear-gradient(90deg, #f0fdf4 25%, #dcfce7 50%, #f0fdf4 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.5s infinite;
+}
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

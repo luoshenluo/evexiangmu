@@ -1,0 +1,174 @@
+'use client'
+
+import { useState } from 'react'
+import { X, Sprout, Leaf } from 'lucide-react'
+import { apiFetch, classNames } from '@/lib/utils'
+import { useAppStore } from '@/lib/store'
+import { useRouter } from 'next/navigation'
+
+interface Props {
+  onClose?: () => void
+  onSuccess?: () => void
+}
+
+export default function LoginModal({ onClose, onSuccess }: Props) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { login, showToast } = useAppStore()
+  const router = useRouter()
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!username.trim() || !password.trim()) {
+      showToast('请填写完整信息', 'error')
+      return
+    }
+    if (mode === 'register' && !nickname.trim()) {
+      showToast('请填写昵称', 'error')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await apiFetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(mode === 'login'
+          ? { username, password }
+          : { username, password, nickname }
+        ),
+      })
+      if (res.success && res.data) {
+        login(res.data.user, res.data.token)
+        showToast(mode === 'login' ? '登录成功！欢迎回来 🌱' : '注册成功！欢迎加入花园 🌸', 'success')
+        onSuccess?.()
+        router.push('/garden')
+      } else {
+        showToast(res.error || '操作失败', 'error')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: 'demo', password: '123456' })
+      })
+      if (res.success && res.data) {
+        login(res.data.user, res.data.token)
+        showToast('已使用演示账号登录', 'success')
+        onSuccess?.()
+        router.push('/garden')
+      } else {
+        showToast(res.error || '演示账号登录失败', 'error')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="card w-full max-w-md p-6 relative slide-up">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+          >
+            <X size={20} />
+          </button>
+        )}
+
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-garden-400 to-garden-600 flex items-center justify-center shadow-lg shadow-garden-200">
+            <Sprout size={32} className="text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+            <Leaf size={22} className="text-garden-500" />
+            花园 Garden
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">种植 · 交易 · 社交 · 成长</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-garden-50 rounded-xl">
+          {(['login', 'register'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={classNames(
+                'py-2 px-4 rounded-lg text-sm font-medium transition-all',
+                mode === m
+                  ? 'bg-white text-garden-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              {m === 'login' ? '登录' : '注册'}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">账号</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="请输入账号"
+              className="input"
+              autoFocus
+            />
+          </div>
+          {mode === 'register' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">昵称</label>
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="给自己起个好听的昵称吧"
+                className="input"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">密码</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="请输入密码"
+              className="input"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full py-2.5 mt-2"
+          >
+            {loading ? '处理中...' : mode === 'login' ? '登 录' : '注 册'}
+          </button>
+        </form>
+
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <button
+            onClick={handleDemoLogin}
+            disabled={loading}
+            className="btn-secondary w-full text-sm"
+          >
+            🎮 使用演示账号快速体验 (demo/123456)
+          </button>
+          <p className="text-xs text-slate-400 text-center mt-3">
+            管理员账号: admin / admin123
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
