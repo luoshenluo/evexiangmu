@@ -32,6 +32,7 @@ function dbRowToUser(row: any): User {
     inventorySize: row.inventory_size,
     isAdmin: row.is_admin,
     mutedUntil: row.muted_until,
+    bannedUntil: row.banned_until || null,
     familyId: row.family_id,
     friends: row.friends || [],
     deleted: row.deleted,
@@ -59,6 +60,7 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.inventorySize !== undefined) row.inventory_size = user.inventorySize
   if (user.isAdmin !== undefined) row.is_admin = user.isAdmin
   if (user.mutedUntil !== undefined) row.muted_until = user.mutedUntil
+  if (user.bannedUntil !== undefined) row.banned_until = user.bannedUntil
   if (user.familyId !== undefined) row.family_id = user.familyId
   if (user.friends !== undefined) row.friends = user.friends
   if (user.deleted !== undefined) row.deleted = user.deleted
@@ -395,7 +397,6 @@ export async function findUserByUsername(username: string): Promise<User | null>
   const { data, error } = await sb.from('users')
     .select('*')
     .eq('username', username)
-    .eq('deleted', false)
     .single()
   if (error || !data) return null
   return dbRowToUser(data)

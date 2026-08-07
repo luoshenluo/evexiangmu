@@ -108,6 +108,7 @@ export interface User {
   inventorySize: number
   isAdmin: boolean
   mutedUntil: number | null
+  bannedUntil: number | null
   familyId: string | null
   friends: string[]
   deleted?: boolean

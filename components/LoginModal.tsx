@@ -57,29 +57,6 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
     }
   }
 
-  const handleDemoLogin = async () => {
-    setServerMsg(null)
-    setLoading(true)
-    try {
-      const res = await apiFetch('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username: 'demo', password: '123456' })
-      })
-      if (res.success && res.data) {
-        login(res.data.user, res.data.token)
-        showToast('已使用演示账号登录', 'success')
-        onSuccess?.()
-        router.push('/garden')
-      } else {
-        setServerMsg({ type: 'error', text: res.error || '演示账号登录失败，请联系管理员' })
-      }
-    } catch (e: any) {
-      setServerMsg({ type: 'error', text: e?.message || '网络请求失败，无法连接服务器' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="card w-full max-w-md p-6 relative slide-up">
@@ -194,14 +171,6 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
             className="btn-primary w-full text-sm"
           >
             👤 游客模式（仅浏览）
-          </button>
-          {/* 体验账号登录：保留原 demo 登录逻辑 */}
-          <button
-            onClick={handleDemoLogin}
-            disabled={loading}
-            className="btn-secondary w-full text-sm"
-          >
-            🎮 体验账号登录 (demo/123456)
           </button>
         </div>
       </div>

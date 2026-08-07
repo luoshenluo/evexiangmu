@@ -49,6 +49,18 @@ export default function AdminPage() {
   const [editAvatar, setEditAvatar] = useState('')
   const [showUserEdit, setShowUserEdit] = useState(false)
 
+  // 禁言对话框状态
+  const [muteTarget, setMuteTarget] = useState<any>(null)
+  const [muteDays, setMuteDays] = useState(1)
+  const [muteCustomDays, setMuteCustomDays] = useState('')
+  const [mutePreset, setMutePreset] = useState<number | 'custom'>(1)
+
+  // 封号对话框状态
+  const [banTarget, setBanTarget] = useState<any>(null)
+  const [banDays, setBanDays] = useState(7)
+  const [banCustomDays, setBanCustomDays] = useState('')
+  const [banPreset, setBanPreset] = useState<number | 'forever' | 'custom'>(7)
+
   const loadAll = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -161,14 +173,77 @@ export default function AdminPage() {
   }
 
   const muteUser = async (userId: string, days: number) => {
+    setLoading(`mute_${userId}`)
     const res = await apiFetch('/api/admin/mute', {
       method: 'POST',
       body: JSON.stringify({ userId, days })
     })
     if (res.success) {
-      showToast(days > 0 ? `已禁言 ${days} 天` : '已解除禁言', 'success')
-      loadAll()
+      if (days > 0) showToast(`已禁言 ${days} 天`, 'success')
+      else showToast('已解除禁言', 'success')
+      setMuteTarget(null); loadAll()
     } else showToast(res.error || '操作失败', 'error')
+    setLoading(null)
+  }
+
+  const openMuteDialog = (u: any) => {
+    setMuteTarget(u)
+    setMutePreset(1)
+    setMuteDays(1)
+    setMuteCustomDays('')
+  }
+
+  const confirmMute = async () => {
+    if (!muteTarget) return
+    let days = 0
+    if (mutePreset === 'custom') {
+      const d = parseFloat(muteCustomDays)
+      if (isNaN(d) || d <= 0) { showToast('请输入有效的天数', 'error'); return }
+      days = d
+    } else {
+      days = mutePreset
+    }
+    await muteUser(muteTarget.id, days)
+  }
+
+  const banUser = async (userId: string, ban: boolean, banDays?: number) => {
+    setLoading(`ban_${userId}`)
+    const body: any = { userId }
+    if (ban) {
+      body.banUser = true
+      if (banDays !== undefined && banDays > 0) body.banDays = banDays
+    } else {
+      body.unbanUser = true
+    }
+    const res = await apiFetch('/api/admin/users/action', { method: 'POST', body: JSON.stringify(body) })
+    if (res.success) {
+      if (ban) showToast(banDays && banDays > 0 ? `已封号 ${banDays} 天` : '已永久封号', 'success')
+      else showToast('已解封', 'success')
+      setBanTarget(null); loadAll()
+    } else showToast(res.error || '操作失败', 'error')
+    setLoading(null)
+  }
+
+  const openBanDialog = (u: any) => {
+    setBanTarget(u)
+    setBanPreset(7)
+    setBanDays(7)
+    setBanCustomDays('')
+  }
+
+  const confirmBan = async () => {
+    if (!banTarget) return
+    let days: number | undefined
+    if (banPreset === 'forever') {
+      days = undefined
+    } else if (banPreset === 'custom') {
+      const d = parseFloat(banCustomDays)
+      if (isNaN(d) || d <= 0) { showToast('请输入有效的天数', 'error'); return }
+      days = d
+    } else {
+      days = banPreset
+    }
+    await banUser(banTarget.id, true, days)
   }
 
   const updateUserPermission = async (userId: string, isAdmin: boolean) => {
@@ -179,19 +254,6 @@ export default function AdminPage() {
     })
     if (res.success) {
       showToast(isAdmin ? '已设为管理员' : '已取消管理员权限', 'success')
-      loadAll()
-    } else showToast(res.error || '操作失败', 'error')
-    setLoading(null)
-  }
-
-  const banUser = async (userId: string, ban: boolean) => {
-    setLoading(`ban_${userId}`)
-    const res = await apiFetch('/api/admin/users/action', {
-      method: 'POST',
-      body: JSON.stringify({ userId, [ban ? 'banUser' : 'unbanUser']: true })
-    })
-    if (res.success) {
-      showToast(ban ? '已封号' : '已解封', 'success')
       loadAll()
     } else showToast(res.error || '操作失败', 'error')
     setLoading(null)
@@ -524,13 +586,23 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3 text-amber-600 font-medium">{formatNumber(u.coins)}</td>
                           <td className="p-3">
-                            {u.deleted ? (
+                            {u.deleted && u.bannedUntil && u.bannedUntil > Date.now() ? (
                               <span className="chip bg-red-100 text-red-700">
-                                <Ban size={10} className="inline mr-1" /> 已封号
+                                <Ban size={10} className="inline mr-1" /> 封号中 {(() => {
+                                  const h = Math.ceil((u.bannedUntil - Date.now()) / 3600000)
+                                  return h >= 24 ? Math.ceil(h / 24) + '天' : h + '小时'
+                                })()}
+                              </span>
+                            ) : u.deleted ? (
+                              <span className="chip bg-red-100 text-red-700">
+                                <Ban size={10} className="inline mr-1" /> 永久封号
                               </span>
                             ) : u.mutedUntil && u.mutedUntil > Date.now() ? (
                               <span className="chip bg-orange-100 text-orange-700">
-                                <Ban size={10} className="inline mr-1" /> 禁言中
+                                <Ban size={10} className="inline mr-1" /> 禁言中 {(() => {
+                                  const h = Math.ceil((u.mutedUntil - Date.now()) / 3600000)
+                                  return h >= 24 ? Math.ceil(h / 24) + '天' : h + '小时'
+                                })()}
                               </span>
                             ) : (
                               <span className="chip bg-green-100 text-green-700">正常</span>
@@ -545,17 +617,19 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3">
                             <div className="flex gap-1 flex-wrap">
+                              {/* 禁言：点击打开时长选择弹窗 */}
                               {u.mutedUntil && u.mutedUntil > Date.now() ? (
                                 <button onClick={() => muteUser(u.id, 0)} className="p-1.5 rounded-lg hover:bg-garden-50 text-garden-600" title="解除禁言">
                                   <Unlock size={14} />
                                 </button>
                               ) : !u.deleted && (
-                                <button onClick={() => muteUser(u.id, 1)} disabled={u.isAdmin} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 disabled:opacity-30" title="禁言 1 天">
-                                  <Ban size={14} />
+                                <button onClick={() => openMuteDialog(u)} disabled={u.isAdmin} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 disabled:opacity-30" title="禁言">
+                                  <MessageSquare size={14} />
                                 </button>
                               )}
+                              {/* 封号：点击打开时长选择弹窗 */}
                               {!u.isAdmin && !u.deleted && (
-                                <button onClick={() => banUser(u.id, true)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="封号">
+                                <button onClick={() => openBanDialog(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="封号">
                                   <UserX size={14} />
                                 </button>
                               )}
@@ -855,6 +929,124 @@ export default function AdminPage() {
               </div>
               <button onClick={editUserInfo} disabled={loading?.startsWith('edit_')} className="btn-primary w-full py-2.5">
                 {loading?.startsWith('edit_') ? '保存中...' : '保存修改'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 禁言对话框 */}
+      {muteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setMuteTarget(null)}>
+          <div className="card w-full max-w-sm p-5 slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2"><MessageSquare size={18} className="text-amber-500" /> 禁言用户</h2>
+              <button onClick={() => setMuteTarget(null)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl text-sm text-slate-700 mb-4">
+              目标用户: <b>{muteTarget.nickname}</b> (@{muteTarget.username})
+            </div>
+            <div className="text-sm font-medium text-slate-700 mb-2">选择禁言时长</div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { v: 1/24, label: '1 小时' },
+                { v: 1, label: '1 天' },
+                { v: 3, label: '3 天' },
+                { v: 7, label: '7 天' },
+                { v: 30, label: '30 天' },
+                { v: 'custom', label: '自定义' },
+              ].map(p => (
+                <button
+                  key={String(p.v)}
+                  onClick={() => { setMutePreset(p.v as any); setMuteDays(p.v as number) }}
+                  className={`py-2 rounded-lg text-sm border transition ${
+                    mutePreset === p.v
+                      ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {mutePreset === 'custom' && (
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="number"
+                  min="0.04"
+                  step="0.25"
+                  placeholder="天数 (如 1, 0.5, 3.5)"
+                  value={muteCustomDays}
+                  onChange={e => setMuteCustomDays(e.target.value)}
+                  className="flex-1 input"
+                />
+                <span className="text-sm text-slate-500">天</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setMuteTarget(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">取消</button>
+              <button onClick={confirmMute} disabled={loading?.startsWith('mute_')} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                {loading?.startsWith('mute_') ? '处理中...' : '确认禁言'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 封号对话框 */}
+      {banTarget && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setBanTarget(null)}>
+          <div className="card w-full max-w-sm p-5 slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2"><UserX size={18} className="text-red-500" /> 封号用户</h2>
+              <button onClick={() => setBanTarget(null)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="p-3 bg-red-50 rounded-xl text-sm text-red-700 mb-4">
+              目标用户: <b>{banTarget.nickname}</b> (@{banTarget.username}) — 封号后该用户将无法登录
+            </div>
+            <div className="text-sm font-medium text-slate-700 mb-2">选择封号时长</div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { v: 1, label: '1 天' },
+                { v: 7, label: '7 天' },
+                { v: 30, label: '30 天' },
+                { v: 90, label: '90 天' },
+                { v: 'forever', label: '永久' },
+                { v: 'custom', label: '自定义' },
+              ].map(p => (
+                <button
+                  key={String(p.v)}
+                  onClick={() => { setBanPreset(p.v as any); if (typeof p.v === 'number') setBanDays(p.v) }}
+                  className={`py-2 rounded-lg text-sm border transition ${
+                    banPreset === p.v
+                      ? p.v === 'forever'
+                        ? 'border-red-500 bg-red-50 text-red-700 font-medium'
+                        : 'border-red-400 bg-red-50 text-red-600 font-medium'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {banPreset === 'custom' && (
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="天数"
+                  value={banCustomDays}
+                  onChange={e => setBanCustomDays(e.target.value)}
+                  className="flex-1 input"
+                />
+                <span className="text-sm text-slate-500">天</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setBanTarget(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">取消</button>
+              <button onClick={confirmBan} disabled={loading?.startsWith('ban_')} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">
+                {loading?.startsWith('ban_') ? '处理中...' : '确认封号'}
               </button>
             </div>
           </div>

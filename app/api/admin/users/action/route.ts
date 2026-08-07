@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
 
-    const { userId, newPassword, makeAdmin, banUser, unbanUser, nickname, avatar } = await req.json()
+    const { userId, newPassword, makeAdmin, banUser, unbanUser, banDays, nickname, avatar } = await req.json()
     const target = await findUserById(userId)
     if (!target) return jsonResponse(false, null, '用户不存在', 404)
 
@@ -33,11 +33,18 @@ export async function POST(req: Request) {
 
     if (banUser) {
       if (target.isAdmin) return jsonResponse(false, null, '不能封号管理员', 403)
-      updates.deleted = true
+      if (banDays !== undefined && banDays > 0) {
+        updates.deleted = true
+        updates.banned_until = Date.now() + banDays * 24 * 60 * 60 * 1000
+      } else {
+        updates.deleted = true
+        updates.banned_until = null
+      }
     }
 
     if (unbanUser) {
       updates.deleted = false
+      updates.banned_until = null
     }
 
     if (nickname !== undefined) {
