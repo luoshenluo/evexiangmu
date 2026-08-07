@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
-import { apiFetch, formatNumber } from '@/lib/utils'
+import { apiFetch, classNames, formatNumber } from '@/lib/utils'
 import { SEASON_NAMES, SEASON_COLORS } from '@/lib/game-data'
 import { Sun, Coins, Package, Bell, ChevronLeft, ChevronRight, Sparkles, Users } from 'lucide-react'
 import Plot from '@/components/Plot'
@@ -11,6 +11,7 @@ import type { Plot as PlotType } from '@/lib/types'
 
 export default function GardenPage() {
   const { user, updateUser, gameState, announcements, showToast, isGuest } = useAppStore()
+  const gardenBg = useAppStore(s => s.gardenBg)  // 顶层 Hook（必须在任何 early return 之前）
   const [page, setPage] = useState(0)
   const [tick, setTick] = useState(0)
   const [loaded, setLoaded] = useState(false)
@@ -135,6 +136,21 @@ export default function GardenPage() {
   const unlockedCount = user.plots.filter(p => p.unlocked).length
   const plantedCount = user.plots.filter(p => p.unlocked && p.flower).length
 
+  // 花园背景
+  const GARDEN_BG_MAP: Record<string, string> = {
+    default: 'from-green-400 via-emerald-400 to-teal-500',
+    green:   'from-emerald-300 via-green-400 to-lime-400',
+    purple:  'from-purple-300 via-violet-400 to-fuchsia-400',
+    blue:    'from-sky-300 via-cyan-400 to-blue-500',
+    sunset:  'from-amber-300 via-orange-400 to-rose-400',
+    sakura:  'from-pink-200 via-rose-300 to-pink-400',
+    autumn:  'from-amber-400 via-orange-500 to-red-500',
+    night:   'from-slate-700 via-indigo-800 to-slate-900',
+    ocean:   'from-cyan-400 via-blue-500 to-indigo-600',
+  }
+  const bgClass = GARDEN_BG_MAP[gardenBg] || GARDEN_BG_MAP.default
+  const bgIsDark = gardenBg === 'night'
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 顶部状态栏 */}
@@ -254,13 +270,16 @@ export default function GardenPage() {
       </div>
 
       {/* 九宫格地块 */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {Array.from({ length: plotsPerPage }).map((_, i) => {
-          const plotIdx = startIdx + i
-          const plot = user.plots[plotIdx]
-          if (!plot) return <div key={i} className="aspect-square" />
-          return <Plot key={plot.id} plot={plot} onUpdate={() => setTick(t => t + 1)} />
-        })}
+      <div className={classNames('rounded-2xl p-3 bg-gradient-to-br shadow-inner relative overflow-hidden', bgClass, bgIsDark ? 'text-white' : '')}>
+        <div className="absolute inset-0 opacity-30 pointer-events-none bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.4),transparent_40%),radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.25),transparent_45%)]" />
+        <div className="grid grid-cols-3 gap-2.5 relative">
+          {Array.from({ length: plotsPerPage }).map((_, i) => {
+            const plotIdx = startIdx + i
+            const plot = user.plots[plotIdx]
+            if (!plot) return <div key={i} className="aspect-square" />
+            return <Plot key={plot.id} plot={plot} onUpdate={() => setTick(t => t + 1)} />
+          })}
+        </div>
       </div>
 
       {/* 提示 */}

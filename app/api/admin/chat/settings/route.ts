@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getChatSettings, updateChatSettings } from '@/lib/server-store'
-import { authRequest, jsonResponse } from '@/lib/auth'
+import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await authRequest(req)
     if (!user || !user.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+    if (!userHasPermission(user, 2)) return jsonResponse(false, null, '无「聊天管理」权限', 403)
 
     const settings = await getChatSettings()
     return jsonResponse(true, settings)
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+    if (!userHasPermission(admin, 2)) return jsonResponse(false, null, '无「聊天管理」权限', 403)
 
     const body = await req.json()
     const updates: any = {}

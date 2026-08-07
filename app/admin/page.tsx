@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
+import { ADMIN_PERMISSIONS, userHasPermission, isSuperAdmin as _isSuperAdmin } from '@/lib/auth'
 import {
   Settings, Users, MessageSquare, TrendingUp, Gift, Coins, Tag, Plus, X,
   Search, Ban, Crown, Shield, AlertCircle, Bell, Trash2, Edit, Key,
@@ -12,8 +13,21 @@ import LoginModal from '@/components/LoginModal'
 import ChatManagement from '@/components/admin/ChatManagement'
 import SensitiveWords from '@/components/admin/SensitiveWords'
 import ChatSettingsPanel from '@/components/admin/ChatSettingsPanel'
+import AdminMarketPanel from '@/components/admin/AdminMarketPanel'
 
 type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'settings'
+
+// 将 Tab 映射到权限位
+const TAB_PERM_BIT: Record<Tab, number | null> = {
+  dashboard: 6,   // 数据总览 - 日志统计（宽松：允许有 0 也可见）
+  users: 0,
+  announcements: 1,
+  chat: 2,
+  sensitive: 2,
+  market: 4,
+  cdk: 3,
+  settings: null, // 改自己密码和权限说明，所有 admin 可见
+}
 
 export default function AdminPage() {
   const { user, showToast } = useAppStore()
@@ -48,6 +62,8 @@ export default function AdminPage() {
   const [editNickname, setEditNickname] = useState('')
   const [editAvatar, setEditAvatar] = useState('')
   const [showUserEdit, setShowUserEdit] = useState(false)
+  // 子管理员权限位编辑
+  const [editAdminPerms, setEditAdminPerms] = useState<number>(0)
 
   // 禁言对话框状态
   const [muteTarget, setMuteTarget] = useState<any>(null)
@@ -279,7 +295,27 @@ export default function AdminPage() {
 
   const openUserEdit = (u: any) => {
     setEditingUser(u); setEditNickname(u.nickname || ''); setEditAvatar(u.avatar || '')
+    setEditAdminPerms((Number(u.adminPermissions) ?? 0) & 0xff)
     setShowUserEdit(true)
+  }
+
+  const saveAdminPermissions = async () => {
+    if (!editingUser) return
+    if (!_isSuperAdmin(user?.id || '')) return showToast('仅超级管理员可修改权限', 'error')
+    setLoading(`perm_${editingUser.id}`)
+    const body: any = { userId: editingUser.id }
+    // 有任意权限位 => 确保设为管理员；无权限位 => 撤管（同时在 action 端也会做）
+    body.adminPermissions = editAdminPerms & 0xff
+    body.makeAdmin = (editAdminPerms & 0xff) > 0
+    const res = await apiFetch('/api/admin/users/action', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+    if (res.success) {
+      showToast('权限已保存', 'success')
+      loadAll()
+    } else showToast(res.error || '保存失败', 'error')
+    setLoading(null)
   }
 
   const resetUserPassword = async (userId: string) => {
@@ -330,6 +366,20 @@ export default function AdminPage() {
     { k: 'settings', label: '系统设置', icon: Settings },
   ]
 
+  // 有权限显示哪些 Tab
+  const canSeeTab = (t: Tab): boolean => {
+    if (!user) return false
+    if (_isSuperAdmin(user.id || '')) return true
+    const bit = TAB_PERM_BIT[t]
+    if (bit === null) return true
+    if (t === 'dashboard') return userHasPermission(user, 6) || userHasPermission(user, 0)
+    return userHasPermission(user, bit)
+  }
+
+  const canSetAdminPerms = _isSuperAdmin(user?.id || '')
+
+  const visibleTabs = tabs.filter(t => canSeeTab(t.k))
+
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="bg-gradient-to-r from-slate-900 to-slate-800 text-white sticky top-0 z-40">
@@ -364,7 +414,7 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto p-4 flex gap-4 flex-col md:flex-row">
         <aside className="md:w-56 flex-shrink-0">
           <div className="card p-2 space-y-1 sticky top-4">
-            {tabs.map(t => {
+            {visibleTabs.map(t => {
               const Icon = t.icon
               const active = tab === t.k
               return (
@@ -638,12 +688,12 @@ export default function AdminPage() {
                                   <Unlock size={14} />
                                 </button>
                               )}
-                              {!u.isAdmin && !u.deleted && (
+                              {canSetAdminPerms && !u.isAdmin && !u.deleted && (
                                 <button onClick={() => updateUserPermission(u.id, true)} disabled={loading?.startsWith('perm_')} className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-600" title="设为管理员">
                                   <UserCheck size={14} />
                                 </button>
                               )}
-                              {u.isAdmin && u.id !== 'admin' && (
+                              {canSetAdminPerms && u.isAdmin && u.id !== 'admin' && (
                                 <button onClick={() => updateUserPermission(u.id, false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" title="取消管理员">
                                   <UserX size={14} />
                                 </button>
@@ -703,39 +753,8 @@ export default function AdminPage() {
           {tab === 'sensitive' && <SensitiveWords />}
 
           {tab === 'market' && (
-            <div className="card p-5">
-              <h3 className="font-bold text-slate-800 mb-4">花品种基础信息</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs">
-                    <tr>
-                      <th className="text-left p-3 font-medium">花品种</th>
-                      <th className="text-left p-3 font-medium">适宜季节</th>
-                      <th className="text-left p-3 font-medium">最高等级</th>
-                      <th className="text-left p-3 font-medium">基础收购价</th>
-                      <th className="text-left p-3 font-medium">种子价</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { n: '玫瑰🌹', s: '春夏', r: '钻石', b: 30, seed: 18 },
-                      { n: '郁金香🌷', s: '春', r: '铂金', b: 25, seed: 15 },
-                      { n: '向日葵🌻', s: '夏', r: '铂金', b: 20, seed: 12 },
-                      { n: '雏菊🌼', s: '春秋', r: '黄金', b: 12, seed: 8 },
-                      { n: '菊花🏵️', s: '秋', r: '铂金', b: 28, seed: 16 },
-                      { n: '梅花🌸', s: '冬', r: '传说', b: 60, seed: 30 },
-                    ].map((x, i) => (
-                      <tr key={i} className="border-t border-slate-100">
-                        <td className="p-3 font-medium text-slate-700">{x.n}</td>
-                        <td className="p-3 text-slate-600">{x.s}</td>
-                        <td className="p-3">{x.r}</td>
-                        <td className="p-3 text-amber-600 font-medium">{x.b} 💰</td>
-                        <td className="p-3 text-slate-600">{x.seed} 💰</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="space-y-4">
+              <AdminMarketPanel />
             </div>
           )}
 
@@ -927,6 +946,49 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
+
+              {/* 子管理员权限配置（仅超级管理员可见） */}
+              {canSetAdminPerms && editingUser && _isSuperAdmin(editingUser.id) === false && (
+                <div className="border border-slate-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-slate-700 flex items-center gap-1">
+                      <Shield size={14} className="text-indigo-500" /> 管理员权限
+                    </label>
+                    <div className="text-[10px] text-slate-400">
+                      当前权限位: <span className="font-mono">{(editAdminPerms & 0xff).toString(2).padStart(8, '0')} ({editAdminPerms & 0xff})</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                    {ADMIN_PERMISSIONS.map(p => {
+                      const checked = (editAdminPerms & (1 << p.bit)) !== 0
+                      return (
+                        <label key={p.bit} className={classNames(
+                          'p-2 rounded-lg border text-xs cursor-pointer select-none transition-all',
+                          checked ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                        )}>
+                          <div className="flex items-center gap-1.5">
+                            <input type="checkbox" className="accent-indigo-600"
+                              checked={checked}
+                              onChange={e => setEditAdminPerms(prev => e.target.checked ? prev | (1 << p.bit) : prev & ~(1 << p.bit))} />
+                            <span className="font-medium">{p.name}</span>
+                          </div>
+                          <div className="text-[10px] opacity-70 ml-5 mt-0.5 leading-tight">{p.desc}</div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-1.5 mt-2">
+                    <button onClick={() => setEditAdminPerms(0xff)} className="flex-1 py-1.5 text-[11px] rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100">全选</button>
+                    <button onClick={() => setEditAdminPerms(0)} className="flex-1 py-1.5 text-[11px] rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100">清空</button>
+                    <button onClick={() => setEditAdminPerms(1 | 2 | 4)} className="flex-1 py-1.5 text-[11px] rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100">基础权限</button>
+                  </div>
+                  <button onClick={saveAdminPermissions}
+                    disabled={loading?.startsWith('perm_')}
+                    className="w-full mt-2 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 text-xs font-medium disabled:opacity-50">
+                    {loading?.startsWith('perm_') ? '保存中...' : '保存权限配置（并自动设为管理员/撤管）'}
+                  </button>
+                </div>
+              )}
               <button onClick={editUserInfo} disabled={loading?.startsWith('edit_')} className="btn-primary w-full py-2.5">
                 {loading?.startsWith('edit_') ? '保存中...' : '保存修改'}
               </button>

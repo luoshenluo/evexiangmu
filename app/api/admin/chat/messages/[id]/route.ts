@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { deleteMessage } from '@/lib/server-store'
-import { authRequest, jsonResponse } from '@/lib/auth'
+import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -13,6 +13,7 @@ export async function DELETE(
   try {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+    if (!userHasPermission(admin, 2)) return jsonResponse(false, null, '无「聊天管理」权限', 403)
 
     const ok = await deleteMessage(params.id)
     if (!ok) return jsonResponse(false, null, '删除失败', 500)

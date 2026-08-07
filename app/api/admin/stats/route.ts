@@ -1,137 +1,103 @@
 import { NextRequest } from 'next/server'
-import {
-  getAllUsers, getGameState, getListings, getBuyOrders, getMessages,
-} from '@/lib/server-store'
-import { getSupabase } from '@/lib/supabase'
-import { authRequest, jsonResponse } from '@/lib/auth'
-import { SEASON_NAMES, FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { authRequest, jsonResponse, userHasPermission, isSuperAdmin } from '@/lib/auth'
+import { getAllUsers, listAdminLogs } from '@/lib/server-store'
 
 export const runtime = 'edge'
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await authRequest(req)
-    if (!user || !user.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+    const admin = await authRequest(req)
+    if (!admin) return jsonResponse(false, null, '请先登录', 401)
+    if (!admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+    if (!userHasPermission(admin, 6) && !isSuperAdmin(admin.id)) return jsonResponse(false, null, '无「日志统计」权限', 403)
 
-    const [users, gs, listings, buyOrders, messages] = await Promise.all([
-      getAllUsers(),
-      getGameState(),
-      getListings(),
-      getBuyOrders(),
-      getMessages('world', 1000),
-    ])
+    const url = new URL(req.url)
+    const action = url.searchParams.get('action') || 'overview'
 
-    const now = Date.now()
-    const todayStart = now - 24 * 60 * 60 * 1000
+    if (action === 'overview') {
+      const users = await getAllUsers()
+      const totalUsers = users.length
+      const now = Date.now()
+      const dayAgo = now - 86400000
+      const weekAgo = now - 7 * 86400000
+      const monthAgo = now - 30 * 86400000
 
-    const todayNewUsers = users.filter(u => u.createdAt > todayStart).length
-    const todayMessages = messages.filter(m => m.timestamp > todayStart).length
-    const onlineUsers = users.filter(u => now - u.lastLogin < 10 * 60 * 1000).length
+      const active1d = users.filter(u => u.lastLogin >= dayAgo).length
+      const active7d = users.filter(u => u.lastLogin >= weekAgo).length
+      const new30d = users.filter(u => u.createdAt >= monthAgo).length
+      const banned = users.filter(u => u.bannedUntil && u.bannedUntil > now).length
+      const muted = users.filter(u => u.mutedUntil && u.mutedUntil > now).length
+      const admins = users.filter(u => u.isAdmin).length
 
-    // ========== 经济指标 ==========
-    // 全服金币总量
-    const totalCoins = users.reduce((sum, u) => sum + (u.coins || 0), 0)
-    // 全服种植中的花
-    let plantedCount = 0
-    let maturedCount = 0
-    let pestCount = 0
-    let totalGrowthSum = 0
-    let plantsWithGrowth = 0
-    const flowerTypeCount: Record<string, number> = {}
-    for (const u of users) {
-      for (const p of u.plots || []) {
-        if (p.unlocked && p.flower) {
-          plantedCount++
-          totalGrowthSum += p.flower.growthProgress || 0
-          plantsWithGrowth++
-          if (p.flower.isReady) maturedCount++
-          if (p.flower.hasPest) pestCount++
-          flowerTypeCount[p.flower.flowerTypeId] = (flowerTypeCount[p.flower.flowerTypeId] || 0) + 1
-        }
-      }
-    }
-    const avgGrowth = plantsWithGrowth > 0 ? Math.round(totalGrowthSum / plantsWithGrowth) : 0
+      const totalCoins = users.reduce((s, u) => s + (u.coins || 0), 0)
+      const avgCoins = totalUsers > 0 ? Math.floor(totalCoins / totalUsers) : 0
+      const richest = [...users].sort((a, b) => b.coins - a.coins).slice(0, 5).map(u => ({ id: u.id, nickname: u.nickname, coins: u.coins, avatar: u.avatar }))
 
-    // 全服背包花朵估值（潜在金币）
-    let inventoryFlowerValue = 0
-    const inventoryFlowerCount: Record<string, number> = {}
-    for (const u of users) {
-      for (const item of u.inventory || []) {
-        if (item.type === 'flower' && item.quantity > 0) {
-          const ft = FLOWER_TYPES.find(f => f.id === item.referenceId)
-          if (ft) {
-            inventoryFlowerValue += getFlowerSellPrice(ft, (item.rank || 1) as any) * item.quantity
-            inventoryFlowerCount[item.referenceId] = (inventoryFlowerCount[item.referenceId] || 0) + item.quantity
-          }
-        }
-      }
+      const unlockedPlots = users.reduce((s, u) => s + u.plots.filter(p => p.unlocked).length, 0)
+      const invSize = users.reduce((s, u) => s + u.inventory.filter(i => i.quantity > 0).length, 0)
+      const totalPetalCoins = users.reduce((s, u) => s + ((u as any).petalCoins || 0), 0)
+
+      const logs = (await listAdminLogs({ limit: 50 })).items
+
+      return jsonResponse(true, {
+        snapshotAt: now,
+        users: { totalUsers, active1d, active7d, new30d, banned, muted, admins },
+        economy: { totalCoins, avgCoins, richest, totalPetalCoins, unlockedPlots, invSize },
+        recentActions: logs,
+      })
     }
 
-    // 金币分布（贫富差距）
-    const sortedCoins = users.map(u => u.coins || 0).sort((a, b) => b - a)
-    const top10Coins = sortedCoins.slice(0, Math.max(1, Math.floor(sortedCoins.length * 0.1))).reduce((a, b) => a + b, 0)
-    const giniRatio = totalCoins > 0 ? Math.round((top10Coins / totalCoins) * 100) : 0
+    if (action === 'export_users') {
+      const users = await getAllUsers()
+      const now = Date.now()
+      const header = ['ID', '用户名', '昵称', '金币', '花瓣', '角色', '创建时间', '最后登录', '封号', '禁言', '好友数', '解锁地块', '背包物品数']
+      const lines = [header.join(',')]
+      for (const u of users) {
+        lines.push([
+          u.id, u.username, `"${u.nickname.replace(/"/g, '""')}"`,
+          u.coins, (u as any).petalCoins || 0,
+          u.isAdmin ? '管理员' : '用户',
+          new Date(u.createdAt).toISOString(),
+          new Date(u.lastLogin).toISOString(),
+          u.bannedUntil && u.bannedUntil > now ? '是' : '',
+          u.mutedUntil && u.mutedUntil > now ? '是' : '',
+          u.friends?.length || 0,
+          u.plots.filter(p => p.unlocked).length,
+          u.inventory.filter(i => i.quantity > 0).length,
+        ].map(String).join(','))
+      }
+      return new Response('\uFEFF' + lines.join('\n'), {
+        status: 200,
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': `attachment; filename="users_${Math.floor(now/1000)}.csv"`,
+        },
+      })
+    }
 
-    // 市场指标
-    const officialListings = listings.filter(l => l.isOfficial).length
-    const playerListings = listings.filter(l => !l.isOfficial).length
-    const officialOrders = buyOrders.filter(o => o.isOfficial).length
-    const playerOrders = buyOrders.filter(o => !o.isOfficial).length
+    if (action === 'export_logs') {
+      const logs = (await listAdminLogs({ limit: 2000 })).items
+      const now = Date.now()
+      const header = ['时间', '管理员ID', '管理员名', '操作', '目标类型', '目标ID', '详情']
+      const lines = [header.join(',')]
+      for (const l of logs) {
+        lines.push([
+          new Date(l.createdAt).toISOString(),
+          l.adminId, `"${(l.adminName || '').replace(/"/g, '""')}"`,
+          l.action, l.targetType || '', l.targetId || '',
+          `"${(l.detail ? JSON.stringify(l.detail) : '').replace(/"/g, '""')}"`,
+        ].join(','))
+      }
+      return new Response('\uFEFF' + lines.join('\n'), {
+        status: 200,
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': `attachment; filename="admin_logs_${Math.floor(now/1000)}.csv"`,
+        },
+      })
+    }
 
-    // 花园点赞总数（从 garden_likes 表）
-    let totalLikes = 0
-    try {
-      const sb = getSupabase()
-      const { count } = await sb.from('garden_likes').select('*', { count: 'exact', head: true })
-      totalLikes = count || 0
-    } catch {}
-
-    // 最受欢迎的花型 Top 5
-    const topFlowers = Object.entries(flowerTypeCount)
-      .map(([id, count]) => ({
-        id,
-        name: FLOWER_TYPES.find(f => f.id === id)?.name || id,
-        emoji: FLOWER_TYPES.find(f => f.id === id)?.emoji || '🌸',
-        count,
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-
-    // 金币排行 Top 5
-    const topRich = users
-      .map(u => ({ id: u.id, nickname: u.nickname, avatar: u.avatar, coins: u.coins || 0 }))
-      .sort((a, b) => b.coins - a.coins)
-      .slice(0, 5)
-
-    return jsonResponse(true, {
-      // 基础
-      totalUsers: users.length,
-      todayNewUsers,
-      onlineUsers,
-      todayMessages,
-      totalListings: listings.length,
-      totalBuyOrders: buyOrders.length,
-      season: SEASON_NAMES[gs.currentSeason],
-      seasonStartAt: gs.seasonStartAt,
-      // 经济
-      totalCoins,
-      giniRatio,
-      inventoryFlowerValue,
-      totalLikes,
-      // 种植
-      plantedCount,
-      maturedCount,
-      pestCount,
-      avgGrowth,
-      topFlowers,
-      // 市场
-      officialListings,
-      playerListings,
-      officialOrders,
-      playerOrders,
-      // 排行
-      topRich,
-    })
+    return jsonResponse(false, null, '未知 action', 400)
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
   }

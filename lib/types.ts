@@ -94,6 +94,33 @@ export interface Tool {
   power: number
 }
 
+// ==================== 好友系统 ====================
+
+export interface FriendRequest {
+  id: string
+  fromUserId: string
+  fromUserName: string
+  fromUserAvatar: string
+  toUserId: string
+  toUserName: string
+  toUserAvatar: string
+  status: 'pending' | 'accepted' | 'rejected'
+  createdAt: number
+  message?: string
+}
+
+export interface FriendProfile {
+  id: string
+  nickname: string
+  avatar: string
+  online: boolean
+  lastLogin: number
+  plotsUnlocked: number
+  coins: number
+  familyId?: string | null
+  familyName?: string | null
+}
+
 export interface User {
   id: string
   username: string
@@ -121,6 +148,26 @@ export interface User {
   taskProgress: Record<string, number>
   taskClaimed: Record<string, boolean>
   taskLastReset: Record<string, number>  // 各类型任务上次重置时间戳
+  // 好友系统：待处理申请
+  incomingFriendRequests?: FriendRequest[]  // 收到的申请
+  outgoingFriendRequests?: FriendRequest[]  // 发出的申请
+  // 子管理员权限位（超级管理员 admin 永远全开）
+  adminPermissions?: number
+  // 皮肤/主题
+  theme?: 'light' | 'dark' | 'garden' | 'sunset' | 'ocean'
+  gardenBg?: string
+  // 签到
+  lastCheckInAt?: number
+  checkInStreak?: number
+  totalCheckinDays?: number         // 当前周期累计（可能重置）
+  totalCheckinDaysAccum?: number    // 历史累计（永不重置）
+  // 成就: { [key]: { unlockedAt: ms } }
+  achievements?: Record<string, { unlockedAt: number }>
+  title?: string
+  // 花瓣代币（小游戏用）
+  petalCoins?: number
+  // 成就额外奖励：称号列表
+  titles?: string[]
 }
 
 export interface MarketListing {
@@ -128,7 +175,7 @@ export interface MarketListing {
   sellerId: string
   sellerName: string
   isOfficial: boolean
-  itemType: 'flower' | 'seed'
+  itemType: 'flower' | 'seed' | 'tool'
   referenceId: string
   name: string
   emoji: string
@@ -143,7 +190,7 @@ export interface BuyOrder {
   buyerId: string
   buyerName: string
   isOfficial: boolean
-  itemType: 'flower' | 'seed'
+  itemType: 'flower' | 'seed' | 'tool'
   referenceId: string
   name: string
   emoji: string
@@ -216,7 +263,7 @@ export interface CDK {
 export interface Notification {
   id: string
   userId: string
-  type: 'system' | 'trade' | 'friend' | 'family' | 'harvest' | 'plant' | 'purchase' | 'cdk_redeem' | 'task'
+  type: 'system' | 'trade' | 'friend' | 'family' | 'harvest' | 'plant' | 'purchase' | 'cdk_redeem' | 'task' | 'reward' | 'achievement'
   title: string
   content: string
   read: boolean

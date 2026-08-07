@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert } from 'lucide-react'
+import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert, Palette, Calendar } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
 export default function ProfilePage() {
@@ -83,12 +83,14 @@ export default function ProfilePage() {
   }
 
   const menuItems = [
+    { icon: Calendar, label: '每日签到', tip: '每日奖励 + 成就', onClick: () => window.location.href = '/checkin', color: 'from-amber-400 to-orange-500' },
     { icon: Bell, label: '消息中心', tip: notifications.filter(n => !n.read).length > 0 ? `${notifications.filter(n => !n.read).length}条未读` : '系统通知', onClick: loadNotifications, color: 'from-blue-400 to-blue-600' },
+    { icon: Palette, label: '外观设置', tip: '主题 & 花园皮肤', onClick: () => window.location.href = '/settings', color: 'from-purple-400 to-fuchsia-500' },
     { icon: Award, label: '排行榜', tip: '查看全服排名', onClick: loadRanking, color: 'from-amber-400 to-orange-500' },
     { icon: ShieldAlert, label: '偷花记录', tip: '谁动了我的花', onClick: loadStealLogs, color: 'from-red-400 to-rose-600' },
     { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-purple-400 to-pink-500' },
-    { icon: Sparkles, label: '活动中心', tip: '暂无进行中活动', onClick: () => showToast('活动开发中~', 'info'), color: 'from-red-400 to-rose-500' },
-    { icon: Users, label: '好友系统', tip: '添加好友', onClick: () => showToast('好友系统开发中~', 'info'), color: 'from-green-400 to-emerald-600' },
+    { icon: Sparkles, label: '活动中心', tip: '小游戏每日福利', onClick: () => window.location.href = '/minigames', color: 'from-fuchsia-400 to-purple-600' },
+    { icon: Users, label: '好友系统', tip: `${user?.friends?.length || 0}位好友`, onClick: () => window.location.href = '/friends', color: 'from-green-400 to-emerald-600' },
     { icon: HelpCircle, label: '帮助反馈', tip: '游戏介绍', onClick: () => setShowAnnouncements(true), color: 'from-slate-400 to-slate-600' },
   ]
 

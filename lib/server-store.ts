@@ -5,7 +5,7 @@ import type {
   User, Family, ChatMessage, ChatChannel, MarketListing, BuyOrder,
   Task, CDK, Notification, GameState, Announcement,
   StealLog, PestSeverity, PlantedFlower, Plot, RankLevel,
-  SensitiveWord, ChatSettings, ChatStats,
+  SensitiveWord, ChatSettings, ChatStats, InventoryItem,
 } from './types'
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
@@ -42,6 +42,19 @@ function dbRowToUser(row: any): User {
     taskProgress: row.task_progress || {},
     taskClaimed: row.task_claimed || {},
     taskLastReset: row.task_last_reset || {},
+    incomingFriendRequests: row.incoming_friend_requests || [],
+    outgoingFriendRequests: row.outgoing_friend_requests || [],
+    adminPermissions: row.admin_permissions ?? 0,
+    theme: row.theme || 'light',
+    gardenBg: row.garden_bg || '',
+    lastCheckInAt: row.last_check_in_at || 0,
+    checkInStreak: row.check_in_streak || 0,
+    totalCheckinDays: row.total_checkin_days || 0,
+    totalCheckinDaysAccum: row.total_checkin_days_accum || 0,
+    achievements: row.achievements || {},
+    title: row.title || '',
+    petalCoins: row.petal_coins || 0,
+    titles: row.titles || [],
   }
 }
 
@@ -70,6 +83,19 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.taskProgress !== undefined) row.task_progress = user.taskProgress
   if (user.taskClaimed !== undefined) row.task_claimed = user.taskClaimed
   if (user.taskLastReset !== undefined) row.task_last_reset = user.taskLastReset
+  if (user.incomingFriendRequests !== undefined) row.incoming_friend_requests = user.incomingFriendRequests
+  if (user.outgoingFriendRequests !== undefined) row.outgoing_friend_requests = user.outgoingFriendRequests
+  if (user.adminPermissions !== undefined) row.admin_permissions = user.adminPermissions
+  if (user.theme !== undefined) row.theme = user.theme
+  if (user.gardenBg !== undefined) row.garden_bg = user.gardenBg
+  if (user.lastCheckInAt !== undefined) row.last_check_in_at = user.lastCheckInAt
+  if (user.checkInStreak !== undefined) row.check_in_streak = user.checkInStreak
+  if ((user as any).totalCheckinDays !== undefined) row.total_checkin_days = (user as any).totalCheckinDays
+  if ((user as any).totalCheckinDaysAccum !== undefined) row.total_checkin_days_accum = (user as any).totalCheckinDaysAccum
+  if (user.achievements !== undefined) row.achievements = user.achievements
+  if (user.title !== undefined) row.title = user.title
+  if (user.petalCoins !== undefined) row.petal_coins = user.petalCoins
+  if ((user as any).titles !== undefined) row.titles = (user as any).titles
   return row
 }
 
@@ -165,6 +191,91 @@ function genId(prefix: string): string {
 // ==================== 数据库初始化/种子 ====================
 
 let seedPromise: Promise<void> | null = null
+
+// ========== 管理员操作审计日志（内存缓存，最多 10000 条） ==========
+export interface AdminLogEntry {
+  id: string
+  adminId: string
+  adminName: string
+  action: string
+  targetType?: 'user' | 'announcement' | 'cdk' | 'chat' | 'market' | 'setting' | 'permissions' | 'economy' | 'other'
+  targetId?: string
+  detail?: Record<string, any>
+  createdAt: number
+  ip?: string
+}
+
+let _adminLogsCache: AdminLogEntry[] = []
+const MAX_ADMIN_LOGS = 10000
+
+export async function logAdminAction(
+  admin: { id: string; nickname?: string; username?: string } | null,
+  action: string,
+  extra: Omit<Partial<AdminLogEntry>, 'id' | 'adminId' | 'adminName' | 'action' | 'createdAt'> = {},
+): Promise<void> {
+  if (!admin) return
+  try {
+    const entry: AdminLogEntry = {
+      id: 'log_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
+      adminId: admin.id,
+      adminName: admin.nickname || admin.username || admin.id,
+      action,
+      createdAt: Date.now(),
+      ...extra,
+    }
+    _adminLogsCache.unshift(entry)
+    if (_adminLogsCache.length > MAX_ADMIN_LOGS) _adminLogsCache = _adminLogsCache.slice(0, MAX_ADMIN_LOGS)
+    // 尽量写入 admin_logs 表（如果有的话）
+    try {
+      await seedDatabase()
+      const sb = getSupabase()
+      await sb.from('admin_logs').insert({
+        id: entry.id, admin_id: entry.adminId, admin_name: entry.adminName,
+        action: entry.action, target_type: entry.targetType || null, target_id: entry.targetId || null,
+        detail: entry.detail || null, created_at: entry.createdAt, ip: entry.ip || null,
+      }).select().maybeSingle()
+    } catch (_e) { /* noop: 没有表也可以 */ }
+  } catch (e: any) {
+    logger.warn('admin', `logAdminAction 失败: ${e?.message || 'unknown'}`)
+  }
+}
+
+export async function listAdminLogs(options: {
+  adminId?: string;
+  action?: string;
+  targetType?: AdminLogEntry['targetType'];
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: AdminLogEntry[]; total: number }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  let q: any = sb.from('admin_logs').select('*', { count: 'exact' })
+  let hasTable = true
+  try {
+    if (options.adminId) q = q.eq('admin_id', options.adminId)
+    if (options.targetType) q = q.eq('target_type', options.targetType)
+    if (options.action) q = q.eq('action', options.action)
+    q = q.order('created_at', { ascending: false }).range(options.offset || 0, (options.offset || 0) + (options.limit || 200) - 1)
+    const { data, error, count } = await q
+    if (error || !Array.isArray(data)) throw new Error(error?.message || 'no table')
+    return { total: count || data.length, items: data.map((r: any) => ({
+      id: r.id, adminId: r.admin_id, adminName: r.admin_name,
+      action: r.action, targetType: r.target_type || undefined, targetId: r.target_id || undefined,
+      detail: r.detail || undefined, createdAt: r.created_at, ip: r.ip || undefined,
+    })) }
+  } catch (_e) {
+    hasTable = false
+  }
+  // 退化为内存
+  let arr = _adminLogsCache.slice()
+  if (options.adminId) arr = arr.filter(x => x.adminId === options.adminId)
+  if (options.targetType) arr = arr.filter(x => x.targetType === options.targetType)
+  if (options.action) arr = arr.filter(x => x.action === options.action)
+  const total = arr.length
+  const limit = options.limit || 200
+  const offset = options.offset || 0
+  return { items: arr.slice(offset, offset + limit), total }
+}
 
 export async function seedDatabase(): Promise<void> {
   if (seedPromise) return seedPromise
@@ -469,6 +580,20 @@ export async function createUser(data: { username: string; password: string; nic
   return dbRowToUser(newRow)
 }
 
+// 本轮新增的列（签到/设置/小游戏/成就）——用于热更新降级：
+// 当 users 表尚未 ALTER 添加这些列时，update 会整条失败，这里在失败后自动剥离重试
+const NEW_USER_COLUMNS = new Set([
+  'theme', 'garden_bg', 'title',
+  'last_check_in_at', 'check_in_streak',
+  'total_checkin_days', 'total_checkin_days_accum',
+  'petal_coins', 'achievements', 'titles',
+])
+
+function isMissingColumnError(err: any): boolean {
+  const msg = String(err?.message || '')
+  return /column .* does not exist|Could not find the column|could not find column|relation .* does not exist/i.test(msg)
+}
+
 export async function updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
   await seedDatabase()
   const sb = getSupabase()
@@ -479,6 +604,24 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
     .select('*')
     .single()
   if (error || !data) {
+    // 热更新降级：若因新列不存在导致整条 update 失败，剥离新列后重试，保证旧字段仍能写入
+    if (isMissingColumnError(error)) {
+      const stripped: Record<string, any> = {}
+      let removed = false
+      for (const [k, v] of Object.entries(dbRow)) {
+        if (NEW_USER_COLUMNS.has(k)) { removed = true; continue }
+        stripped[k] = v
+      }
+      if (removed && Object.keys(stripped).length > 0) {
+        logger.warn('system', `updateUser 热更新降级：剥离新列重试`, { userId, removedCols: Object.keys(dbRow).filter(k => NEW_USER_COLUMNS.has(k)) })
+        const { data: data2, error: error2 } = await sb.from('users')
+          .update(stripped)
+          .eq('id', userId)
+          .select('*')
+          .single()
+        if (!error2 && data2) return dbRowToUser(data2)
+      }
+    }
     logger.error('system', '更新用户失败', { userId, error: error?.message })
     return null
   }
@@ -671,6 +814,51 @@ export async function getBuyOrders(): Promise<BuyOrder[]> {
   return data.map(dbRowToBuyOrder)
 }
 
+export async function createBuyOrder(data: Omit<BuyOrder, 'id' | 'createdAt'>): Promise<BuyOrder> {
+  const sb = getSupabase()
+  const order: BuyOrder = { ...data, id: genId('o'), createdAt: Date.now() }
+  const row: any = {
+    id: order.id,
+    buyer_id: order.buyerId,
+    buyer_name: order.buyerName,
+    is_official: order.isOfficial,
+    item_type: order.itemType,
+    reference_id: order.referenceId,
+    name: order.name,
+    emoji: order.emoji,
+    price: order.price,
+    quantity: order.quantity,
+    created_at: order.createdAt,
+  }
+  // buy_orders 表有 rank 列（历史数据），但 BuyOrder 类型无 rank；保持兼容
+  const { rank } = (data as any)
+  if (rank !== undefined) row.rank = rank
+  await sb.from('buy_orders').insert(row)
+  return order
+}
+
+export async function removeBuyOrder(id: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { error } = await sb.from('buy_orders').delete().eq('id', id)
+  return !error
+}
+
+export async function findBuyOrder(id: string): Promise<BuyOrder | null> {
+  const sb = getSupabase()
+  const { data, error } = await sb.from('buy_orders').select('*').eq('id', id).single()
+  if (error || !data) return null
+  return dbRowToBuyOrder(data)
+}
+
+export async function updateBuyOrderQuantity(id: string, quantity: number): Promise<void> {
+  const sb = getSupabase()
+  if (quantity <= 0) {
+    await sb.from('buy_orders').delete().eq('id', id)
+  } else {
+    await sb.from('buy_orders').update({ quantity }).eq('id', id)
+  }
+}
+
 export async function createListing(data: Omit<MarketListing, 'id' | 'createdAt'>): Promise<MarketListing> {
   const sb = getSupabase()
   const listing: MarketListing = {
@@ -742,6 +930,79 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
   const sb = getSupabase()
   const { error } = await sb.from('announcements').delete().eq('id', id)
   return !error
+}
+
+// ==================== 背包工具函数（共享） ====================
+
+export function addInventoryItem(
+  inventory: InventoryItem[],
+  item: Partial<InventoryItem> & Pick<InventoryItem, 'name' | 'type' | 'referenceId' | 'emoji'>,
+  inventorySize: number,
+): InventoryItem[] {
+  const existing = inventory.find(
+    (i) =>
+      i.type === item.type &&
+      i.referenceId === item.referenceId &&
+      (!item.rank || i.rank === item.rank) &&
+      i.quantity < i.maxStack,
+  )
+  if (existing) {
+    return inventory.map((i) =>
+      i.id === existing.id
+        ? { ...i, quantity: Math.min(i.maxStack, i.quantity + (item.quantity || 1)) }
+        : i,
+    )
+  }
+  if (inventory.filter((i) => i.quantity > 0).length >= inventorySize) {
+    throw new Error('背包已满，请先清理或扩容')
+  }
+  return [
+    ...inventory,
+    {
+      id: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: item.type,
+      referenceId: item.referenceId,
+      name: item.name,
+      emoji: item.emoji,
+      rank: item.rank,
+      quantity: item.quantity || 1,
+      maxStack: item.maxStack || 99,
+      sellable: item.sellable ?? true,
+      tradeable: item.tradeable ?? true,
+    } as InventoryItem,
+  ]
+}
+
+export function removeInventoryItem(
+  inventory: InventoryItem[],
+  type: InventoryItem['type'],
+  referenceId: string,
+  rank: number | undefined,
+  quantity: number,
+): [InventoryItem[], number] {
+  const out: InventoryItem[] = []
+  let remaining = quantity
+  for (const it of inventory) {
+    const match =
+      it.type === type &&
+      it.referenceId === referenceId &&
+      (rank === undefined || it.rank === rank)
+    if (!match || remaining <= 0) {
+      if (it.quantity > 0) out.push(it)
+      continue
+    }
+    const take = Math.min(it.quantity, remaining)
+    const left = it.quantity - take
+    remaining -= take
+    if (left > 0) out.push({ ...it, quantity: left })
+  }
+  return [out, quantity - remaining]
+}
+
+export function consumeTool(inventory: InventoryItem[], toolId: string): InventoryItem[] | null {
+  const [newInv] = removeInventoryItem(inventory, 'tool', toolId, undefined, 1)
+  if (newInv.length >= inventory.length) return null
+  return newInv
 }
 
 // ==================== CDK ====================
@@ -1668,6 +1929,557 @@ export function getFriendWaterRemainingToday(userId: string): number {
   const now = Date.now()
   const times = (store.get(userId) || []).filter(t => now - t < 86400000)
   return Math.max(0, FRIEND_WATER_DAILY_LIMIT - times.length)
+}
+
+// ==================== 好友系统 ====================
+
+// 搜索用户（按昵称或用户名匹配，排除自己和已好友）
+export async function searchUsers(currentUserId: string, keyword: string, limit = 20): Promise<User[]> {
+  const all = await getAllUsers()
+  const kw = keyword.trim().toLowerCase()
+  if (!kw) return []
+  return all
+    .filter((u) =>
+      u.id !== currentUserId
+      && !u.deleted
+      && !u.friends.includes(currentUserId)
+      && (
+        u.nickname.toLowerCase().includes(kw)
+        || u.username.toLowerCase().includes(kw)
+        || u.id.toLowerCase().includes(kw)
+      )
+    )
+    .slice(0, limit)
+}
+
+// 发送好友申请
+export async function sendFriendRequest(
+  fromUserId: string,
+  toUserId: string,
+  message?: string
+): Promise<{ success: boolean; error?: string; request?: any }> {
+  if (fromUserId === toUserId) return { success: false, error: '不能加自己为好友' }
+
+  const from = await findUserById(fromUserId)
+  const to = await findUserById(toUserId)
+  if (!from || !to) return { success: false, error: '用户不存在' }
+  if (to.deleted) return { success: false, error: '该用户已注销' }
+  if (from.friends.includes(toUserId)) return { success: false, error: '已经是好友了' }
+
+  // 检查是否已发送/已收到
+  const outgoing = from.outgoingFriendRequests || []
+  if (outgoing.some((r) => r.toUserId === toUserId && r.status === 'pending')) {
+    return { success: false, error: '已发送过申请，等待对方处理' }
+  }
+  const incoming = to.incomingFriendRequests || []
+  if (incoming.some((r) => r.fromUserId === fromUserId && r.status === 'pending')) {
+    return { success: false, error: '对方已有你的待处理申请' }
+  }
+
+  const now = Date.now()
+  const request: any = {
+    id: `fr_${now}_${Math.random().toString(36).slice(2, 8)}`,
+    fromUserId,
+    fromUserName: from.nickname,
+    fromUserAvatar: from.avatar,
+    toUserId,
+    toUserName: to.nickname,
+    toUserAvatar: to.avatar,
+    status: 'pending',
+    createdAt: now,
+    message: message || '',
+  }
+
+  // 写入双方
+  await Promise.all([
+    updateUser(fromUserId, {
+      outgoingFriendRequests: [...outgoing, request],
+    }),
+    updateUser(toUserId, {
+      incomingFriendRequests: [...incoming, request],
+    }),
+  ])
+
+  // 通知对方
+  await createNotification({
+    userId: toUserId,
+    type: 'friend',
+    title: '👋 好友申请',
+    content: `${from.nickname} 申请加你为好友${message ? `：「${message}」` : ''}`,
+  })
+
+  return { success: true, request }
+}
+
+// 处理好友申请（接受/拒绝）
+export async function handleFriendRequest(
+  currentUserId: string,
+  requestId: string,
+  action: 'accept' | 'reject'
+): Promise<{ success: boolean; error?: string }> {
+  const me = await findUserById(currentUserId)
+  if (!me) return { success: false, error: '用户不存在' }
+
+  const incoming = me.incomingFriendRequests || []
+  const req = incoming.find((r) => r.id === requestId)
+  if (!req) return { success: false, error: '申请不存在' }
+  if (req.toUserId !== currentUserId) return { success: false, error: '无权操作此申请' }
+  if (req.status !== 'pending') return { success: false, error: '申请已处理过' }
+
+  const fromUser = await findUserById(req.fromUserId)
+  if (!fromUser) return { success: false, error: '对方用户不存在' }
+
+  const newStatus = action === 'accept' ? 'accepted' : 'rejected'
+
+  if (action === 'accept') {
+    // 双向加好友
+    const myFriends = [...me.friends, req.fromUserId]
+    const theirFriends = [...fromUser.friends, currentUserId]
+    await Promise.all([
+      updateUser(currentUserId, {
+        friends: myFriends,
+        incomingFriendRequests: incoming.map((r) =>
+          r.id === requestId ? { ...r, status: newStatus } : r
+        ),
+      }),
+      updateUser(req.fromUserId, {
+        friends: theirFriends,
+        outgoingFriendRequests: (fromUser.outgoingFriendRequests || []).map((r) =>
+          r.id === requestId ? { ...r, status: newStatus } : r
+        ),
+      }),
+    ])
+
+    // 通知对方
+    await createNotification({
+      userId: req.fromUserId,
+      type: 'friend',
+      title: '🎉 好友申请通过',
+      content: `你和 ${me.nickname} 已经是好友了！`,
+    })
+  } else {
+    await Promise.all([
+      updateUser(currentUserId, {
+        incomingFriendRequests: incoming.map((r) =>
+          r.id === requestId ? { ...r, status: newStatus } : r
+        ),
+      }),
+      updateUser(req.fromUserId, {
+        outgoingFriendRequests: (fromUser.outgoingFriendRequests || []).map((r) =>
+          r.id === requestId ? { ...r, status: newStatus } : r
+        ),
+      }),
+    ])
+  }
+
+  return { success: true }
+}
+
+// 删除好友
+export async function removeFriend(currentUserId: string, friendId: string): Promise<{ success: boolean; error?: string }> {
+  const me = await findUserById(currentUserId)
+  const friend = await findUserById(friendId)
+  if (!me || !friend) return { success: false, error: '用户不存在' }
+  if (!me.friends.includes(friendId)) return { success: false, error: '不是好友' }
+
+  await Promise.all([
+    updateUser(currentUserId, {
+      friends: me.friends.filter((f) => f !== friendId),
+    }),
+    updateUser(friendId, {
+      friends: friend.friends.filter((f) => f !== currentUserId),
+    }),
+  ])
+  return { success: true }
+}
+
+// 获取好友列表资料
+export async function getFriendProfiles(currentUserId: string): Promise<any[]> {
+  const me = await findUserById(currentUserId)
+  if (!me) return []
+  const all = await getAllUsers()
+  return me.friends
+    .map((fid) => {
+      const u = all.find((x) => x.id === fid && !x.deleted)
+      if (!u) return null
+      return {
+        id: u.id,
+        nickname: u.nickname,
+        avatar: u.avatar,
+        online: Date.now() - u.lastLogin < 5 * 60 * 1000,
+        lastLogin: u.lastLogin,
+        plotsUnlocked: u.plots.filter((p) => p.unlocked).length,
+        coins: u.coins,
+        familyId: u.familyId,
+        familyName: null,
+        title: u.title || '',
+      }
+    })
+    .filter(Boolean)
+}
+
+// ==================== 家族系统（真实版） ====================
+
+const FAMILY_LEVEL_EXP = [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000]
+function getFamilyLevel(exp: number): number {
+  let lv = 1
+  for (let i = 1; i < FAMILY_LEVEL_EXP.length; i++) {
+    if (exp >= FAMILY_LEVEL_EXP[i]) lv = i + 1
+  }
+  return Math.min(lv, 10)
+}
+function getFamilyMaxMembers(level: number): number {
+  return 10 + (level - 1) * 10 // 1级10人，每级+10，10级100人
+}
+
+export async function getFamilies(keyword?: string, limit = 50): Promise<Family[]> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    let query = sb.from('families').select('*').order('level', { ascending: false }).order('exp', { ascending: false }).limit(limit)
+    const { data, error } = await query
+    if (error || !data) return []
+    const list = data.map(dbRowToFamily)
+    if (keyword) {
+      const kw = keyword.trim().toLowerCase()
+      return list.filter((f) => f.name.toLowerCase().includes(kw))
+    }
+    return list
+  } catch {
+    return []
+  }
+}
+
+export async function findFamilyById(id: string): Promise<Family | null> {
+  const sb = getSupabase()
+  const { data, error } = await sb.from('families').select('*').eq('id', id).single()
+  if (error || !data) return null
+  return dbRowToFamily(data)
+}
+
+export async function findFamilyByName(name: string): Promise<Family | null> {
+  const sb = getSupabase()
+  const { data, error } = await sb.from('families').select('*').eq('name', name.trim()).single()
+  if (error || !data) return null
+  return dbRowToFamily(data)
+}
+
+export async function createFamilyReal(ownerId: string, name: string, announcement: string, avatar = '🏰'): Promise<{ success: boolean; error?: string; family?: Family }> {
+  const owner = await findUserById(ownerId)
+  if (!owner) return { success: false, error: '用户不存在' }
+  if (owner.familyId) return { success: false, error: '你已加入其他家族，请先退出' }
+  if (owner.coins < 1000) return { success: false, error: '创建家族需要 1000 金币' }
+
+  const exist = await findFamilyByName(name)
+  if (exist) return { success: false, error: '家族名称已存在' }
+
+  const sb = getSupabase()
+  const id = `fam_${Date.now()}`
+  const now = Date.now()
+  const row = {
+    id,
+    name: name.trim(),
+    avatar,
+    announcement: announcement || '',
+    owner_id: ownerId,
+    members: [{ userId: ownerId, role: 'owner', contribution: 0 }],
+    level: 1,
+    exp: 0,
+    max_members: 10,
+    created_at: now,
+  }
+  const { error } = await sb.from('families').insert(row)
+  if (error) return { success: false, error: error.message }
+
+  // 扣金币 + 绑定家族ID
+  await updateUser(ownerId, { coins: owner.coins - 1000, familyId: id })
+  const family = await findFamilyById(id)
+  return { success: true, family: family! }
+}
+
+export async function joinFamily(userId: string, familyId: string): Promise<{ success: boolean; error?: string }> {
+  const u = await findUserById(userId)
+  if (!u) return { success: false, error: '用户不存在' }
+  if (u.familyId) return { success: false, error: '你已加入其他家族' }
+  const fam = await findFamilyById(familyId)
+  if (!fam) return { success: false, error: '家族不存在' }
+  if (fam.members.length >= fam.maxMembers) return { success: false, error: '家族人数已满' }
+
+  const sb = getSupabase()
+  const newMembers = [...fam.members, { userId, role: 'member' as const, contribution: 0 }]
+  await sb.from('families').update({ members: newMembers }).eq('id', familyId)
+  await updateUser(userId, { familyId })
+
+  // 通知族长
+  await createNotification({
+    userId: fam.ownerId,
+    type: 'family',
+    title: '👪 新成员加入',
+    content: `${u.nickname} 加入了你的家族！`,
+  })
+  return { success: true }
+}
+
+export async function leaveFamilyReal(userId: string): Promise<{ success: boolean; error?: string }> {
+  const u = await findUserById(userId)
+  if (!u || !u.familyId) return { success: false, error: '你未加入任何家族' }
+  const fam = await findFamilyById(u.familyId)
+  if (!fam) {
+    await updateUser(userId, { familyId: null })
+    return { success: true }
+  }
+
+  const isOwner = fam.ownerId === userId
+  const sb = getSupabase()
+
+  if (isOwner) {
+    // 族长退出 = 解散家族（仅当只剩族长1人时，否则转移给 admin 或报错）
+    const other = fam.members.filter((m) => m.userId !== userId)
+    if (other.length > 0) {
+      const admin = other.find((m) => m.role === 'admin') || other[0]
+      const newOwnerId = admin.userId
+      const newMembers = fam.members.filter((m) => m.userId !== userId).map((m) =>
+        m.userId === newOwnerId ? { ...m, role: 'owner' as const } : m
+      )
+      await sb.from('families').update({
+        members: newMembers,
+        owner_id: newOwnerId,
+      }).eq('id', fam.id)
+    } else {
+      await sb.from('families').delete().eq('id', fam.id)
+    }
+  } else {
+    const newMembers = fam.members.filter((m) => m.userId !== userId)
+    await sb.from('families').update({ members: newMembers }).eq('id', fam.id)
+  }
+
+  await updateUser(userId, { familyId: null })
+  return { success: true }
+}
+
+export async function setFamilyMemberRole(operatorId: string, familyId: string, targetUserId: string, role: 'owner' | 'admin' | 'member'): Promise<{ success: boolean; error?: string }> {
+  const fam = await findFamilyById(familyId)
+  if (!fam) return { success: false, error: '家族不存在' }
+  if (fam.ownerId !== operatorId) return { success: false, error: '仅族长可操作' }
+
+  const sb = getSupabase()
+  let newMembers = fam.members.map((m) =>
+    m.userId === targetUserId ? { ...m, role } : m
+  )
+  let ownerId = fam.ownerId
+  if (role === 'owner') {
+    // 转让族长：旧族长降级为 member
+    newMembers = newMembers.map((m) =>
+      m.userId === operatorId ? { ...m, role: 'member' as const } : m
+    )
+    ownerId = targetUserId
+  }
+  await sb.from('families').update({ members: newMembers, owner_id: ownerId }).eq('id', familyId)
+  return { success: true }
+}
+
+export async function kickFamilyMember(operatorId: string, familyId: string, targetUserId: string): Promise<{ success: boolean; error?: string }> {
+  const fam = await findFamilyById(familyId)
+  if (!fam) return { success: false, error: '家族不存在' }
+  const operator = fam.members.find((m) => m.userId === operatorId)
+  if (!operator) return { success: false, error: '你不在家族中' }
+  if (operator.role === 'member') return { success: false, error: '无权踢出成员' }
+  if (fam.ownerId === targetUserId) return { success: false, error: '不能踢出族长' }
+
+  const sb = getSupabase()
+  const newMembers = fam.members.filter((m) => m.userId !== targetUserId)
+  await sb.from('families').update({ members: newMembers }).eq('id', familyId)
+  await updateUser(targetUserId, { familyId: null })
+  return { success: true }
+}
+
+export async function addFamilyExp(familyId: string, exp: number): Promise<void> {
+  const fam = await findFamilyById(familyId)
+  if (!fam) return
+  const sb = getSupabase()
+  const newExp = fam.exp + exp
+  const newLevel = getFamilyLevel(newExp)
+  const newMax = getFamilyMaxMembers(newLevel)
+  await sb.from('families').update({
+    exp: newExp,
+    level: newLevel,
+    max_members: newMax,
+  }).eq('id', familyId)
+}
+
+export async function updateFamilyInfo(operatorId: string, familyId: string, data: { name?: string; announcement?: string; avatar?: string }): Promise<{ success: boolean; error?: string }> {
+  const fam = await findFamilyById(familyId)
+  if (!fam) return { success: false, error: '家族不存在' }
+  if (fam.ownerId !== operatorId) return { success: false, error: '仅族长可编辑' }
+
+  const sb = getSupabase()
+  const updates: Record<string, any> = {}
+  if (data.announcement !== undefined) updates.announcement = data.announcement
+  if (data.avatar !== undefined) updates.avatar = data.avatar
+  if (data.name !== undefined) {
+    const trimmed = data.name.trim()
+    if (!trimmed) return { success: false, error: '家族名不能为空' }
+    const dup = await findFamilyByName(trimmed)
+    if (dup && dup.id !== familyId) return { success: false, error: '家族名称已存在' }
+    updates.name = trimmed
+  }
+  if (Object.keys(updates).length === 0) return { success: true }
+  const { error } = await sb.from('families').update(updates).eq('id', familyId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// ============== 价格覆盖（后台调控） ==============
+
+export interface PriceOverrides {
+  flowers?: Record<string, { baseSellPrice?: number; seedPrice?: number }>
+  seeds?: Record<string, { price?: number }>
+  tools?: Record<string, { price?: number }>
+  feeRate?: number          // 手续费倍率，默认 0.05
+  minListPrice?: number     // 挂售最低价
+  maxListPrice?: number     // 挂售最高价
+  updatedAt?: number
+  updatedBy?: string
+}
+
+let _priceOverridesCache: PriceOverrides | null = null
+
+function priceOverridesRow(row: any): PriceOverrides {
+  if (!row) return {}
+  return {
+    flowers: row.flowers || undefined,
+    seeds: row.seeds || undefined,
+    tools: row.tools || undefined,
+    feeRate: row.fee_rate ?? undefined,
+    minListPrice: row.min_list_price ?? undefined,
+    maxListPrice: row.max_list_price ?? undefined,
+    updatedAt: row.updated_at,
+    updatedBy: row.updated_by,
+  }
+}
+
+export async function getPriceOverrides(): Promise<PriceOverrides> {
+  await seedDatabase()
+  if (_priceOverridesCache) return _priceOverridesCache
+  const sb = getSupabase()
+  const { data, error } = await sb.from('price_overrides').select('*').order('updated_at', { ascending: false }).limit(1)
+  if (error || !data || data.length === 0) {
+    try {
+      // 无表则 fall back 空
+      _priceOverridesCache = {}
+    } catch {}
+    return _priceOverridesCache || {}
+  }
+  _priceOverridesCache = priceOverridesRow(data[0])
+  return _priceOverridesCache
+}
+
+export async function setPriceOverrides(adminId: string, overrides: PriceOverrides): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const { error } = await sb.from('price_overrides').insert({
+    flowers: overrides.flowers || null,
+    seeds: overrides.seeds || null,
+    tools: overrides.tools || null,
+    fee_rate: overrides.feeRate ?? null,
+    min_list_price: overrides.minListPrice ?? null,
+    max_list_price: overrides.maxListPrice ?? null,
+    updated_by: adminId,
+    updated_at: Date.now(),
+  })
+  if (error) return { success: false, error: error.message }
+  _priceOverridesCache = { ...overrides, updatedAt: Date.now(), updatedBy: adminId }
+  return { success: true }
+}
+
+// 应用价格覆盖到实际售价 / 收购价 / 工具价
+export function applyFlowerPriceOverrides(flower: { id: string; baseSellPrice: number; seedPrice: number }, rank: number, overrides?: PriceOverrides): { sell: number; seed: number } {
+  const rankMultipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+  const rankMul = rankMultipliers[Math.max(0, Math.min(rankMultipliers.length - 1, rank - 1))] || 1
+  const flowerOver = overrides?.flowers?.[flower.id] || {}
+  let base = flowerOver.baseSellPrice ?? flower.baseSellPrice
+  if (base < 0) base = flower.baseSellPrice
+  const sell = Math.floor(base * rankMul)
+  const seed = (flowerOver.seedPrice ?? flower.seedPrice)
+  return { sell, seed: seed < 0 ? flower.seedPrice : seed }
+}
+
+// ============== 管理员/市场 辅助函数 ==============
+
+/** 带分页和 source 的 listing 列表（source: official / player） */
+export async function getListingItems(
+  itemType?: string,
+  limit = 100,
+  offset = 0,
+): Promise<{ items: any[]; total: number }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  let query: any = sb.from('listings').select('*', { count: 'exact' })
+  if (itemType) query = query.eq('item_type', itemType)
+  query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1)
+  const { data, error, count } = await query
+  const items: any[] = (data || []).map((r: any) => {
+    const l = dbRowToListing(r)
+    return { ...l, source: l.isOfficial ? 'official' : 'player' }
+  })
+  return { items, total: count ?? items.length }
+}
+
+/** 管理员创建官方挂售（不从背包扣） */
+export async function createAdminListing(data: {
+  itemType: 'flower' | 'seed' | 'tool';
+  referenceId: string;
+  name: string;
+  emoji: string;
+  rank?: number;
+  price: number;
+  quantity: number;
+}): Promise<{ success: boolean; error?: string; listing?: MarketListing }> {
+  if (data.price <= 0) return { success: false, error: '价格需大于 0' }
+  if (data.quantity <= 0) return { success: false, error: '数量需大于 0' }
+  try {
+    const listing = await createListing({
+      sellerId: 'official',
+      sellerName: '官方商城',
+      isOfficial: true,
+      itemType: data.itemType,
+      referenceId: data.referenceId,
+      name: data.name,
+      emoji: data.emoji,
+      rank: (data.rank as any) || 1,
+      price: data.price,
+      quantity: data.quantity,
+    })
+    return { success: true, listing }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+}
+
+// 扩展 removeListing：保留原签名 (id)，也支持 (userId?, id, forceAdmin?)
+export async function removeListingExt(userId: string | null | undefined, id: string, forceAdmin = false): Promise<{ success: boolean; error?: string }> {
+  const l = await findListing(id)
+  if (!l) return { success: false, error: '商品不存在' }
+  if (forceAdmin) {
+    const ok = await removeListing(id)
+    return { success: ok, error: ok ? undefined : '删除失败' }
+  }
+  if (!userId) return { success: false, error: '未登录' }
+  if (l.sellerId !== userId) return { success: false, error: '不能下架他人商品' }
+  const ok = await removeListing(id)
+  return { success: ok, error: ok ? undefined : '删除失败' }
+}
+
+export async function getAllUserBaseCount(): Promise<number> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const { count, error } = await sb.from('users').select('id', { count: 'exact', head: true })
+  if (error) return 0
+  return count ?? 0
+}
+
+export async function getAllFamilies(): Promise<Family[]> {
+  return getFamilies(undefined, 500)
 }
 
 

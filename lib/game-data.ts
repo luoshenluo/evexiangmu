@@ -201,6 +201,31 @@ export function getFlowerSellPrice(flower: FlowerType, rank: number): number {
   return Math.floor(flower.baseSellPrice * rankMultipliers[rank - 1])
 }
 
+// 工具价格调控兼容别名
+export const TOOL_TYPES = TOOLS
+
+// 幸运转盘奖励配置（花瓣代币玩法）
+export const WHEEL_REWARDS: { key: string; label: string; weight: number; coins: number; petals?: number }[] = [
+  { key: 'coins_100',   label: '100 金币', weight: 35, coins: 100 },
+  { key: 'coins_200',   label: '200 金币', weight: 25, coins: 200 },
+  { key: 'coins_500',   label: '500 金币', weight: 15, coins: 500 },
+  { key: 'coins_1000',  label: '1000 金币', weight: 8, coins: 1000 },
+  { key: 'coins_5000',  label: '5000 金币', weight: 2, coins: 5000 },
+  { key: 'petal_2',     label: '+2 花瓣',   weight: 9, coins: 0, petals: 2 },
+  { key: 'jackpot',     label: '🎉 大奖 20000 金币', weight: 1, coins: 20000 },
+  { key: 'nothing',     label: '谢谢参与',   weight: 5, coins: 0 },
+]
+
+export function pickWheelIndex(): number {
+  const total = WHEEL_REWARDS.reduce((s, r) => s + r.weight, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < WHEEL_REWARDS.length; i++) {
+    r -= WHEEL_REWARDS[i].weight
+    if (r <= 0) return i
+  }
+  return 0
+}
+
 // 敏感词过滤
 // 默认内置敏感词（DB 中无配置时的兜底）
 const DEFAULT_SENSITIVE_WORDS = [
