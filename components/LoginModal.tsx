@@ -18,17 +18,19 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
+  const [serverMsg, setServerMsg] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
   const { login, showToast } = useAppStore()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setServerMsg(null)
     if (!username.trim() || !password.trim()) {
-      showToast('请填写完整信息', 'error')
+      setServerMsg({ type: 'error', text: '请填写完整信息' })
       return
     }
     if (mode === 'register' && !nickname.trim()) {
-      showToast('请填写昵称', 'error')
+      setServerMsg({ type: 'error', text: '请填写昵称' })
       return
     }
     setLoading(true)
@@ -46,14 +48,17 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
         onSuccess?.()
         router.push('/garden')
       } else {
-        showToast(res.error || '操作失败', 'error')
+        setServerMsg({ type: 'error', text: res.error || '操作失败，请检查网络后重试' })
       }
+    } catch (e: any) {
+      setServerMsg({ type: 'error', text: e?.message || '网络请求失败，无法连接服务器' })
     } finally {
       setLoading(false)
     }
   }
 
   const handleDemoLogin = async () => {
+    setServerMsg(null)
     setLoading(true)
     try {
       const res = await apiFetch('/api/auth/login', {
@@ -66,8 +71,10 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
         onSuccess?.()
         router.push('/garden')
       } else {
-        showToast(res.error || '演示账号登录失败', 'error')
+        setServerMsg({ type: 'error', text: res.error || '演示账号登录失败，请联系管理员' })
       }
+    } catch (e: any) {
+      setServerMsg({ type: 'error', text: e?.message || '网络请求失败，无法连接服务器' })
     } finally {
       setLoading(false)
     }
@@ -156,6 +163,28 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
             {loading ? '处理中...' : mode === 'login' ? '登 录' : '注 册'}
           </button>
         </form>
+
+        {/* 服务器返回的错误/提示，显示在表单下方，比 Toast 更可见 */}
+        {serverMsg && (
+          <div
+            className={
+              'mt-3 p-3 rounded-xl text-sm border flex items-start gap-2 ' +
+              (serverMsg.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : 'bg-blue-50 border-blue-200 text-blue-700')
+            }
+          >
+            <span className="mt-0.5">{serverMsg.type === 'error' ? '⚠️' : 'ℹ️'}</span>
+            <div className="flex-1 whitespace-pre-wrap break-all">{serverMsg.text}</div>
+            <button
+              onClick={() => setServerMsg(null)}
+              className="text-xs opacity-60 hover:opacity-100"
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
           {/* 游客模式：不调 API，直接以游客身份浏览 */}

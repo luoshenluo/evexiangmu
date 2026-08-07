@@ -17,6 +17,7 @@ type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'mar
 
 export default function AdminPage() {
   const { user, showToast } = useAppStore()
+  const hasHydrated = useAppStore(s => s._hasHydrated)
   const [tab, setTab] = useState<Tab>('dashboard')
   const [authed, setAuthed] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
@@ -66,6 +67,7 @@ export default function AdminPage() {
     }
   }, [])
 
+  // 等待 Zustand 持久化完成后再判断权限，避免刷新瞬间误判
   useEffect(() => {
     const stored = localStorage.getItem('garden-app-storage')
     let isAdmin = user?.isAdmin
@@ -73,8 +75,9 @@ export default function AdminPage() {
       try { isAdmin = JSON.parse(stored).state?.user?.isAdmin } catch {}
     }
     setAuthed(!!isAdmin)
-  }, [user?.isAdmin])
+  }, [user?.isAdmin, hasHydrated])
 
+  // 授权后加载所有数据
   useEffect(() => {
     if (authed) {
       loadAll()
@@ -91,6 +94,14 @@ export default function AdminPage() {
       loadAll()
     }
   }, [refreshTick])
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 p-4">
+        <div className="text-white text-sm opacity-70">正在验证权限...</div>
+      </div>
+    )
+  }
 
   if (!authed) {
     return (

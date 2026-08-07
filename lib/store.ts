@@ -10,6 +10,7 @@ interface AppState {
   user: User | null
   token: string | null
   isAuthenticated: boolean
+  _hasHydrated: boolean
   // 游客 / 离线
   isGuest: boolean
   lastActiveAt: number
@@ -31,6 +32,7 @@ interface AppState {
   // Actions
   login: (user: User, token: string) => void
   logout: () => void
+  setHasHydrated: (v: boolean) => void
   enterGuest: () => void
   exitGuest: () => void
   setLastActiveAt: () => void
@@ -55,6 +57,7 @@ export const useAppStore = create<AppState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      _hasHydrated: false,
       isGuest: false,
       lastActiveAt: Date.now(),
       isOffline: false,
@@ -67,8 +70,9 @@ export const useAppStore = create<AppState>()(
       currentChatChannel: 'world',
       toast: null,
 
-      login: (user, token) => set({ user, token, isAuthenticated: true, isGuest: false }),
+      login: (user, token) => set({ user, token, isAuthenticated: true, isGuest: false, _hasHydrated: true }),
       logout: () => set({ user: null, token: null, isAuthenticated: false, isGuest: false, messages: {}, lastMessageTimes: {} }),
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       // 进入游客模式：不调 API，直接以游客身份浏览
       enterGuest: () => set({ isGuest: true, isAuthenticated: false, user: null, token: null }),
       // 退出游客模式（清空游客状态）
@@ -118,6 +122,9 @@ export const useAppStore = create<AppState>()(
       name: 'garden-app-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated, isGuest: s.isGuest }),
+      onRehydrateStorage: () => (state, error) => {
+        if (state) state._hasHydrated = true
+      },
     }
   )
 )

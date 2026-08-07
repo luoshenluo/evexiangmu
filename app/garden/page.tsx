@@ -129,13 +129,8 @@ export default function GardenPage() {
     )
   }
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-96 text-slate-500">
-        正在加载...
-      </div>
-    )
-  }
+  // 未登录（非游客）阶段：交给 ClientLayout 的欢迎遮罩处理即可，这里渲染空占位
+  if (!user) return null
 
   const unlockedCount = user.plots.filter(p => p.unlocked).length
   const plantedCount = user.plots.filter(p => p.unlocked && p.flower).length
