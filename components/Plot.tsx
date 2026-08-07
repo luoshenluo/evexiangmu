@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function Plot({ plot, onUpdate }: Props) {
-  const { user, updateUser, showToast } = useAppStore()
+  const { user, updateUser, showToast, isGuest } = useAppStore()
   const [showPlant, setShowPlant] = useState(false)
   const [showActions, setShowActions] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -22,6 +22,7 @@ export default function Plot({ plot, onUpdate }: Props) {
   const flowerType = flower ? FLOWER_TYPES.find(f => f.id === flower.flowerTypeId) : null
 
   const unlock = async () => {
+    if (isGuest) { showToast('请先登录', 'info'); return }
     if (!user || user.coins < plot.unlockPrice) {
       showToast('金币不足！', 'error')
       return
@@ -45,6 +46,7 @@ export default function Plot({ plot, onUpdate }: Props) {
   }
 
   const performAction = async (action: 'water' | 'fertilize' | 'pesticide' | 'speedup' | 'harvest') => {
+    if (isGuest) { showToast('请先登录', 'info'); return }
     setLoading(true)
     try {
       const res = await apiFetch('/api/garden/plot-action', {
@@ -101,7 +103,7 @@ export default function Plot({ plot, onUpdate }: Props) {
     return (
       <>
         <div
-          onClick={() => setShowPlant(true)}
+          onClick={() => { if (isGuest) { showToast('请先登录', 'info'); return } setShowPlant(true) }}
           className="aspect-square rounded-2xl border-2 flex flex-col items-center justify-center cursor-pointer plot-hover overflow-hidden relative bg-gradient-to-br from-amber-100 to-amber-200/80 border-amber-300/60"
         >
           <div className="absolute inset-2 rounded-xl border-2 border-amber-300/40 border-dashed" />

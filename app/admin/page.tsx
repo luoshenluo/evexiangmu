@@ -9,8 +9,11 @@ import {
   RefreshCw, Lock, Unlock, UserCheck, UserX, Eye
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
+import ChatManagement from '@/components/admin/ChatManagement'
+import SensitiveWords from '@/components/admin/SensitiveWords'
+import ChatSettingsPanel from '@/components/admin/ChatSettingsPanel'
 
-type Tab = 'dashboard' | 'users' | 'announcements' | 'market' | 'cdk' | 'settings'
+type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'settings'
 
 export default function AdminPage() {
   const { user, showToast } = useAppStore()
@@ -205,6 +208,8 @@ export default function AdminPage() {
     { k: 'dashboard', label: '数据总览', icon: TrendingUp },
     { k: 'users', label: '用户管理', icon: Users },
     { k: 'announcements', label: '公告管理', icon: Bell },
+    { k: 'chat', label: '聊天管理', icon: MessageSquare },
+    { k: 'sensitive', label: '敏感词库', icon: Shield },
     { k: 'market', label: '市场调控', icon: Tag },
     { k: 'cdk', label: 'CDK管理', icon: Gift },
     { k: 'settings', label: '系统设置', icon: Settings },
@@ -453,6 +458,10 @@ export default function AdminPage() {
             </div>
           )}
 
+          {tab === 'chat' && <ChatManagement />}
+
+          {tab === 'sensitive' && <SensitiveWords />}
+
           {tab === 'market' && (
             <div className="card p-5">
               <h3 className="font-bold text-slate-800 mb-4">花品种基础信息</h3>
@@ -530,6 +539,8 @@ export default function AdminPage() {
 
           {tab === 'settings' && (
             <div className="space-y-4">
+              <ChatSettingsPanel />
+
               <div className="card p-5">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <Key size={18} className="text-blue-500" /> 修改管理员密码

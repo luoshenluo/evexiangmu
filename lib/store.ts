@@ -10,6 +10,10 @@ interface AppState {
   user: User | null
   token: string | null
   isAuthenticated: boolean
+  // 游客 / 离线
+  isGuest: boolean
+  lastActiveAt: number
+  isOffline: boolean
   // 聊天
   messages: Record<string, ChatMessage[]>
   lastMessageTimes: Record<string, number[]>
@@ -27,6 +31,10 @@ interface AppState {
   // Actions
   login: (user: User, token: string) => void
   logout: () => void
+  enterGuest: () => void
+  exitGuest: () => void
+  setLastActiveAt: () => void
+  setOffline: (v: boolean) => void
   updateUser: (data: Partial<User>) => void
   setMessages: (channel: string, msgs: ChatMessage[]) => void
   addMessage: (channel: string, msg: ChatMessage) => void
@@ -47,6 +55,9 @@ export const useAppStore = create<AppState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      isGuest: false,
+      lastActiveAt: Date.now(),
+      isOffline: false,
       messages: {},
       lastMessageTimes: {},
       gameState: null,
@@ -56,8 +67,16 @@ export const useAppStore = create<AppState>()(
       currentChatChannel: 'world',
       toast: null,
 
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false, messages: {}, lastMessageTimes: {} }),
+      login: (user, token) => set({ user, token, isAuthenticated: true, isGuest: false }),
+      logout: () => set({ user: null, token: null, isAuthenticated: false, isGuest: false, messages: {}, lastMessageTimes: {} }),
+      // 进入游客模式：不调 API，直接以游客身份浏览
+      enterGuest: () => set({ isGuest: true, isAuthenticated: false, user: null, token: null }),
+      // 退出游客模式（清空游客状态）
+      exitGuest: () => set({ isGuest: false }),
+      // 更新最后活跃时间
+      setLastActiveAt: () => set({ lastActiveAt: Date.now() }),
+      // 设置离线状态
+      setOffline: (v) => set({ isOffline: v }),
       updateUser: (data) => {
         const u = get().user
         if (u) set({ user: { ...u, ...data } })
@@ -98,7 +117,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'garden-app-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }),
+      partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated, isGuest: s.isGuest }),
     }
   )
 )

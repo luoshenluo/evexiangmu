@@ -9,9 +9,10 @@ import { useRouter } from 'next/navigation'
 interface Props {
   onClose?: () => void
   onSuccess?: () => void
+  onGuestEnter?: () => void
 }
 
-export default function LoginModal({ onClose, onSuccess }: Props) {
+export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -156,13 +157,22 @@ export default function LoginModal({ onClose, onSuccess }: Props) {
           </button>
         </form>
 
-        <div className="mt-4 pt-4 border-t border-slate-100">
+        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+          {/* 游客模式：不调 API，直接以游客身份浏览 */}
+          <button
+            onClick={() => onGuestEnter?.()}
+            disabled={loading}
+            className="btn-primary w-full text-sm"
+          >
+            👤 游客模式（仅浏览）
+          </button>
+          {/* 体验账号登录：保留原 demo 登录逻辑 */}
           <button
             onClick={handleDemoLogin}
             disabled={loading}
             className="btn-secondary w-full text-sm"
           >
-            🎮 使用演示账号快速体验 (demo/123456)
+            🎮 体验账号登录 (demo/123456)
           </button>
         </div>
       </div>

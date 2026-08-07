@@ -10,7 +10,7 @@ import type { MarketListing, BuyOrder } from '@/lib/types'
 type Tab = 'flower' | 'seed' | 'buy' | 'sell'
 
 export default function MarketPage() {
-  const { user, updateUser, showToast } = useAppStore()
+  const { user, updateUser, showToast, isGuest } = useAppStore()
   const [tab, setTab] = useState<Tab>('flower')
   const [listings, setListings] = useState<MarketListing[]>([])
   const [buyOrders, setBuyOrders] = useState<BuyOrder[]>([])
@@ -161,21 +161,25 @@ export default function MarketPage() {
                     <Coins size={14} />
                     {formatNumber(item.price)}
                   </div>
-                  <button
-                    onClick={() => buy(item)}
-                    disabled={loading === item.id || !user}
-                    className={classNames(
-                      'px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-all',
-                      loading === item.id
-                        ? 'bg-slate-200 text-slate-400'
-                        : user && user.coins >= item.price
-                          ? 'bg-garden-500 text-white hover:bg-garden-600 active:scale-95'
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    )}
-                  >
-                    <ShoppingCart size={12} />
-                    购买
-                  </button>
+                  {isGuest ? (
+                    <span className="text-[11px] text-slate-400 px-2 py-1">登录后可交易</span>
+                  ) : (
+                    <button
+                      onClick={() => buy(item)}
+                      disabled={loading === item.id || !user}
+                      className={classNames(
+                        'px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-all',
+                        loading === item.id
+                          ? 'bg-slate-200 text-slate-400'
+                          : user && user.coins >= item.price
+                            ? 'bg-garden-500 text-white hover:bg-garden-600 active:scale-95'
+                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      )}
+                    >
+                      <ShoppingCart size={12} />
+                      购买
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -285,14 +289,18 @@ export default function MarketPage() {
                       <Download size={14} />
                       {formatNumber(order.price)}
                     </div>
-                    <button
-                      onClick={() => sellToSystem(order)}
-                      disabled={loading === order.id}
-                      className="px-3 py-1 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all flex items-center gap-1"
-                    >
-                      <ArrowRightLeft size={12} />
-                      出售
-                    </button>
+                    {isGuest ? (
+                      <span className="text-[11px] text-slate-400 px-2 py-1">登录后可交易</span>
+                    ) : (
+                      <button
+                        onClick={() => sellToSystem(order)}
+                        disabled={loading === order.id}
+                        className="px-3 py-1 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all flex items-center gap-1"
+                      >
+                        <ArrowRightLeft size={12} />
+                        出售
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

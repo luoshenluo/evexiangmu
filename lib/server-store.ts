@@ -2,9 +2,10 @@
 import { getSupabase } from './supabase'
 import { logger } from './logger'
 import type {
-  User, Family, ChatMessage, MarketListing, BuyOrder,
+  User, Family, ChatMessage, ChatChannel, MarketListing, BuyOrder,
   Task, CDK, Notification, GameState, Announcement,
   StealLog, PestSeverity, PlantedFlower, Plot, RankLevel,
+  SensitiveWord, ChatSettings, ChatStats,
 } from './types'
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
@@ -1149,3 +1150,291 @@ export async function getStealLogs(victimId: string, limit = 20): Promise<StealL
     stolenAt: d.stolen_at,
   }))
 }
+
+// ==================== 敏感词库（后台化） ====================
+
+// 敏感词缓存（带 TTL，减少 DB 查询）
+let _sensitiveWordsCache: { words: string[]; expireAt: number } | null = null
+const SENSITIVE_CACHE_TTL = 30 * 1000 // 30 秒
+
+export async function getSensitiveWords(): Promise<SensitiveWord[]> {
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('sensitive_words')
+      .select('*')
+      .order('created_at', { ascending: true })
+    if (error || !data) return []
+    return data.map((d: any) => ({
+      id: d.id,
+      word: d.word,
+      createdAt: d.created_at,
+      createdBy: d.created_by,
+    }))
+  } catch (e: any) {
+    logger.warn('chat', `获取敏感词失败: ${e?.message}`)
+    return []
+  }
+}
+
+// 获取敏感词字符串列表（带缓存），供 filterSensitiveWords 使用
+export async function getSensitiveWordList(): Promise<string[]> {
+  const now = Date.now()
+  if (_sensitiveWordsCache && now < _sensitiveWordsCache.expireAt) {
+    return _sensitiveWordsCache.words
+  }
+  const list = await getSensitiveWords()
+  const words = list.map(w => w.word)
+  _sensitiveWordsCache = { words, expireAt: now + SENSITIVE_CACHE_TTL }
+  return words
+}
+
+export function clearSensitiveWordsCache(): void {
+  _sensitiveWordsCache = null
+}
+
+export async function addSensitiveWord(word: string, createdBy: string | null = null): Promise<SensitiveWord | null> {
+  const sb = getSupabase()
+  const trimmed = word.trim()
+  if (!trimmed) return null
+  const sw: SensitiveWord = {
+    id: genId('sw'),
+    word: trimmed,
+    createdAt: Date.now(),
+    createdBy,
+  }
+  const { error } = await sb.from('sensitive_words').insert({
+    id: sw.id,
+    word: sw.word,
+    created_at: sw.createdAt,
+    created_by: sw.createdBy,
+  })
+  if (error) {
+    // 唯一约束冲突 = 已存在
+    if (error.code === '23505') return null
+    logger.error('chat', '添加敏感词失败', { error: error.message })
+    return null
+  }
+  clearSensitiveWordsCache()
+  return sw
+}
+
+export async function removeSensitiveWord(id: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { error } = await sb.from('sensitive_words').delete().eq('id', id)
+  if (error) {
+    logger.error('chat', '删除敏感词失败', { error: error.message })
+    return false
+  }
+  clearSensitiveWordsCache()
+  return true
+}
+
+// ==================== 聊天设置（频率限制配置） ====================
+
+const DEFAULT_CHAT_SETTINGS: ChatSettings = {
+  maxMessagesPerMinute: 5,
+  maxMessageLength: 200,
+  minMessageIntervalMs: 2000,
+  enabled: true,
+  updatedAt: 0,
+}
+
+export async function getChatSettings(): Promise<ChatSettings> {
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('chat_settings').select('*').eq('id', 1).single()
+    if (error || !data) return { ...DEFAULT_CHAT_SETTINGS, updatedAt: Date.now() }
+    return {
+      maxMessagesPerMinute: data.max_messages_per_minute,
+      maxMessageLength: data.max_message_length,
+      minMessageIntervalMs: data.min_message_interval_ms,
+      enabled: data.enabled,
+      updatedAt: data.updated_at,
+    }
+  } catch {
+    return { ...DEFAULT_CHAT_SETTINGS, updatedAt: Date.now() }
+  }
+}
+
+export async function updateChatSettings(updates: Partial<ChatSettings>): Promise<ChatSettings | null> {
+  const sb = getSupabase()
+  const current = await getChatSettings()
+  const merged: ChatSettings = { ...current, ...updates, updatedAt: Date.now() }
+  const row: Record<string, any> = {
+    id: 1,
+    max_messages_per_minute: merged.maxMessagesPerMinute,
+    max_message_length: merged.maxMessageLength,
+    min_message_interval_ms: merged.minMessageIntervalMs,
+    enabled: merged.enabled,
+    updated_at: merged.updatedAt,
+  }
+  const { error } = await sb.from('chat_settings').upsert(row)
+  if (error) {
+    logger.error('chat', '更新聊天设置失败', { error: error.message })
+    return null
+  }
+  return merged
+}
+
+// ==================== 服务端消息频率限制 ====================
+
+// 用户最近发言时间戳（内存 + globalAsm fallback，Edge 重启后会清空，可接受）
+function getRateLimitStore(): Map<string, number[]> {
+  try {
+    const g = globalThis as any
+    g.__gardenRateLimit = g.__gardenRateLimit || new Map<string, number[]>()
+    return g.__gardenRateLimit
+  } catch {
+    return new Map<string, number[]>()
+  }
+}
+
+// 用户最近一次发言时间（用于最小间隔限制）
+function getLastMessageStore(): Map<string, number> {
+  try {
+    const g = globalThis as any
+    g.__gardenLastMsg = g.__gardenLastMsg || new Map<string, number>()
+    return g.__gardenLastMsg
+  } catch {
+    return new Map<string, number>()
+  }
+}
+
+export interface RateLimitResult {
+  allowed: boolean
+  reason?: string
+  retryAfterMs?: number
+}
+
+export async function checkMessageRateLimit(userId: string): Promise<RateLimitResult> {
+  const settings = await getChatSettings()
+  if (!settings.enabled) return { allowed: true }
+
+  const now = Date.now()
+  const lastStore = getLastMessageStore()
+  const lastTs = lastStore.get(userId) || 0
+  const sinceLast = now - lastTs
+
+  // 最小发言间隔检查
+  if (sinceLast < settings.minMessageIntervalMs) {
+    return {
+      allowed: false,
+      reason: `发言太快，请稍候`,
+      retryAfterMs: settings.minMessageIntervalMs - sinceLast,
+    }
+  }
+
+  // 每分钟最大条数检查
+  const rateStore = getRateLimitStore()
+  const times = (rateStore.get(userId) || []).filter(t => now - t < 60000)
+  if (times.length >= settings.maxMessagesPerMinute) {
+    const oldest = Math.min(...times)
+    return {
+      allowed: false,
+      reason: `每分钟最多 ${settings.maxMessagesPerMinute} 条，请稍候`,
+      retryAfterMs: 60000 - (now - oldest),
+    }
+  }
+
+  return { allowed: true }
+}
+
+export function recordServerMessageTime(userId: string): void {
+  const now = Date.now()
+  const lastStore = getLastMessageStore()
+  lastStore.set(userId, now)
+  const rateStore = getRateLimitStore()
+  const times = (rateStore.get(userId) || []).filter(t => now - t < 60000)
+  times.push(now)
+  rateStore.set(userId, times)
+}
+
+// ==================== 聊天管理（后台） ====================
+
+// 获取所有频道最近消息（供后台审查）
+export async function getRecentMessagesAllChannels(limit = 100, channel?: string): Promise<ChatMessage[]> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const col = await detectMessagesTimeCol()
+  try {
+    let query = sb.from('messages').select('*').order(col, { ascending: false }).limit(limit)
+    if (channel) query = query.eq('channel', channel)
+    const { data, error } = await query
+    if (error || !data) return []
+    return data.map(dbRowToMessage)
+  } catch {
+    return []
+  }
+}
+
+export async function deleteMessage(id: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { error } = await sb.from('messages').delete().eq('id', id)
+  if (error) {
+    logger.error('chat', '删除消息失败', { id, error: error.message })
+    return false
+  }
+  logger.info('chat', '管理员删除消息', { id })
+  return true
+}
+
+// 批量删除某用户的消息
+export async function deleteMessagesByUser(userId: string): Promise<number> {
+  const sb = getSupabase()
+  const { data, error } = await sb.from('messages').delete().eq('user_id', userId).select('id')
+  if (error) {
+    logger.error('chat', '批量删除用户消息失败', { userId, error: error.message })
+    return 0
+  }
+  const count = data?.length || 0
+  logger.info('chat', '管理员批量删除用户消息', { userId, count })
+  return count
+}
+
+export async function getChatStats(): Promise<ChatStats> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const now = Date.now()
+  const todayStart = now - 24 * 60 * 60 * 1000
+
+  // 各频道消息数
+  const channels: ChatChannel[] = ['world', 'family', 'friend']
+  const counts: Record<string, number> = { world: 0, family: 0, friend: 0 }
+  let totalCount = 0
+  let todayCount = 0
+  const userCounter: Record<string, { userId: string; userName: string; count: number }> = {}
+
+  try {
+    for (const ch of channels) {
+      const { data } = await sb.from('messages').select('user_id, user_name, is_system, created_at, timestamp').eq('channel', ch)
+      if (data) {
+        counts[ch] = data.length
+        totalCount += data.length
+        for (const m of data) {
+          const ts = (typeof m.timestamp === 'number' ? m.timestamp : m.created_at) || 0
+          if (ts > todayStart && !m.is_system) todayCount++
+          if (m.user_id && m.user_id !== 'system' && !m.is_system) {
+            if (!userCounter[m.user_id]) {
+              userCounter[m.user_id] = { userId: m.user_id, userName: m.user_name || '未知', count: 0 }
+            }
+            userCounter[m.user_id].count++
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    logger.warn('chat', `获取聊天统计失败: ${e?.message}`)
+  }
+
+  const topUsers = Object.values(userCounter).sort((a, b) => b.count - a.count).slice(0, 10)
+
+  return {
+    worldCount: counts.world,
+    familyCount: counts.family,
+    friendCount: counts.friend,
+    totalCount,
+    todayCount,
+    topUsers,
+  }
+}
+

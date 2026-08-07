@@ -202,23 +202,36 @@ export function getFlowerSellPrice(flower: FlowerType, rank: number): number {
 }
 
 // 敏感词过滤
-const SENSITIVE_WORDS = [
+// 默认内置敏感词（DB 中无配置时的兜底）
+const DEFAULT_SENSITIVE_WORDS = [
   '操', '草', '傻逼', 'sb', 'SB', '去死', '狗日', '他妈', 'tmd', 'TMD',
   '垃圾游戏', '骗钱', '外挂', 'waigua', 'hack',
 ]
 
-export function filterSensitiveWords(text: string): string {
+// 过滤敏感词（可传入后台动态词库；不传则只用默认内置词）
+export function filterSensitiveWords(text: string, extraWords?: string[]): string {
   let result = text
-  for (const word of SENSITIVE_WORDS) {
-    const regex = new RegExp(word, 'gi')
-    result = result.replace(regex, '*'.repeat(word.length))
+  const words = extraWords && extraWords.length > 0 ? extraWords : DEFAULT_SENSITIVE_WORDS
+  for (const word of words) {
+    if (!word) continue
+    try {
+      // 转义正则特殊字符
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(escaped, 'gi')
+      result = result.replace(regex, '*'.repeat(word.length))
+    } catch {
+      // 单个词正则失败不影响其他词
+      result = result.split(word).join('*'.repeat(word.length))
+    }
   }
   return result
 }
 
-export function containsSensitiveWords(text: string): boolean {
-  for (const word of SENSITIVE_WORDS) {
-    if (text.toLowerCase().includes(word.toLowerCase())) {
+export function containsSensitiveWords(text: string, extraWords?: string[]): boolean {
+  const words = extraWords && extraWords.length > 0 ? extraWords : DEFAULT_SENSITIVE_WORDS
+  const lower = text.toLowerCase()
+  for (const word of words) {
+    if (word && lower.includes(word.toLowerCase())) {
       return true
     }
   }

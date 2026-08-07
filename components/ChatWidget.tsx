@@ -13,18 +13,24 @@ const channels: { key: ChatChannel; label: string; icon: any }[] = [
   { key: 'friend', label: '好友', icon: UserPlus },
 ]
 
-export default function ChatWidget() {
+interface Props {
+  onRequestLogin?: () => void
+}
+
+export default function ChatWidget({ onRequestLogin }: Props) {
   const {
     user, chatExpanded, currentChatChannel, messages,
     setChatExpanded, setCurrentChatChannel, setMessages, addMessage,
-    recordMessageTime, showToast
+    recordMessageTime, showToast,
+    isGuest, isOffline,
   } = useAppStore()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // 加载消息
+  // 加载消息（离线时跳过；恢复在线时会因 isOffline 变化重新触发，实现刷新）
   useEffect(() => {
+    if (isOffline) return
     const load = async () => {
       const res = await apiFetch(`/api/chat/${currentChatChannel}`)
       if (res.success && res.data) {
@@ -32,10 +38,11 @@ export default function ChatWidget() {
       }
     }
     load()
-  }, [currentChatChannel])
+  }, [currentChatChannel, isOffline])
 
-  // 轮询新消息
+  // 轮询新消息（离线时暂停，节省资源）
   useEffect(() => {
+    if (isOffline) return
     const interval = setInterval(async () => {
       const res = await apiFetch(`/api/chat/${currentChatChannel}`)
       if (res.success && res.data) {
@@ -46,7 +53,7 @@ export default function ChatWidget() {
       }
     }, 3000)
     return () => clearInterval(interval)
-  }, [currentChatChannel, messages])
+  }, [currentChatChannel, messages, isOffline])
 
   // 自动滚动到底部
   useEffect(() => {
@@ -209,29 +216,49 @@ export default function ChatWidget() {
         )}
       </div>
 
-      {/* Input */}
+      {/* Input / 游客提示 / 离线提示 */}
       <div className="border-t border-slate-100 p-2 flex gap-2 flex-shrink-0 bg-white">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="说点什么..."
-          className="flex-1 px-3 py-2 text-sm bg-slate-50 rounded-lg border border-slate-200 focus:border-garden-400 focus:ring-1 focus:ring-garden-200 outline-none"
-          maxLength={200}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={loading || !input.trim()}
-          className={classNames(
-            'px-3 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-1 transition-all',
-            input.trim() && !loading
-              ? 'bg-garden-500 hover:bg-garden-600 active:scale-95'
-              : 'bg-slate-300 cursor-not-allowed'
-          )}
-        >
-          <Send size={16} />
-        </button>
+        {isOffline ? (
+          <div className="flex-1 py-2 text-center text-xs text-slate-400">
+            🌙 已离线
+          </div>
+        ) : isGuest ? (
+          <div className="flex-1 flex items-center gap-2">
+            <span className="flex-1 px-3 py-2 text-xs text-slate-400 bg-slate-50 rounded-lg border border-slate-200">
+              游客无法发言，请先登录
+            </span>
+            <button
+              onClick={() => onRequestLogin?.()}
+              className="px-3 py-2 rounded-lg bg-garden-500 text-white text-xs font-medium hover:bg-garden-600 active:scale-95 transition-all"
+            >
+              登录
+            </button>
+          </div>
+        ) : (
+          <>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="说点什么..."
+              className="flex-1 px-3 py-2 text-sm bg-slate-50 rounded-lg border border-slate-200 focus:border-garden-400 focus:ring-1 focus:ring-garden-200 outline-none"
+              maxLength={200}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              className={classNames(
+                'px-3 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-1 transition-all',
+                input.trim() && !loading
+                  ? 'bg-garden-500 hover:bg-garden-600 active:scale-95'
+                  : 'bg-slate-300 cursor-not-allowed'
+              )}
+            >
+              <Send size={16} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

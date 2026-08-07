@@ -261,3 +261,33 @@ export interface StealResult {
     rank: RankLevel
   }
 }
+
+// ==================== 聊天管理 / 敏感词 / 频率限制 ====================
+
+export interface SensitiveWord {
+  id: string
+  word: string
+  createdAt: number
+  createdBy: string | null
+}
+
+export interface ChatSettings {
+  maxMessagesPerMinute: number
+  maxMessageLength: number
+  minMessageIntervalMs: number
+  enabled: boolean
+  updatedAt: number
+}
+
+export interface AdminChatMessage extends ChatMessage {
+  // 后台管理用的扩展字段
+}
+
+export interface ChatStats {
+  worldCount: number
+  familyCount: number
+  friendCount: number
+  totalCount: number
+  todayCount: number
+  topUsers: { userId: string; userName: string; count: number }[]
+}

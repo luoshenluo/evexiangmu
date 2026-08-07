@@ -9,7 +9,7 @@ import type { Task } from '@/lib/types'
 type Tab = 'daily' | 'weekly' | 'monthly'
 
 export default function TasksPage() {
-  const { user, updateUser, showToast } = useAppStore()
+  const { user, updateUser, showToast, isGuest } = useAppStore()
   const [tab, setTab] = useState<Tab>('daily')
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState<string | null>(null)
@@ -21,7 +21,8 @@ export default function TasksPage() {
     }
   }
 
-  useEffect(() => { refresh() }, [])
+  // 游客不拉取任务
+  useEffect(() => { if (!isGuest) refresh() }, [isGuest])
 
   const claim = async (taskId: string) => {
     setLoading(taskId)
@@ -53,6 +54,27 @@ export default function TasksPage() {
   const totalProgress = filteredTasks.length
     ? Math.round(filteredTasks.reduce((s, t) => s + Math.min(t.progress / t.target, 1), 0) / filteredTasks.length * 100)
     : 0
+
+  // 游客模式：任务列表为空，提示登录后查看
+  if (isGuest) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+        <div className="card p-4 mb-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-md shadow-orange-200">
+            <ClipboardList size={24} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">任务中心</h1>
+            <p className="text-xs text-slate-500 mt-0.5">完成任务获取丰厚奖励</p>
+          </div>
+        </div>
+        <div className="card p-8 text-center text-slate-400 text-sm">
+          <ClipboardList size={40} className="mx-auto mb-2 text-slate-300" />
+          登录后查看任务
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">

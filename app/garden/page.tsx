@@ -7,9 +7,10 @@ import { SEASON_NAMES, SEASON_COLORS } from '@/lib/game-data'
 import { Sun, Coins, Package, Bell, ChevronLeft, ChevronRight, Sparkles, Users } from 'lucide-react'
 import Plot from '@/components/Plot'
 import Link from 'next/link'
+import type { Plot as PlotType } from '@/lib/types'
 
 export default function GardenPage() {
-  const { user, updateUser, gameState, announcements, showToast } = useAppStore()
+  const { user, updateUser, gameState, announcements, showToast, isGuest } = useAppStore()
   const [page, setPage] = useState(0)
   const [tick, setTick] = useState(0)
   const [loaded, setLoaded] = useState(false)
@@ -18,8 +19,10 @@ export default function GardenPage() {
   const totalPages = user ? Math.ceil(user.plots.length / plotsPerPage) : 1
   const startIdx = page * plotsPerPage
 
-  // 定期刷新
+  // 定期刷新（游客跳过：不调用 pest-check，也不轮询 /api/user/{id}）
   useEffect(() => {
+    if (isGuest) { setLoaded(true); return }
+
     const refresh = async () => {
       if (!user?.id) return
       try {
@@ -57,7 +60,59 @@ export default function GardenPage() {
     }, 5000)
     setLoaded(true)
     return () => clearInterval(i)
-  }, [user?.id])
+  }, [user?.id, isGuest])
+
+  // 游客模式：显示示例花园（3 块解锁的空地），不调用任何写接口
+  if (isGuest) {
+    const guestPlots: PlotType[] = [
+      { id: 1, unlocked: true, unlockPrice: 0, flower: null },
+      { id: 2, unlocked: true, unlockPrice: 0, flower: null },
+      { id: 3, unlocked: true, unlockPrice: 0, flower: null },
+    ]
+    return (
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+        {/* 游客横幅 */}
+        <div className="mb-4 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+          <Sparkles size={14} className="flex-shrink-0" />
+          <span>你是游客模式，登录后解锁完整玩法</span>
+        </div>
+
+        {/* 季节 */}
+        <div className={`card p-3 flex items-center gap-3 mb-4 bg-gradient-to-br ${
+          gameState ? SEASON_COLORS[gameState.currentSeason] : SEASON_COLORS.spring
+        } text-white`}>
+          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+            <Sun size={20} />
+          </div>
+          <div>
+            <div className="text-[11px] opacity-80">当前季节</div>
+            <div className="text-lg font-bold">
+              {gameState ? SEASON_NAMES[gameState.currentSeason] : '春季'}
+            </div>
+          </div>
+        </div>
+
+        {/* 花园标题 */}
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            🌳 游客预览
+          </h1>
+        </div>
+
+        {/* 示例地块 */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {guestPlots.map((p) => (
+            <Plot key={p.id} plot={p} onUpdate={() => setTick(t => t + 1)} />
+          ))}
+        </div>
+
+        {/* 提示 */}
+        <div className="mt-6 text-center text-xs text-slate-400">
+          💡 登录后即可种植、浇水、施肥、收获，经营属于你的花园！
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
     return (
