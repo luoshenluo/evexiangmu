@@ -106,7 +106,7 @@ export default function AdminPage() {
   if (!authed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 p-4">
-        <div className="card p-8 max-w-md text-center">
+        <div className="card p-8 max-w-md text-center relative">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
             <Shield size={32} className="text-red-600" />
           </div>
@@ -116,7 +116,10 @@ export default function AdminPage() {
             管理员登录
           </button>
         </div>
-        {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={() => { window.location.reload() }} />}
+        {/* LoginModal 自带 fixed z-50 覆盖层，直接渲染即可 */}
+        {showLogin && (
+          <LoginModal onClose={() => setShowLogin(false)} onSuccess={() => { window.location.reload() }} />
+        )}
       </div>
     )
   }

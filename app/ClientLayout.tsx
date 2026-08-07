@@ -15,6 +15,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     setGameState, setAnnouncements,
     enterGuest, setLastActiveAt, setOffline,
   } = useAppStore()
+  const hasHydrated = useAppStore(s => s._hasHydrated)
   const [showLogin, setShowLogin] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const lastActivityLogRef = useRef(0)
@@ -39,10 +40,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return () => clearInterval(interval)
   }, [refreshData])
 
-  // 欢迎遮罩：未登录、非游客、且登录弹窗未打开时显示
+  // 欢迎遮罩：只有 Zustand 完成 hydrate 后再判断
+  // 未登录、非游客、且登录弹窗未打开时显示
   useEffect(() => {
+    if (!hasHydrated) { setShowWelcome(false); return }
     setShowWelcome(!isAuthenticated && !isGuest && !showLogin)
-  }, [isAuthenticated, isGuest, showLogin])
+  }, [isAuthenticated, isGuest, showLogin, hasHydrated])
 
   // 全局活跃监听（mousemove/click/keydown/touchstart），节流 5 秒更新一次 lastActiveAt
   useEffect(() => {
