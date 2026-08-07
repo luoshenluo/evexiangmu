@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser } from '@/lib/server-store'
+import { updateUser, findUserById } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -16,33 +16,53 @@ const TASK_TEMPLATES: any[] = [
   { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, rewards: { coins: 1000, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 5 }] } },
 ]
 
-// 内存进度 (闭包)
-const userTaskProgress: Record<string, Record<string, number>> = {}
-const claimedTasksLocal: Record<string, Record<string, boolean>> = {}
-
-// 双存储：闭包变量 + globalThis（防止 Edge Runtime 重启后丢失）
-function getClaimedStore(): Record<string, Record<string, boolean>> {
-  try {
-    const g = globalThis as any
-    g.__gardenClaimedTasks = g.__gardenClaimedTasks || {}
-    return g.__gardenClaimedTasks
-  } catch {
-    return claimedTasksLocal
+function getPeriodStart(type: string): number {
+  const now = new Date()
+  if (type === 'daily') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   }
+  if (type === 'weekly') {
+    const day = now.getDay() || 7
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1).getTime()
+  }
+  if (type === 'monthly') {
+    return new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+  }
+  return 0
 }
 
-function getUserClaimed(userId: string): Record<string, boolean> {
-  const store = getClaimedStore()
-  store[userId] = store[userId] || claimedTasksLocal[userId] || {}
-  claimedTasksLocal[userId] = store[userId]
-  return store[userId]
+function getTaskType(taskId: string): string {
+  if (taskId.includes('daily')) return 'daily'
+  if (taskId.includes('weekly')) return 'weekly'
+  if (taskId.includes('monthly')) return 'monthly'
+  return 'daily'
 }
 
-function markUserClaimed(userId: string, taskId: string): void {
-  const store = getClaimedStore()
-  store[userId] = store[userId] || {}
-  store[userId][taskId] = true
-  claimedTasksLocal[userId] = store[userId]
+function checkAndResetTasks(user: any): { progress: Record<string, number>; claimed: Record<string, boolean>; lastReset: Record<string, number> } {
+  const now = Date.now()
+  const progress = { ...(user.taskProgress || {}) }
+  const claimed = { ...(user.taskClaimed || {}) }
+  const lastReset = { ...(user.taskLastReset || {}) }
+
+  for (const task of TASK_TEMPLATES) {
+    const type = task.type
+    const periodStart = getPeriodStart(type)
+    const resetKey = type
+
+    if (!lastReset[resetKey] || lastReset[resetKey] < periodStart) {
+      // 周期已过，重置该类型下所有任务
+      const taskTypePrefix = type === 'daily' ? 't_daily_' : type === 'weekly' ? 't_weekly_' : 't_monthly_'
+      for (const key of Object.keys(progress)) {
+        if (key.startsWith(taskTypePrefix)) {
+          progress[key] = 0
+          delete claimed[key]
+        }
+      }
+      lastReset[resetKey] = now
+    }
+  }
+
+  return { progress, claimed, lastReset }
 }
 
 export async function GET(req: NextRequest) {
@@ -50,13 +70,18 @@ export async function GET(req: NextRequest) {
     const user = await authRequest(req)
     if (!user) return jsonResponse(false, null, '请先登录', 401)
 
-    const progress = userTaskProgress[user.id] || {
-      t_daily_1: 1, t_daily_2: 1, t_daily_3: 1, t_daily_4: 0, t_daily_5: 2,
-      t_weekly_1: 3, t_weekly_2: 200, t_monthly_1: 4,
-    }
-    userTaskProgress[user.id] = progress
+    // 从数据库获取最新用户数据，确保任务数据是最新的
+    const freshUser = await findUserById(user.id)
+    if (!freshUser) return jsonResponse(false, null, '用户不存在', 404)
 
-    const claimed = getUserClaimed(user.id)
+    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser)
+
+    // 如果有重置，保存回数据库
+    const needSave = JSON.stringify(progress) !== JSON.stringify(freshUser.taskProgress || {}) ||
+                     JSON.stringify(claimed) !== JSON.stringify(freshUser.taskClaimed || {})
+    if (needSave) {
+      await updateUser(freshUser.id, { taskProgress: progress, taskClaimed: claimed, taskLastReset: lastReset })
+    }
 
     const tasks = TASK_TEMPLATES.map(t => {
       const prog = progress[t.id] || 0
@@ -94,16 +119,26 @@ export async function POST(req: NextRequest) {
     const task = TASK_TEMPLATES.find(t => t.id === taskId)
     if (!task) return jsonResponse(false, null, '任务不存在', 404)
 
-    const progress = (userTaskProgress[user.id] || {})[taskId] || 0
-    if (progress < task.target) return jsonResponse(false, null, '任务未完成', 400)
+    // 从数据库获取最新用户数据
+    const freshUser = await findUserById(user.id)
+    if (!freshUser) return jsonResponse(false, null, '用户不存在', 404)
 
-    const claimed = getUserClaimed(user.id)
+    // 检查并重置过期任务
+    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser)
+
+    // 检查任务进度
+    const currentProgress = progress[taskId] || 0
+    if (currentProgress < task.target) return jsonResponse(false, null, '任务未完成', 400)
+
+    // 检查是否已领取
     if (claimed[taskId]) return jsonResponse(false, null, '奖励已领取', 400)
-    markUserClaimed(user.id, taskId)
+
+    // 标记为已领取
+    claimed[taskId] = true
 
     // 发放奖励
-    const newInv = [...(user.inventory || [])]
-    const coins = (user.coins || 0) + (task.rewards.coins || 0)
+    const newInv = [...(freshUser.inventory || [])]
+    const coins = (freshUser.coins || 0) + (task.rewards.coins || 0)
 
     const rewardDetails: string[] = []
     if (task.rewards.coins) rewardDetails.push(`💰 ${task.rewards.coins} 金币`)
@@ -141,13 +176,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const updated = await updateUser(user.id, { coins, inventory: newInv })
+    const updated = await updateUser(freshUser.id, {
+      coins,
+      inventory: newInv,
+      taskProgress: progress,
+      taskClaimed: claimed,
+      taskLastReset: lastReset,
+    })
+
     if (!updated) {
-      logger.error('tasks', '更新用户失败（updateUser 返回 null）', { userId: user.id, taskId })
+      logger.error('tasks', '更新用户失败', { userId: freshUser.id, taskId })
       return jsonResponse(false, null, '更新用户数据失败', 500)
     }
 
-    logger.info('tasks', '任务奖励领取', { userId: user.id, taskId, coins: task.rewards.coins, itemsCount: (task.rewards.items || []).length })
+    logger.info('tasks', '任务奖励领取', { userId: freshUser.id, taskId, coins: task.rewards.coins })
 
     return jsonResponse(true, {
       user: sanitizeUser(updated),
@@ -159,7 +201,7 @@ export async function POST(req: NextRequest) {
       message: `🎁 领取成功！获得 ${rewardDetails.join('，')}`,
     })
   } catch (e: any) {
-    logger.error('tasks', '领取任务奖励失败', { error: e?.message, stack: e?.stack?.slice(0, 500) })
+    logger.error('tasks', '领取任务奖励失败', { error: e?.message })
     return jsonResponse(false, null, e?.message || '服务器内部错误', 500)
   }
 }

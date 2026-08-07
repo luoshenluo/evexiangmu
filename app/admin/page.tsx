@@ -44,6 +44,9 @@ export default function AdminPage() {
   const [oldPwd, setOldPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
+  const [editNickname, setEditNickname] = useState('')
+  const [editAvatar, setEditAvatar] = useState('')
+  const [showUserEdit, setShowUserEdit] = useState(false)
 
   const loadAll = useCallback(async () => {
     setRefreshing(true)
@@ -165,6 +168,42 @@ export default function AdminPage() {
       loadAll()
     } else showToast(res.error || '操作失败', 'error')
     setLoading(null)
+  }
+
+  const banUser = async (userId: string, ban: boolean) => {
+    setLoading(`ban_${userId}`)
+    const res = await apiFetch('/api/admin/users/action', {
+      method: 'POST',
+      body: JSON.stringify({ userId, [ban ? 'banUser' : 'unbanUser']: true })
+    })
+    if (res.success) {
+      showToast(ban ? '已封号' : '已解封', 'success')
+      loadAll()
+    } else showToast(res.error || '操作失败', 'error')
+    setLoading(null)
+  }
+
+  const editUserInfo = async () => {
+    if (!editingUser) return
+    setLoading(`edit_${editingUser.id}`)
+    const body: any = { userId: editingUser.id }
+    if (editNickname.trim()) body.nickname = editNickname.trim()
+    if (editAvatar.trim()) body.avatar = editAvatar.trim()
+    const res = await apiFetch('/api/admin/users/action', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+    if (res.success) {
+      showToast('修改成功', 'success')
+      setShowUserEdit(false); setEditingUser(null)
+      loadAll()
+    } else showToast(res.error || '修改失败', 'error')
+    setLoading(null)
+  }
+
+  const openUserEdit = (u: any) => {
+    setEditingUser(u); setEditNickname(u.nickname || ''); setEditAvatar(u.avatar || '')
+    setShowUserEdit(true)
   }
 
   const resetUserPassword = async (userId: string) => {
@@ -463,6 +502,7 @@ export default function AdminPage() {
                                 <div className="font-medium text-slate-800 flex items-center gap-1">
                                   {u.nickname}
                                   {u.isAdmin && <Crown size={12} className="text-amber-500" />}
+                                  {u.deleted && <span className="chip bg-red-100 text-red-600 text-[9px] ml-1">已封号</span>}
                                 </div>
                                 <div className="text-[11px] text-slate-400">@{u.username} · ID: {u.id}</div>
                               </div>
@@ -470,8 +510,12 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3 text-amber-600 font-medium">{formatNumber(u.coins)}</td>
                           <td className="p-3">
-                            {u.mutedUntil && u.mutedUntil > Date.now() ? (
+                            {u.deleted ? (
                               <span className="chip bg-red-100 text-red-700">
+                                <Ban size={10} className="inline mr-1" /> 已封号
+                              </span>
+                            ) : u.mutedUntil && u.mutedUntil > Date.now() ? (
+                              <span className="chip bg-orange-100 text-orange-700">
                                 <Ban size={10} className="inline mr-1" /> 禁言中
                               </span>
                             ) : (
@@ -486,17 +530,27 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="p-3">
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 flex-wrap">
                               {u.mutedUntil && u.mutedUntil > Date.now() ? (
                                 <button onClick={() => muteUser(u.id, 0)} className="p-1.5 rounded-lg hover:bg-garden-50 text-garden-600" title="解除禁言">
                                   <Unlock size={14} />
                                 </button>
-                              ) : (
+                              ) : !u.deleted && (
                                 <button onClick={() => muteUser(u.id, 1)} disabled={u.isAdmin} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 disabled:opacity-30" title="禁言 1 天">
                                   <Ban size={14} />
                                 </button>
                               )}
-                              {!u.isAdmin && (
+                              {!u.isAdmin && !u.deleted && (
+                                <button onClick={() => banUser(u.id, true)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="封号">
+                                  <UserX size={14} />
+                                </button>
+                              )}
+                              {u.deleted && (
+                                <button onClick={() => banUser(u.id, false)} className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="解封">
+                                  <Unlock size={14} />
+                                </button>
+                              )}
+                              {!u.isAdmin && !u.deleted && (
                                 <button onClick={() => updateUserPermission(u.id, true)} disabled={loading?.startsWith('perm_')} className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-600" title="设为管理员">
                                   <UserCheck size={14} />
                                 </button>
@@ -506,7 +560,10 @@ export default function AdminPage() {
                                   <UserX size={14} />
                                 </button>
                               )}
-                              <button onClick={() => { setEditingUser(u); setNewPassword('') }} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="重置密码">
+                              <button onClick={() => openUserEdit(u)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="编辑用户">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => { setEditingUser(u); setNewPassword('') }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" title="重置密码">
                                 <Key size={14} />
                               </button>
                             </div>
@@ -752,6 +809,38 @@ export default function AdminPage() {
               </div>
               <button onClick={() => resetUserPassword(editingUser.id)} disabled={loading?.startsWith('pwd_')} className="btn-primary w-full py-2.5">
                 {loading?.startsWith('pwd_') ? '重置中...' : '确认重置'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUserEdit && editingUser && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setShowUserEdit(false); setEditingUser(null) }}>
+          <div className="card w-full max-w-md p-5 slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Edit size={18} className="text-blue-500" /> 编辑用户</h2>
+              <button onClick={() => { setShowUserEdit(false); setEditingUser(null) }} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="p-3 bg-slate-50 rounded-xl text-sm text-slate-700">
+                用户: <b>{editingUser.nickname}</b> (@{editingUser.username})
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700">昵称</label>
+                <input className="input" value={editNickname} onChange={e => setEditNickname(e.target.value)} maxLength={20} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700">头像 (emoji)</label>
+                <input className="input" value={editAvatar} onChange={e => setEditAvatar(e.target.value)} maxLength={4} placeholder="输入 emoji，如 🌹" />
+                <div className="flex gap-1 mt-2 text-xl">
+                  {['🌱','🌿','🍀','🌵','🎍','🌹','🌻','🌼','🌸','🏵️','🌺','🍄','🐰','🐱','🐶','🦊','🐼','🦄','🐸','🐞','🪴','🌳','🌲','🌴','🌵','🌾','🌻'].map(e => (
+                    <button key={e} onClick={() => setEditAvatar(e)} className={`w-8 h-8 rounded-lg hover:bg-slate-100 ${editAvatar === e ? 'bg-slate-200' : ''}`}>{e}</button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={editUserInfo} disabled={loading?.startsWith('edit_')} className="btn-primary w-full py-2.5">
+                {loading?.startsWith('edit_') ? '保存中...' : '保存修改'}
               </button>
             </div>
           </div>

@@ -10,7 +10,10 @@ export async function GET(req: Request) {
 
     const users = (await getAllUsers())
       .sort((a, b) => b.createdAt - a.createdAt)
-      .map(u => sanitizeUser(u))
+      .map(u => ({
+        ...sanitizeUser(u),
+        deleted: u.deleted || false,
+      }))
     return jsonResponse(true, users)
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

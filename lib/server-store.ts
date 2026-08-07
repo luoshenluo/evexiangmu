@@ -38,6 +38,9 @@ function dbRowToUser(row: any): User {
     stealCountToday: row.steal_count_today || 0,
     stealResetAt: row.steal_reset_at || 0,
     gardenProtectedUntil: row.garden_protected_until || 0,
+    taskProgress: row.task_progress || {},
+    taskClaimed: row.task_claimed || {},
+    taskLastReset: row.task_last_reset || {},
   }
 }
 
@@ -62,6 +65,9 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.stealCountToday !== undefined) row.steal_count_today = user.stealCountToday
   if (user.stealResetAt !== undefined) row.steal_reset_at = user.stealResetAt
   if (user.gardenProtectedUntil !== undefined) row.garden_protected_until = user.gardenProtectedUntil
+  if (user.taskProgress !== undefined) row.task_progress = user.taskProgress
+  if (user.taskClaimed !== undefined) row.task_claimed = user.taskClaimed
+  if (user.taskLastReset !== undefined) row.task_last_reset = user.taskLastReset
   return row
 }
 
@@ -212,37 +218,46 @@ async function doSeed(): Promise<void> {
   }
 
   // 检查是否已有用户
-  const { data: allUsers, error: listErr } = await sb.from('users').select('id, plots, inventory, is_admin')
+  const { data: allUsers, error: listErr } = await sb.from('users').select('id, plots, inventory, is_admin, task_progress, task_claimed, task_last_reset')
   if (listErr) {
     logger.error('system', '查询用户列表失败', { error: listErr.message })
     return
   }
 
-  // 修复：对已有用户检查并修复空 plots
+  // 修复：对已有用户检查并修复空 plots + 缺失任务字段
   if (allUsers && allUsers.length > 0) {
     for (const u of allUsers) {
       const plots = u.plots
       const isEmpty = !plots || plots.length === 0
-      // 如果 plots 为空或没有解锁的地块，修复它
       const hasUnlocked = plots && plots.some((p: any) => p.unlocked)
-      if (isEmpty || !hasUnlocked) {
-        const unlockedCount = u.is_admin ? 30 : isEmpty ? 1 : Math.max(3, (plots?.length || 0))
-        const fixedPlots = createInitialPlots(unlockedCount)
-        const existingInv = u.inventory
-        const fixedInv = !existingInv || existingInv.length === 0
-          ? (u.is_admin ? [] : [
-              { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-              { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
-              { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
-            ])
-          : existingInv
+      const needsTaskFix = !u.task_progress || !u.task_claimed || !u.task_last_reset
+
+      if (isEmpty || !hasUnlocked || needsTaskFix) {
+        const updates: Record<string, any> = {}
+        if (isEmpty || !hasUnlocked) {
+          const unlockedCount = u.is_admin ? 30 : isEmpty ? 1 : Math.max(3, (plots?.length || 0))
+          updates.plots = createInitialPlots(unlockedCount)
+          const existingInv = u.inventory
+          updates.inventory = !existingInv || existingInv.length === 0
+            ? (u.is_admin ? [] : [
+                { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
+                { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
+                { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
+              ])
+            : existingInv
+        }
+        if (needsTaskFix) {
+          updates.task_progress = u.task_progress || {}
+          updates.task_claimed = u.task_claimed || {}
+          updates.task_last_reset = u.task_last_reset || {}
+        }
         const { error } = await sb.from('users')
-          .update({ plots: fixedPlots, inventory: fixedInv })
+          .update(updates)
           .eq('id', u.id)
         if (error) {
-          logger.error('system', `修复用户 ${u.id} plots 失败`, { error: error.message })
+          logger.error('system', `修复用户 ${u.id} 失败`, { error: error.message })
         } else {
-          logger.info('system', `修复用户 ${u.id} plots`, { unlockedCount })
+          logger.info('system', `修复用户 ${u.id}`, { fields: Object.keys(updates).join(',') })
         }
       }
     }
@@ -277,6 +292,9 @@ async function doSeed(): Promise<void> {
     steal_count_today: 0,
     steal_reset_at: 0,
     garden_protected_until: 0,
+    task_progress: {},
+    task_claimed: {},
+    task_last_reset: {},
   })
   if (adminErr) logger.error('system', '创建管理员失败', { error: adminErr.message })
   else logger.info('system', '管理员账号创建成功')
@@ -309,6 +327,9 @@ async function doSeed(): Promise<void> {
     steal_count_today: 0,
     steal_reset_at: 0,
     garden_protected_until: 0,
+    task_progress: {},
+    task_claimed: {},
+    task_last_reset: {},
   })
   if (demoErr) logger.error('system', '创建演示用户失败', { error: demoErr.message })
   else logger.info('system', '演示账号创建成功')
@@ -396,7 +417,6 @@ export async function getAllUsers(): Promise<User[]> {
   const sb = getSupabase()
   const { data, error } = await sb.from('users')
     .select('*')
-    .eq('deleted', false)
     .order('created_at', { ascending: true })
   if (error || !data) return []
   return data.map(dbRowToUser)
@@ -436,6 +456,9 @@ export async function createUser(data: { username: string; password: string; nic
     steal_count_today: 0,
     steal_reset_at: 0,
     garden_protected_until: 0,
+    task_progress: {},
+    task_claimed: {},
+    task_last_reset: {},
   }
 
   const { error } = await sb.from('users').insert(newRow)
@@ -811,6 +834,72 @@ export async function createNotification(data: Omit<Notification, 'id' | 'create
     read: false,
     created_at: Date.now(),
   })
+}
+
+// ==================== 任务进度 ====================
+
+const TASK_INCREMENT_MAP: Record<string, string> = {
+  'plant': 't_daily_2',
+  'water': 't_daily_2',
+  'fertilize': 't_daily_2',
+  'pesticide': 't_daily_2',
+  'harvest': 't_daily_3',
+  'chat': 't_daily_5',
+  'trade': 't_daily_4',
+}
+
+export async function incrementTaskProgress(userId: string, action: string, amount = 1): Promise<void> {
+  const taskId = TASK_INCREMENT_MAP[action]
+  if (!taskId) return
+
+  const user = await findUserById(userId)
+  if (!user) return
+
+  const progress = { ...(user.taskProgress || {}) }
+  progress[taskId] = (progress[taskId] || 0) + amount
+
+  // 同时推进对应的周任务/月任务
+  if (action === 'harvest') {
+    progress['t_monthly_1'] = (progress['t_monthly_1'] || 0) + amount
+  }
+  if (action === 'plant' || action === 'water' || action === 'fertilize') {
+    progress['t_weekly_1'] = (progress['t_weekly_1'] || 0) + amount
+  }
+
+  // 登录任务特殊处理
+  if (action === 'login') {
+    progress['t_daily_1'] = 1
+  }
+
+  const lastReset = { ...(user.taskLastReset || {}) }
+  const now = Date.now()
+  const periodStart = (type: string) => {
+    const d = new Date()
+    if (type === 'daily') return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    if (type === 'weekly') {
+      const day = d.getDay() || 7
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 1).getTime()
+    }
+    if (type === 'monthly') return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+    return 0
+  }
+
+  // 重置过期任务
+  const typeMap: Record<string, string> = {
+    't_daily_': 'daily', 't_weekly_': 'weekly', 't_monthly_': 'monthly',
+  }
+  for (const [prefix, type] of Object.entries(typeMap)) {
+    if (!lastReset[type] || lastReset[type] < periodStart(type)) {
+      for (const key of Object.keys(progress)) {
+        if (key.startsWith(prefix)) {
+          progress[key] = 0
+        }
+      }
+      lastReset[type] = now
+    }
+  }
+
+  await updateUser(userId, { taskProgress: progress, taskLastReset: lastReset })
 }
 
 // ==================== 官方收购价调整 ====================

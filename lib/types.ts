@@ -116,6 +116,10 @@ export interface User {
   stealResetAt: number
   // 花园保护（防止被偷）
   gardenProtectedUntil: number
+  // 任务系统（持久化到数据库）
+  taskProgress: Record<string, number>
+  taskClaimed: Record<string, boolean>
+  taskLastReset: Record<string, number>  // 各类型任务上次重置时间戳
 }
 
 export interface MarketListing {

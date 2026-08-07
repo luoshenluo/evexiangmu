@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const plot = user.plots.find(p => p.id === plotId)
     if (!plot || !plot.unlocked) return jsonResponse(false, null, '地块无效', 400)
 
-    // 收获逻辑
+    // 收获逻辑 → 存入背包，不再直接售卖
     if (action === 'harvest') {
       if (!plot.flower || !plot.flower.isReady) {
         logger.warn('garden', '收获失败：花未成熟', { userId: user.id, plotId, progress: plot.flower?.growthProgress })
@@ -84,15 +84,34 @@ export async function POST(req: NextRequest) {
       const flowerType = FLOWER_TYPES.find(f => f.id === plot.flower!.flowerTypeId)
       if (!flowerType) return jsonResponse(false, null, '花朵类型异常', 400)
 
-      const sellPrice = getFlowerSellPrice(flowerType, plot.flower.rank)
+      // 将花朵加入背包
+      let newInventory = [...user.inventory]
+      try {
+        newInventory = addInventoryItem(newInventory, {
+          type: 'flower',
+          referenceId: flowerType.id,
+          name: flowerType.name,
+          emoji: flowerType.emoji,
+          rank: plot.flower.rank,
+          quantity: 1,
+          maxStack: 99,
+          sellable: true,
+          tradeable: true,
+        }, user.inventorySize)
+      } catch (e: any) {
+        return jsonResponse(false, null, e.message, 400)
+      }
+
       const newPlots = user.plots.map(p => p.id === plotId ? { ...p, flower: null } : p)
-      const updated = await updateUser(user.id, { plots: newPlots, coins: user.coins + sellPrice })
+      const updated = await updateUser(user.id, { plots: newPlots, inventory: newInventory })
+
+      const sellPrice = getFlowerSellPrice(flowerType, plot.flower.rank)
 
       await createNotification({
         userId: user.id,
         type: 'harvest',
         title: '🌸 收获成功',
-        content: `收获了 ${flowerType.name}（${rankLabel(plot.flower.rank)}级），获得 ${sellPrice} 💰`,
+        content: `收获了 ${flowerType.name}（${rankLabel(plot.flower.rank)}级），已存入背包，出售可得 ${sellPrice} 💰`,
       })
 
       logger.info('garden', '收获成功', {
@@ -106,8 +125,14 @@ export async function POST(req: NextRequest) {
 
       return jsonResponse(true, {
         user: sanitizeUser(updated),
-        coinsEarned: sellPrice,
-        rewardName: `${flowerType.name} x1`,
+        flowerStored: {
+          type: flowerType.id,
+          name: flowerType.name,
+          emoji: flowerType.emoji,
+          rank: plot.flower.rank,
+          sellPrice,
+        },
+        message: `🌸 收获了 ${flowerType.name}，已存入背包`,
       })
     }
 
