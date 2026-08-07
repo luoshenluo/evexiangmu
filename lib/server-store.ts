@@ -33,6 +33,7 @@ function dbRowToUser(row: any): User {
     mutedUntil: row.muted_until,
     familyId: row.family_id,
     friends: row.friends || [],
+    deleted: row.deleted,
     stealCountToday: row.steal_count_today || 0,
     stealResetAt: row.steal_reset_at || 0,
     gardenProtectedUntil: row.garden_protected_until || 0,
@@ -56,6 +57,7 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.mutedUntil !== undefined) row.muted_until = user.mutedUntil
   if (user.familyId !== undefined) row.family_id = user.familyId
   if (user.friends !== undefined) row.friends = user.friends
+  if (user.deleted !== undefined) row.deleted = user.deleted
   if (user.stealCountToday !== undefined) row.steal_count_today = user.stealCountToday
   if (user.stealResetAt !== undefined) row.steal_reset_at = user.stealResetAt
   if (user.gardenProtectedUntil !== undefined) row.garden_protected_until = user.gardenProtectedUntil
@@ -84,7 +86,8 @@ function dbRowToMessage(row: any): ChatMessage {
     userId: row.user_id,
     userName: row.user_name,
     content: row.content,
-    timestamp: row.timestamp,
+    // 双兼容：数据库列可能叫 timestamp 也可能叫 created_at
+    timestamp: (typeof row.timestamp === 'number' ? row.timestamp : row.created_at) ?? Date.now(),
     isSystem: row.is_system,
   }
 }
@@ -163,10 +166,86 @@ export async function seedDatabase(): Promise<void> {
 async function doSeed(): Promise<void> {
   const sb = getSupabase()
 
+  // ============================================================
+  //  自修复 1：检测 messages 表的时间戳列名
+  //  （旧 schema 叫 "timestamp"，新 schema 叫 "created_at"）
+  //  自动重命名，避免查询和插入时报错
+  // ============================================================
+  try {
+    const { data: cols } = await sb
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'messages')
+    const colNames = (cols || []).map((c: any) => c.column_name)
+    if (colNames.includes('timestamp') && !colNames.includes('created_at')) {
+      // 旧表：timestamp → 自动重命名为 created_at
+      const { error: renameErr } = await sb.rpc('_garden_fix_messages_col', {})
+      if (renameErr) {
+        // RPC 不存在，用 raw SQL 通过 Supabase REST 无法执行，用单独的策略：
+        // 下面 getMessages / addMessage 都会 fallback 兼容两列
+        logger.warn('system', 'messages.timestamp 未改名，代码会用双兼容模式')
+      } else {
+        logger.info('system', 'messages.timestamp 已自动改名为 created_at')
+      }
+    }
+  } catch (e: any) {
+    logger.warn('system', `检测 messages 列名失败: ${e?.message || 'unknown'}`)
+  }
+
+  // ============================================================
+  //  自修复 2：检测 buy_orders 表是否缺 fulfilled 列
+  // ============================================================
+  try {
+    const { data: cols } = await sb
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'buy_orders')
+    const colNames = (cols || []).map((c: any) => c.column_name)
+    if (!colNames.includes('fulfilled')) {
+      logger.warn('system', 'buy_orders 缺少 fulfilled 列，实际业务会用兼容代码跳过')
+    }
+  } catch (e: any) {
+    logger.warn('system', `检测 buy_orders 列名失败: ${e?.message || 'unknown'}`)
+  }
+
   // 检查是否已有用户
-  const { count } = await sb.from('users').select('*', { count: 'exact', head: true })
-  if (count && count > 0) {
-    logger.info('system', '数据库已有用户数据，跳过种子')
+  const { data: allUsers, error: listErr } = await sb.from('users').select('id, plots, inventory, is_admin')
+  if (listErr) {
+    logger.error('system', '查询用户列表失败', { error: listErr.message })
+    return
+  }
+
+  // 修复：对已有用户检查并修复空 plots
+  if (allUsers && allUsers.length > 0) {
+    for (const u of allUsers) {
+      const plots = u.plots
+      const isEmpty = !plots || plots.length === 0
+      // 如果 plots 为空或没有解锁的地块，修复它
+      const hasUnlocked = plots && plots.some((p: any) => p.unlocked)
+      if (isEmpty || !hasUnlocked) {
+        const unlockedCount = u.is_admin ? 30 : isEmpty ? 1 : Math.max(3, (plots?.length || 0))
+        const fixedPlots = createInitialPlots(unlockedCount)
+        const existingInv = u.inventory
+        const fixedInv = !existingInv || existingInv.length === 0
+          ? (u.is_admin ? [] : [
+              { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
+              { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
+              { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
+            ])
+          : existingInv
+        const { error } = await sb.from('users')
+          .update({ plots: fixedPlots, inventory: fixedInv })
+          .eq('id', u.id)
+        if (error) {
+          logger.error('system', `修复用户 ${u.id} plots 失败`, { error: error.message })
+        } else {
+          logger.info('system', `修复用户 ${u.id} plots`, { unlockedCount })
+        }
+      }
+    }
+    logger.info('system', '数据库已有用户数据，检查并修复完成')
     return
   }
 
@@ -248,7 +327,7 @@ async function doSeed(): Promise<void> {
     user_id: 'system',
     user_name: '系统',
     content: '欢迎来到花园！祝大家游戏愉快~ 🌸🌺🌻🌷🌹',
-    timestamp: now - 60000,
+    created_at: now - 60000,
     is_system: true,
   })
 
@@ -366,6 +445,7 @@ export async function createUser(data: { username: string; password: string; nic
 }
 
 export async function updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
+  await seedDatabase()
   const sb = getSupabase()
   const dbRow = userToDbRow(updates)
   const { data, error } = await sb.from('users')
@@ -459,35 +539,90 @@ export async function ensureSeasonTick(): Promise<GameState> {
 
 // ==================== 聊天 ====================
 
+// 缓存 messages 表实际使用的时间戳列名（首次检测后不再重复）
+let _messagesTimeCol: 'timestamp' | 'created_at' | null = null
+
+async function detectMessagesTimeCol(): Promise<'timestamp' | 'created_at'> {
+  if (_messagesTimeCol) return _messagesTimeCol
+  const sb = getSupabase()
+  try {
+    const { data: cols } = await sb
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'messages')
+    const names = (cols || []).map((c: any) => c.column_name)
+    _messagesTimeCol = names.includes('created_at')
+      ? 'created_at'
+      : names.includes('timestamp')
+      ? 'timestamp'
+      : 'created_at'
+  } catch {
+    _messagesTimeCol = 'created_at'
+  }
+  return _messagesTimeCol
+}
+
 export async function getMessages(channel: string, limit = 200): Promise<ChatMessage[]> {
   await seedDatabase()
   const sb = getSupabase()
-  const { data, error } = await sb.from('messages')
-    .select('*')
-    .eq('channel', channel)
-    .order('timestamp', { ascending: true })
-    .limit(limit)
-  if (error || !data) return []
-  return data.map(dbRowToMessage)
+  const col = await detectMessagesTimeCol()
+  try {
+    const { data, error } = await sb.from('messages')
+      .select('*')
+      .eq('channel', channel)
+      .order(col, { ascending: true })
+      .limit(limit)
+    if (error || !data) return []
+    return data.map(dbRowToMessage)
+  } catch (e: any) {
+    // 兜底：如果 order 用的列名报错，换另一列重试
+    try {
+      const fallback = col === 'created_at' ? 'timestamp' : 'created_at'
+      const { data } = await sb.from('messages')
+        .select('*')
+        .eq('channel', channel)
+        .order(fallback, { ascending: true })
+        .limit(limit)
+      return (data || []).map(dbRowToMessage)
+    } catch {
+      return []
+    }
+  }
 }
 
 export async function addMessage(msg: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage> {
+  await seedDatabase()
   const sb = getSupabase()
+  const col = await detectMessagesTimeCol()
   const message: ChatMessage = {
     ...msg,
     id: genId('m'),
     timestamp: Date.now(),
   }
-  const { error } = await sb.from('messages').insert({
+  const payload: Record<string, any> = {
     id: message.id,
     channel: message.channel,
     user_id: message.userId,
     user_name: message.userName,
     content: message.content,
-    timestamp: message.timestamp,
     is_system: message.isSystem,
-  })
-  if (error) logger.error('chat', '保存消息失败', { error: error.message })
+  }
+  payload[col] = message.timestamp
+
+  const { error } = await sb.from('messages').insert(payload)
+  if (error) {
+    logger.error('chat', '保存消息失败', { error: error.message, usedCol: col })
+    // 换列名重试一次
+    try {
+      const fallback = col === 'created_at' ? 'timestamp' : 'created_at'
+      const p2: Record<string, any> = { ...payload }
+      delete p2[col]
+      p2[fallback] = message.timestamp
+      const { error: err2 } = await sb.from('messages').insert(p2)
+      if (err2) logger.error('chat', '重试保存消息仍失败', { error: err2.message })
+    } catch { /* ignore */ }
+  }
   return message
 }
 

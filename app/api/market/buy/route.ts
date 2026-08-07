@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick } from '@/lib/server-store'
+import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick, createNotification } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -81,7 +81,15 @@ export async function POST(req: NextRequest) {
       coins: user.coins - totalCost,
       inventory: newInventory.filter(i => i.quantity > 0 || true),
     })
-    return jsonResponse(true, { user: sanitizeUser(updatedUser) })
+
+    await createNotification({
+      userId: user.id,
+      type: 'purchase',
+      title: '🛒 购买成功',
+      content: `购买了 ${listing.name} × ${quantity}，花费 ${totalCost} 💰`,
+    })
+
+    return jsonResponse(true, { user: sanitizeUser(updatedUser), message: `购买成功！获得 ${listing.name} × ${quantity}` })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
   }

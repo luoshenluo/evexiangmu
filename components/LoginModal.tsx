@@ -164,9 +164,6 @@ export default function LoginModal({ onClose, onSuccess }: Props) {
           >
             🎮 使用演示账号快速体验 (demo/123456)
           </button>
-          <p className="text-xs text-slate-400 text-center mt-3">
-            管理员账号: admin / admin123
-          </p>
         </div>
       </div>
     </div>

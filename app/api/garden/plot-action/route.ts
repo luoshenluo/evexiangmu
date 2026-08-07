@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick } from '@/lib/server-store'
+import { updateUser, ensureSeasonTick, createNotification } from '@/lib/server-store'
 import { FLOWER_TYPES, TOOLS, getFlowerSellPrice, PEST_CONFIG } from '@/lib/game-data'
 import type { InventoryItem, PlantedFlower } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -14,6 +14,10 @@ const ACTION_TOOL_MAP: Record<Exclude<Action, 'harvest'>, string> = {
   fertilize: 'fertilizer',
   pesticide: 'pesticide',
   speedup: 'speedup_card',
+}
+
+function rankLabel(r: number): string {
+  return ['', '普通', '优秀', '良好', '稀有', '史诗', '传奇', '钻石'][r] || '普通'
 }
 
 function addInventoryItem(
@@ -83,6 +87,13 @@ export async function POST(req: NextRequest) {
       const sellPrice = getFlowerSellPrice(flowerType, plot.flower.rank)
       const newPlots = user.plots.map(p => p.id === plotId ? { ...p, flower: null } : p)
       const updated = await updateUser(user.id, { plots: newPlots, coins: user.coins + sellPrice })
+
+      await createNotification({
+        userId: user.id,
+        type: 'harvest',
+        title: '🌸 收获成功',
+        content: `收获了 ${flowerType.name}（${rankLabel(plot.flower.rank)}级），获得 ${sellPrice} 💰`,
+      })
 
       logger.info('garden', '收获成功', {
         userId: user.id, plotId,

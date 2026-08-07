@@ -26,13 +26,13 @@ export default function TasksPage() {
   const claim = async (taskId: string) => {
     setLoading(taskId)
     try {
-      const res = await apiFetch('/api/tasks/claim', {
+      const res = await apiFetch('/api/tasks', {
         method: 'POST',
         body: JSON.stringify({ taskId })
       })
       if (res.success) {
         if (res.data?.user) updateUser(res.data.user)
-        showToast(`🎉 领取奖励成功！`, 'success')
+        showToast(res.data?.message || `🎉 领取奖励成功！`, 'success')
         refresh()
       } else {
         showToast(res.error || '领取失败', 'error')
