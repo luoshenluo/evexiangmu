@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles } from 'lucide-react'
+import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
 export default function ProfilePage() {
@@ -16,6 +16,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false)
   const [showRankList, setShowRankList] = useState(false)
   const [rankings, setRankings] = useState<any[]>([])
+  const [showStealLogs, setShowStealLogs] = useState(false)
+  const [stealLogs, setStealLogs] = useState<any[]>([])
 
   const handleLogout = () => {
     if (!confirm('确定退出登录吗？')) return
@@ -53,6 +55,12 @@ export default function ProfilePage() {
     setShowNotifications(true)
   }
 
+  const loadStealLogs = async () => {
+    const res = await apiFetch('/api/garden/steal-logs?limit=20')
+    if (res.success && res.data) setStealLogs(res.data)
+    setShowStealLogs(true)
+  }
+
   // 排行榜数据类型
   const [rankTab, setRankTab] = useState<'coins' | 'flowers' | 'family'>('coins')
 
@@ -77,6 +85,7 @@ export default function ProfilePage() {
   const menuItems = [
     { icon: Bell, label: '消息中心', tip: notifications.filter(n => !n.read).length > 0 ? `${notifications.filter(n => !n.read).length}条未读` : '系统通知', onClick: loadNotifications, color: 'from-blue-400 to-blue-600' },
     { icon: Award, label: '排行榜', tip: '查看全服排名', onClick: loadRanking, color: 'from-amber-400 to-orange-500' },
+    { icon: ShieldAlert, label: '偷花记录', tip: '谁动了我的花', onClick: loadStealLogs, color: 'from-red-400 to-rose-600' },
     { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-purple-400 to-pink-500' },
     { icon: Sparkles, label: '活动中心', tip: '暂无进行中活动', onClick: () => showToast('活动开发中~', 'info'), color: 'from-red-400 to-rose-500' },
     { icon: Users, label: '好友系统', tip: '添加好友', onClick: () => showToast('好友系统开发中~', 'info'), color: 'from-green-400 to-emerald-600' },
@@ -328,6 +337,47 @@ export default function ProfilePage() {
               ))}
               {announcements.length === 0 && (
                 <div className="text-center py-12 text-slate-400 text-sm">暂无公告</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 偷花记录弹窗 */}
+      {showStealLogs && (
+        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowStealLogs(false)}>
+          <div className="card w-full sm:max-w-lg max-h-[85vh] flex flex-col slide-up rounded-t-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <ShieldAlert size={20} className="text-red-500" /> 偷花记录
+              </h2>
+              <button onClick={() => setShowStealLogs(false)} className="p-2 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
+              {stealLogs.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-sm">
+                  <ShieldAlert size={36} className="mx-auto mb-2 text-slate-300" />
+                  还没人偷过你的花，真安全~
+                </div>
+              ) : (
+                stealLogs.map(log => (
+                  <div key={log.id} className="p-3 rounded-xl bg-red-50/50 border border-red-100 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl flex-shrink-0">
+                      {log.flowerEmoji || '🌸'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-700">
+                        <span className="font-bold text-red-600">{log.thiefName}</span> 偷走了你的
+                        <span className="font-medium"> {log.flowerName}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        第 {log.plotId} 块地 · {formatDateTime(log.stolenAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

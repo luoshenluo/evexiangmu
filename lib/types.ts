@@ -59,6 +59,7 @@ export interface PlantedFlower {
   isReady: boolean
   lastWaterAt: number | null // 最后浇水时间
   lastFertilizeAt: number | null // 最后施肥时间
+  lastSettledAt?: number | null // 离线结算锚点（缺省取 plantedAt）
 }
 
 export interface Plot {
@@ -68,7 +69,7 @@ export interface Plot {
   flower: PlantedFlower | null
 }
 
-export type ItemType = 'flower' | 'seed' | 'tool'
+export type ItemType = 'flower' | 'seed' | 'tool' | 'bouquet'
 
 export interface InventoryItem {
   id: string

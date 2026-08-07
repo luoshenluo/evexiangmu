@@ -1438,3 +1438,146 @@ export async function getChatStats(): Promise<ChatStats> {
   }
 }
 
+// ==================== 花园点赞（社交增强） ====================
+
+export async function getGardenLikeCount(targetId: string): Promise<number> {
+  const sb = getSupabase()
+  try {
+    const { count, error } = await sb.from('garden_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('target_id', targetId)
+    if (error || count === null) return 0
+    return count
+  } catch {
+    return 0
+  }
+}
+
+export async function hasLiked(likerId: string, targetId: string): Promise<boolean> {
+  const sb = getSupabase()
+  try {
+    const { data } = await sb.from('garden_likes')
+      .select('id')
+      .eq('liker_id', likerId)
+      .eq('target_id', targetId)
+      .limit(1)
+    return !!(data && data.length > 0)
+  } catch {
+    return false
+  }
+}
+
+export async function toggleGardenLike(likerId: string, targetId: string): Promise<{ liked: boolean; count: number }> {
+  const sb = getSupabase()
+  const existed = await hasLiked(likerId, targetId)
+  if (existed) {
+    await sb.from('garden_likes').delete()
+      .eq('liker_id', likerId)
+      .eq('target_id', targetId)
+  } else {
+    await sb.from('garden_likes').insert({
+      id: genId('gl'),
+      liker_id: likerId,
+      target_id: targetId,
+      created_at: Date.now(),
+    })
+  }
+  const count = await getGardenLikeCount(targetId)
+  return { liked: !existed, count }
+}
+
+// ==================== 好友浇水（社交增强） ====================
+// 每日给好友浇水次数限制（内存计数，Edge 重启清空可接受）
+function getFriendWaterStore(): Map<string, number[]> {
+  try {
+    const g = globalThis as any
+    g.__gardenFriendWater = g.__gardenFriendWater || new Map<string, number[]>()
+    return g.__gardenFriendWater
+  } catch {
+    return new Map<string, number[]>()
+  }
+}
+
+const FRIEND_WATER_DAILY_LIMIT = 5
+const FRIEND_WATER_GROWTH_BONUS = 5 // 每次浇水 +5% 生长
+const FRIEND_WATER_COIN_REWARD = 2 // 浇水者获得 2 金币奖励
+
+export async function waterFriendFlower(
+  watererId: string,
+  targetId: string,
+  plotId: number
+): Promise<{ success: boolean; message: string; reward?: number }> {
+  if (watererId === targetId) {
+    return { success: false, message: '不能给自己的花浇水（请用花园页浇水）' }
+  }
+
+  // 每日次数检查
+  const now = Date.now()
+  const store = getFriendWaterStore()
+  const times = (store.get(watererId) || []).filter(t => now - t < 86400000)
+  if (times.length >= FRIEND_WATER_DAILY_LIMIT) {
+    return { success: false, message: `今日好友浇水次数已用完（${FRIEND_WATER_DAILY_LIMIT}次）` }
+  }
+
+  const target = await findUserById(targetId)
+  if (!target) return { success: false, message: '目标用户不存在' }
+
+  const plot = target.plots.find(p => p.id === plotId)
+  if (!plot || !plot.unlocked || !plot.flower) {
+    return { success: false, message: '该地块没有花朵' }
+  }
+  if (plot.flower.isReady) {
+    return { success: false, message: '花已成熟，无需浇水' }
+  }
+
+  // 推进生长
+  const newFlower = { ...plot.flower }
+  newFlower.growthProgress = Math.min(100, newFlower.growthProgress + FRIEND_WATER_GROWTH_BONUS)
+  newFlower.waterCount += 1
+  newFlower.lastWaterAt = now
+  if (newFlower.growthProgress >= 100) {
+    newFlower.growthProgress = 100
+    newFlower.isReady = true
+  }
+  const newPlots = target.plots.map(p => p.id === plotId ? { ...p, flower: newFlower } : p)
+  await updateUser(targetId, { plots: newPlots })
+
+  // 给浇水者金币奖励
+  const waterer = await findUserById(watererId)
+  if (waterer) {
+    await updateUser(watererId, { coins: waterer.coins + FRIEND_WATER_COIN_REWARD })
+  }
+
+  // 记录次数
+  times.push(now)
+  store.set(watererId, times)
+
+  // 通知被浇水者
+  const watererName = waterer?.nickname || '好友'
+  await createNotification({
+    userId: targetId,
+    type: 'system',
+    title: '💧 好友帮你浇水啦',
+    content: `${watererName} 帮你的花浇了水，生长 +${FRIEND_WATER_GROWTH_BONUS}%`,
+  })
+
+  logger.info('garden', '好友浇水', {
+    watererId, targetId, plotId,
+    growthBonus: FRIEND_WATER_GROWTH_BONUS, coinReward: FRIEND_WATER_COIN_REWARD,
+  })
+
+  return {
+    success: true,
+    message: `浇水成功！花朵生长 +${FRIEND_WATER_GROWTH_BONUS}%，你获得 ${FRIEND_WATER_COIN_REWARD} 金币`,
+    reward: FRIEND_WATER_COIN_REWARD,
+  }
+}
+
+export function getFriendWaterRemainingToday(userId: string): number {
+  const store = getFriendWaterStore()
+  const now = Date.now()
+  const times = (store.get(userId) || []).filter(t => now - t < 86400000)
+  return Math.max(0, FRIEND_WATER_DAILY_LIMIT - times.length)
+}
+
+

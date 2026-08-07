@@ -98,6 +98,16 @@ body {
   animation: shake 0.3s infinite;
 }
 
+/* 幼苗/花苞摇曳动画 - 生长中 */
+@keyframes sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.sway-anim {
+  animation: sway 2.5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
 /* 聊天弹入 */
 @keyframes slideUp {
   from { transform: translateY(20px); opacity: 0; }

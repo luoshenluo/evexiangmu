@@ -6,7 +6,7 @@ import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
 import {
   Settings, Users, MessageSquare, TrendingUp, Gift, Coins, Tag, Plus, X,
   Search, Ban, Crown, Shield, AlertCircle, Bell, Trash2, Edit, Key,
-  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye
+  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 import ChatManagement from '@/components/admin/ChatManagement'
@@ -324,6 +324,101 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+
+              {/* 经济仪表盘 */}
+              <div className="card p-5">
+                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Coins size={18} className="text-amber-500" />
+                  经济仪表盘
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                    <div className="text-xs text-slate-500">全服金币</div>
+                    <div className="text-lg font-bold text-amber-600 mt-0.5">{formatNumber(stats?.totalCoins || 0)}</div>
+                  </div>
+                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                    <div className="text-xs text-slate-500">背包花估值</div>
+                    <div className="text-lg font-bold text-purple-600 mt-0.5">{formatNumber(stats?.inventoryFlowerValue || 0)}</div>
+                  </div>
+                  <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
+                    <div className="text-xs text-slate-500">花园点赞</div>
+                    <div className="text-lg font-bold text-pink-600 mt-0.5">{stats?.totalLikes || 0}</div>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded-xl border border-red-100">
+                    <div className="text-xs text-slate-500">前10%占有</div>
+                    <div className="text-lg font-bold text-red-600 mt-0.5">{stats?.giniRatio || 0}%</div>
+                  </div>
+                </div>
+                {/* 贫富差距说明 */}
+                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <AlertCircle size={11} />
+                  「前10%占有」= 金币最多的 10% 用户持有的金币占比，数值越高贫富差距越大
+                </div>
+              </div>
+
+              {/* 种植概况 + 富豪榜 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="card p-5">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Leaf size={16} className="text-garden-500" />
+                    种植概况
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">种植中</span>
+                      <span className="font-bold text-garden-700">{stats?.plantedCount || 0} 朵</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">已成熟</span>
+                      <span className="font-bold text-amber-600">{stats?.maturedCount || 0} 朵</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">平均进度</span>
+                      <span className="font-bold text-blue-600">{stats?.avgGrowth || 0}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">虫害</span>
+                      <span className="font-bold text-red-500">{stats?.pestCount || 0} 朵</span>
+                    </div>
+                  </div>
+                  {stats?.topFlowers && stats.topFlowers.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="text-xs text-slate-500 mb-2">热门花型 Top 5</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {stats.topFlowers.map((f: any, i: number) => (
+                          <div key={f.id} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                            <span className="text-slate-400 font-bold">{i + 1}</span>
+                            <span>{f.emoji}</span>
+                            <span className="text-slate-600">{f.name}</span>
+                            <span className="text-slate-400">×{f.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="card p-5">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Crown size={16} className="text-amber-500" />
+                    金币富豪榜 Top 5
+                  </h3>
+                  <div className="space-y-2">
+                    {stats?.topRich?.map((u: any, i: number) => (
+                      <div key={u.id} className="flex items-center gap-2 text-sm">
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+                          i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-400' : 'bg-slate-300'
+                        }`}>{i + 1}</span>
+                        <span className="text-lg">{u.avatar || '🌱'}</span>
+                        <span className="flex-1 text-slate-700 font-medium truncate">{u.nickname}</span>
+                        <span className="font-bold text-amber-600 flex items-center gap-0.5">
+                          <Coins size={12} />{formatNumber(u.coins)}
+                        </span>
+                      </div>
+                    )) || <div className="text-sm text-slate-400 text-center py-4">暂无数据</div>}
+                  </div>
+                </div>
+              </div>
+
               <div className="text-xs text-slate-400 text-center">
                 数据每 5 分钟自动刷新 · 最后更新: {stats ? formatDateTime(Date.now()) : '加载中...'}
               </div>

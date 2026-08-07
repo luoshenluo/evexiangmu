@@ -70,6 +70,22 @@ alter table public.sensitive_words enable row level security;
 alter table public.chat_settings enable row level security;
 
 -- ============================================================
+-- 5. 花园点赞表（社交增强）
+-- ============================================================
+create table if not exists public.garden_likes (
+  id          text primary key,
+  liker_id    text not null,
+  target_id   text not null,
+  created_at  bigint not null,
+  unique (liker_id, target_id)  -- 每个用户对同一花园只能点赞一次（取消后可重新点）
+);
+
+create index if not exists idx_garden_likes_target
+  on public.garden_likes(target_id);
+
+alter table public.garden_likes enable row level security;
+
+-- ============================================================
 -- 完成！所有操作都是安全的，可以重复执行。
 -- 聊天记录、用户数据、交易记录全部保留。
 -- ============================================================

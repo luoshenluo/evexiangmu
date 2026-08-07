@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
 import { FLOWER_TYPES, RankNames, RankColors } from '@/lib/game-data'
-import { ChevronLeft, Users, Coins, Shield, Bug, Sparkles, Search } from 'lucide-react'
+import { ChevronLeft, Users, Coins, Shield, Bug, Sparkles, Search, Heart, Droplets } from 'lucide-react'
 
 interface RankedUser {
   id: string
@@ -28,6 +28,7 @@ interface VisitedPlot {
     fertilizeCount: number
   } | null
   canSteal: boolean
+  canWater?: boolean
 }
 
 interface VisitedGarden {
@@ -38,6 +39,9 @@ interface VisitedGarden {
   canSteal: boolean
   stealCountToday: number
   stealLimit: number
+  likeCount?: number
+  liked?: boolean
+  friendWaterRemaining?: number
   plots: VisitedPlot[]
 }
 
@@ -50,6 +54,8 @@ export default function VisitPage() {
   const [targetId, setTargetId] = useState<string | null>(null)
   const [garden, setGarden] = useState<VisitedGarden | null>(null)
   const [stealing, setStealing] = useState<number | null>(null)
+  const [watering, setWatering] = useState<number | null>(null)
+  const [liking, setLiking] = useState(false)
 
   // 加载排行榜作为玩家列表
   useEffect(() => {
@@ -98,6 +104,45 @@ export default function VisitPage() {
       }
     } finally {
       setStealing(null)
+    }
+  }
+
+  const handleLike = async () => {
+    if (!targetId || !garden) return
+    setLiking(true)
+    try {
+      const res = await apiFetch<any>('/api/garden/like', {
+        method: 'POST',
+        body: JSON.stringify({ targetId }),
+      })
+      if (res.success && res.data) {
+        setGarden({ ...garden, liked: res.data.liked, likeCount: res.data.count })
+        showToast(res.data.liked ? '已点赞 ❤️' : '已取消点赞', 'success')
+      } else {
+        showToast(res.error || '操作失败', 'error')
+      }
+    } finally {
+      setLiking(false)
+    }
+  }
+
+  const handleWater = async (plotId: number) => {
+    if (!targetId) return
+    setWatering(plotId)
+    try {
+      const res = await apiFetch<any>('/api/garden/water-friend', {
+        method: 'POST',
+        body: JSON.stringify({ targetId, plotId }),
+      })
+      if (res.success) {
+        if (res.data?.user) updateUser(res.data.user)
+        showToast(res.data?.message || '浇水成功！', 'success')
+        await visitGarden(targetId)
+      } else {
+        showToast(res.error || res.data?.message || '浇水失败', 'error')
+      }
+    } finally {
+      setWatering(null)
     }
   }
 
@@ -187,6 +232,11 @@ export default function VisitPage() {
               <div className="text-xs text-slate-500 flex items-center gap-2">
                 <span className="flex items-center gap-0.5"><Coins size={11} /> {formatNumber(garden.user.coins)}</span>
                 {garden.isFriend && <span className="text-garden-600">· 好友</span>}
+                {typeof garden.likeCount === 'number' && (
+                  <span className="flex items-center gap-0.5 text-pink-500">
+                    · <Heart size={11} className={garden.liked ? 'fill-pink-500' : ''} /> {garden.likeCount}
+                  </span>
+                )}
               </div>
             </div>
             {garden.isProtected && (
@@ -194,28 +244,46 @@ export default function VisitPage() {
                 <Shield size={12} /> 受保护
               </div>
             )}
+            {!garden.isSelf && (
+              <button
+                onClick={handleLike}
+                disabled={liking}
+                className={classNames(
+                  'flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  garden.liked
+                    ? 'bg-pink-100 text-pink-600 border border-pink-200'
+                    : 'bg-white text-slate-500 border border-slate-200 hover:border-pink-200 hover:text-pink-500'
+                )}
+              >
+                <Heart size={14} className={garden.liked ? 'fill-pink-500' : ''} />
+                {garden.liked ? '已赞' : '点赞'}
+              </button>
+            )}
           </div>
 
-          {/* 偷花状态 */}
+          {/* 偷花 + 好友浇水状态 */}
           {!garden.isSelf && (
-            <div className={classNames(
-              'card p-3 mb-4 flex items-center justify-between text-sm',
-              garden.canSteal ? 'bg-amber-50/50' : 'bg-slate-50'
-            )}>
+            <div className="card p-3 mb-4 flex items-center justify-between text-sm bg-slate-50">
               <div className="flex items-center gap-2">
                 {garden.canSteal ? (
                   <>
                     <Sparkles size={16} className="text-amber-500" />
                     <span className="text-slate-700">
-                      今日剩余偷花次数：<span className="font-bold text-amber-600">
+                      偷花 <span className="font-bold text-amber-600">
                         {garden.stealLimit - garden.stealCountToday}
-                      </span> / {garden.stealLimit}
+                      </span>/{garden.stealLimit}
                     </span>
                   </>
                 ) : (
-                  <span className="text-slate-500">今日偷花次数已用完</span>
+                  <span className="text-slate-500">偷花次数已用完</span>
                 )}
               </div>
+              {typeof garden.friendWaterRemaining === 'number' && (
+                <div className="flex items-center gap-1 text-slate-600">
+                  <Droplets size={14} className="text-blue-500" />
+                  帮浇水 <span className="font-bold text-blue-600">{garden.friendWaterRemaining}</span>/5
+                </div>
+              )}
             </div>
           )}
 
@@ -268,6 +336,16 @@ export default function VisitPage() {
                           className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-xs font-bold hover:bg-black/50 transition-colors"
                         >
                           {stealing === p.id ? '偷取中...' : '🤏 偷花'}
+                        </button>
+                      )}
+                      {p.canWater && !p.flower.isReady && !garden.isSelf && (
+                        <button
+                          onClick={() => handleWater(p.id)}
+                          disabled={watering === p.id}
+                          className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md hover:bg-blue-600 active:scale-95 transition-all disabled:opacity-50"
+                          title="帮好友浇水"
+                        >
+                          <Droplets size={14} className={watering === p.id ? 'animate-spin' : ''} />
                         </button>
                       )}
                     </>

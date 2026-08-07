@@ -1,5 +1,8 @@
 import { NextRequest } from 'next/server'
-import { ensureSeasonTick, findUserById } from '@/lib/server-store'
+import {
+  ensureSeasonTick, findUserById,
+  getGardenLikeCount, hasLiked, getFriendWaterRemainingToday,
+} from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { STEAL_CONFIG } from '@/lib/game-data'
@@ -38,10 +41,18 @@ export async function GET(
       p.unlocked && p.flower && p.flower.isReady && !isProtected
     )
 
+    // 社交数据：点赞数、是否已点赞、好友浇水剩余次数
+    const [likeCount, liked, friendWaterRemaining] = await Promise.all([
+      getGardenLikeCount(victimId),
+      isSelf ? Promise.resolve(false) : hasLiked(visitor.id, victimId),
+      Promise.resolve(getFriendWaterRemainingToday(visitor.id)),
+    ])
+
     logger.info('steal', '访问花园', {
       visitorId: visitor.id, visitorName: visitor.nickname,
       victimId, victimName: victim.nickname,
       isFriend, isProtected, stealableCount: stealablePlots.length,
+      likeCount, liked,
     })
 
     return jsonResponse(true, {
@@ -57,6 +68,9 @@ export async function GET(
       canSteal,
       stealCountToday,
       stealLimit: STEAL_CONFIG.dailyStealLimit,
+      likeCount,
+      liked,
+      friendWaterRemaining,
       plots: victim.plots.map(p => ({
         id: p.id,
         unlocked: p.unlocked,
@@ -71,6 +85,7 @@ export async function GET(
           fertilizeCount: p.flower.fertilizeCount,
         } : null,
         canSteal: !isSelf && p.flower?.isReady && !isProtected && canSteal,
+        canWater: !isSelf && !!p.flower && !p.flower.isReady && friendWaterRemaining > 0,
       })),
     })
   } catch (e: any) {

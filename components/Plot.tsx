@@ -13,6 +13,27 @@ interface Props {
   onUpdate: () => void
 }
 
+// 生长阶段：种子 🌱 → 幼苗 🌿 → 花苞 🪴 → 盛开（花朵本体）
+type GrowthStage = 'seed' | 'sprout' | 'bud' | 'bloom'
+const STAGE_EMOJI: Record<Exclude<GrowthStage, 'bloom'>, string> = {
+  seed: '🌱',
+  sprout: '🌿',
+  bud: '🪴',
+}
+const STAGE_SCALE: Record<GrowthStage, number> = {
+  seed: 0.7,
+  sprout: 0.85,
+  bud: 0.95,
+  bloom: 1,
+}
+function getGrowthStage(progress: number, isReady: boolean): GrowthStage {
+  if (isReady || progress >= 100) return 'bloom'
+  if (progress >= 75) return 'bloom'
+  if (progress >= 50) return 'bud'
+  if (progress >= 25) return 'sprout'
+  return 'seed'
+}
+
 export default function Plot({ plot, onUpdate }: Props) {
   const { user, updateUser, showToast, isGuest } = useAppStore()
   const [showPlant, setShowPlant] = useState(false)
@@ -124,6 +145,11 @@ export default function Plot({ plot, onUpdate }: Props) {
   // 有花的地块
   const sellPrice = getFlowerSellPrice(flowerType, flower.rank)
 
+  // 生长分阶段：种子→幼苗→花苞→盛开
+  const stage = getGrowthStage(flower.growthProgress, flower.isReady)
+  const stageEmoji = stage === 'bloom' ? flowerType.emoji : STAGE_EMOJI[stage]
+  const stageScale = STAGE_SCALE[stage]
+
   return (
     <>
       <div
@@ -141,13 +167,20 @@ export default function Plot({ plot, onUpdate }: Props) {
           />
         </div>
 
-        {/* 花朵 */}
+        {/* 花朵（分阶段 + 摇曳动画） */}
         <div className={classNames(
-          'relative bloom-anim',
-          flower.hasPest && 'shake-anim'
+          'relative bloom-anim transition-transform duration-700',
+          flower.hasPest && 'shake-anim',
+          stage !== 'bloom' && 'sway-anim'
         )}>
-          <div className="text-5xl" style={{ filter: `hue-rotate(${flower.rank * 10}deg)` }}>
-            {flowerType.emoji}
+          <div
+            className="text-5xl transition-all duration-700"
+            style={{
+              filter: `hue-rotate(${flower.rank * 10}deg)`,
+              transform: `scale(${stageScale})`,
+            }}
+          >
+            {stageEmoji}
           </div>
           {flower.hasPest && (
             <div className="absolute -top-1 -right-1">
@@ -205,8 +238,8 @@ export default function Plot({ plot, onUpdate }: Props) {
                 'w-20 h-20 rounded-2xl flex items-center justify-center text-5xl',
                 'bg-gradient-to-br from-garden-100 to-emerald-100 border border-garden-200'
               )}>
-                {flower.hasPest && <span className="shake-anim">{flowerType.emoji}</span>}
-                {!flower.hasPest && <span className="bloom-anim">{flowerType.emoji}</span>}
+                {flower.hasPest && <span className="shake-anim">{stageEmoji}</span>}
+                {!flower.hasPest && <span className="bloom-anim">{stageEmoji}</span>}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">

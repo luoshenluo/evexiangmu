@@ -52,6 +52,21 @@ export default function GardenPage() {
       } catch {}
     }
 
+    // 离线收益结算（每次进入花园页面时调用一次）
+    const settleOffline = async () => {
+      if (!user?.id) return
+      try {
+        const res = await apiFetch<any>('/api/garden/offline-settle', { method: 'POST' })
+        if (res.success && res.data) {
+          if (res.data.user) updateUser(res.data.user)
+          if (res.data.settledCount > 0 || res.data.maturedCount > 0) {
+            showToast(res.data.message, 'success')
+          }
+        }
+      } catch {}
+    }
+
+    settleOffline()
     refresh()
     checkPest()
     const i = setInterval(() => {
