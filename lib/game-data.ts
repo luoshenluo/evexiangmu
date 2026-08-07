@@ -143,11 +143,21 @@ export const TOOLS: Tool[] = [
   },
 ]
 
-// 初始游戏状态
+// 初始游戏状态 - 季节按月份自动计算，不再使用固定时长
 export const INITIAL_GAME_STATE: GameState = {
-  currentSeason: 'spring',
+  currentSeason: getSeasonByMonth(),
   seasonStartAt: Date.now(),
-  seasonDuration: 8 * 60 * 60 * 1000, // 8小时一个季节
+  seasonDuration: 30 * 24 * 60 * 60 * 1000, // 兜底
+}
+
+// 按月份计算当前季节（天文季节简化版）
+export function getSeasonByMonth(): 'spring' | 'summer' | 'autumn' | 'winter' {
+  const month = new Date().getMonth()
+  if (month <= 1) return 'winter'
+  if (month <= 4) return 'spring'
+  if (month <= 7) return 'summer'
+  if (month <= 10) return 'autumn'
+  return 'winter'
 }
 
 // 初始公告
@@ -204,15 +214,15 @@ export function getFlowerSellPrice(flower: FlowerType, rank: number): number {
 // 工具价格调控兼容别名
 export const TOOL_TYPES = TOOLS
 
-// 幸运转盘奖励配置（花瓣代币玩法）
+// 幸运转盘奖励配置（花瓣代币玩法）- 大幅降低金币奖励
 export const WHEEL_REWARDS: { key: string; label: string; weight: number; coins: number; petals?: number }[] = [
-  { key: 'coins_100',   label: '100 金币', weight: 35, coins: 100 },
-  { key: 'coins_200',   label: '200 金币', weight: 25, coins: 200 },
-  { key: 'coins_500',   label: '500 金币', weight: 15, coins: 500 },
-  { key: 'coins_1000',  label: '1000 金币', weight: 8, coins: 1000 },
-  { key: 'coins_5000',  label: '5000 金币', weight: 2, coins: 5000 },
+  { key: 'coins_20',    label: '20 金币', weight: 35, coins: 20 },
+  { key: 'coins_50',    label: '50 金币', weight: 25, coins: 50 },
+  { key: 'coins_100',   label: '100 金币', weight: 15, coins: 100 },
+  { key: 'coins_200',   label: '200 金币', weight: 8, coins: 200 },
+  { key: 'coins_500',   label: '500 金币', weight: 2, coins: 500 },
   { key: 'petal_2',     label: '+2 花瓣',   weight: 9, coins: 0, petals: 2 },
-  { key: 'jackpot',     label: '🎉 大奖 20000 金币', weight: 1, coins: 20000 },
+  { key: 'jackpot',     label: '🎉 大奖 2000 金币', weight: 1, coins: 2000 },
   { key: 'nothing',     label: '谢谢参与',   weight: 5, coins: 0 },
 ]
 

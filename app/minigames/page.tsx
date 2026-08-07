@@ -4,9 +4,11 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
 import LoginModal from '@/components/LoginModal'
-import { Sparkles, Gift, Coins, Flower, PlayCircle, ChevronLeft, Trophy, Zap, RefreshCw } from 'lucide-react'
+import { Sparkles, Gift, Coins, Flower, PlayCircle, ChevronLeft, Trophy, Zap, RefreshCw, Dices } from 'lucide-react'
 import { WHEEL_REWARDS } from '@/lib/game-data'
 const WHEEL_REWARDS_LOCAL = WHEEL_REWARDS
+
+type GameTab = 'wheel' | 'dice'
 
 // 颜色数组（奖励扇区颜色）
 const SECTOR_COLORS = [
@@ -17,12 +19,19 @@ const SECTOR_COLORS = [
 export default function MiniGamesPage() {
   const { user, showToast, updateUser } = useAppStore()
   const [showLogin, setShowLogin] = useState(false)
+  const [gameTab, setGameTab] = useState<GameTab>('wheel')
   const [petals, setPetals] = useState((user as any)?.petalCoins || 0)
   const [spinning, setSpinning] = useState(false)
   const [spinTimes, setSpinTimes] = useState<1 | 5 | 10>(1)
   const [rotation, setRotation] = useState(0)   // 当前指针相对角度
   const [history, setHistory] = useState<{ index: number; at: number; time: number; coins: number; petals: number }[]>([])
   const [lastBatch, setLastBatch] = useState<{ results: number[]; totalCoins: number; totalPetals: number } | null>(null)
+  // 猜大小
+  const [diceBetType, setDiceBetType] = useState<'small' | 'big' | 'middle' | 'exact'>('middle')
+  const [diceBetAmount, setDiceBetAmount] = useState(1)
+  const [diceTarget, setDiceTarget] = useState<number>(7)
+  const [diceAnimating, setDiceAnimating] = useState(false)
+  const [lastDiceResult, setLastDiceResult] = useState<{ dice: number[]; sum: number; won: boolean; netPetals: number; netCoins: number } | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { if (user?.id) { (async () => { const r = await apiFetch('/api/user/wheel'); if (r.success) setPetals(r.data.petalCoins) })() } }, [user?.id])
@@ -92,6 +101,62 @@ export default function MiniGamesPage() {
     }
   }
 
+  const playDice = async () => {
+    if (!user) return
+    if (diceAnimating) return
+    if (petals < diceBetAmount) { showToast(`花瓣不足，需要 ${diceBetAmount} 花瓣`, 'error'); return }
+    setDiceAnimating(true)
+    try {
+      const r = await apiFetch('/api/minigame/dice', {
+        method: 'POST',
+        body: JSON.stringify({
+          betType: diceBetType,
+          betAmount: diceBetAmount,
+          target: diceBetType === 'exact' ? diceTarget : undefined,
+        }),
+      })
+      if (!r.success) { showToast(r.error || '下注失败', 'error'); setDiceAnimating(false); return }
+      const { user: updated, dice, sum, won, netPetals, netCoins } = r.data
+      if (updated) {
+        updateUser(updated)
+        setPetals(updated.petalCoins)
+      }
+      setLastDiceResult({ dice, sum, won, netPetals, netCoins })
+      showToast(won ? `🎉 骰子 ${dice[0]}+${dice[1]}=${sum}，命中！` : `骰子 ${dice[0]}+${dice[1]}=${sum}，继续加油`, won ? 'success' : 'error')
+    } catch (e: any) {
+      showToast(e.message || '出错了', 'error')
+    } finally {
+      setDiceAnimating(false)
+    }
+  }
+
+  const DiceFace = ({ v }: { v: number }) => {
+    const dots: Record<number, string[]> = {
+      1: ['c'],
+      2: ['tl', 'br'],
+      3: ['tl', 'c', 'br'],
+      4: ['tl', 'tr', 'bl', 'br'],
+      5: ['tl', 'tr', 'c', 'bl', 'br'],
+      6: ['tl', 'tr', 'ml', 'mr', 'bl', 'br'],
+    }
+    const positions: Record<string, string> = {
+      tl: 'top-1 left-1', tr: 'top-1 right-1',
+      ml: 'top-1/2 -translate-y-1/2 left-1', mr: 'top-1/2 -translate-y-1/2 right-1',
+      c: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+      bl: 'bottom-1 left-1', br: 'bottom-1 right-1',
+    }
+    return (
+      <div className={classNames(
+        'w-16 h-16 rounded-xl bg-white shadow relative border border-slate-200 flex-shrink-0',
+        diceAnimating && 'animate-pulse'
+      )}>
+        {(dots[v] || []).map(p => (
+          <span key={p} className={classNames('absolute w-2.5 h-2.5 rounded-full bg-slate-800', positions[p])} />
+        ))}
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
@@ -129,12 +194,35 @@ export default function MiniGamesPage() {
         </div>
       </div>
 
+      {/* 游戏选择 */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {([
+          { k: 'wheel', label: '幸运转盘', icon: Sparkles },
+          { k: 'dice', label: '猜大小', icon: Dices },
+        ] as const).map(g => {
+          const Icon = g.icon
+          const active = gameTab === g.k
+          return (
+            <button key={g.k} onClick={() => setGameTab(g.k)}
+              className={classNames(
+                'card p-3 flex items-center gap-2 transition',
+                active ? 'ring-2 ring-fuchsia-300 bg-fuchsia-50/60' : 'hover:bg-slate-50'
+              )}>
+              <Icon size={18} className={active ? 'text-fuchsia-600' : 'text-slate-400'} />
+              <span className={classNames('font-bold text-sm', active ? 'text-slate-800' : 'text-slate-500')}>{g.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {gameTab === 'wheel' && (
+      <>
       {/* 转盘 */}
       <div className="card p-5 mb-4">
         <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
           <Sparkles size={16} className="text-fuchsia-500" /> 幸运大转盘
         </h3>
-        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 1 花瓣，大奖高达 20000 金币～</div>
+        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 1 花瓣，大奖高达 2000 金币～</div>
         <div className="flex justify-center relative select-none" ref={canvasRef} style={{ touchAction: 'none' }}>
           {/* 外圈装饰 */}
           <div className="absolute -inset-3 rounded-full bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500 shadow-xl opacity-80" />
@@ -275,6 +363,96 @@ export default function MiniGamesPage() {
           ))}
         </div>
       </div>
+      </>
+      )}
+
+      {gameTab === 'dice' && (
+        <div className="space-y-4">
+          <div className="card p-5">
+            <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+              <Dices size={16} className="text-indigo-500" /> 猜大小
+            </h3>
+            <div className="text-xs text-slate-500 mb-4">两颗骰子之和，猜中可赢取多倍花瓣 + 金币</div>
+
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {([
+                { k: 'small', label: '小 (2-6)', payout: '×2' },
+                { k: 'big', label: '大 (8-12)', payout: '×2' },
+                { k: 'middle', label: '7', payout: '×5' },
+                { k: 'exact', label: '精确7', payout: '×20' },
+              ] as const).map(o => {
+                const active = diceBetType === o.k
+                return (
+                  <button key={o.k} onClick={() => setDiceBetType(o.k as any)}
+                    className={classNames(
+                      'p-2 rounded-xl text-xs font-medium border',
+                      active ? 'bg-indigo-500 text-white border-indigo-500 shadow' : 'bg-white border-slate-200 text-slate-600'
+                    )}>
+                    <div>{o.label}</div>
+                    <div className="text-[10px] opacity-80">{o.payout}</div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {diceBetType === 'exact' && (
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-xs text-slate-600">精确点数：</span>
+                {[2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                  <button key={n} onClick={() => setDiceTarget(n)}
+                    className={classNames(
+                      'w-8 h-8 rounded-lg text-xs font-bold',
+                      diceTarget === n ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-600'
+                    )}>{n}</button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-slate-600">下注：</span>
+              {[1, 5, 10, 20, 50].map(n => (
+                <button key={n} onClick={() => setDiceBetAmount(n)}
+                  className={classNames(
+                    'px-3 py-1 rounded-lg text-xs font-bold',
+                    diceBetAmount === n ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'
+                  )}>{n} 花瓣</button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 mb-4">
+              <div className="w-20 h-20 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400">
+                等待...
+              </div>
+              <div className="text-4xl font-bold text-slate-700 self-center">=</div>
+              <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-2xl font-bold shadow">
+                {lastDiceResult ? lastDiceResult.sum : '?'}
+              </div>
+            </div>
+            {lastDiceResult && (
+              <div className="flex gap-2 mb-4">
+                <DiceFace v={lastDiceResult.dice[0]} />
+                <DiceFace v={lastDiceResult.dice[1]} />
+                <div className={classNames(
+                  'ml-auto px-3 py-1.5 rounded-xl text-sm font-bold',
+                  lastDiceResult.won ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                )}>
+                  {lastDiceResult.won ? `🎉 命中！+${lastDiceResult.netPetals}花瓣 +${lastDiceResult.netCoins}金币` : `未中 -${diceBetAmount}花瓣`}
+                </div>
+              </div>
+            )}
+
+            <button onClick={playDice} disabled={diceAnimating || petals < diceBetAmount}
+              className={classNames(
+                'w-full py-3 rounded-xl font-bold text-base transition-all shadow-lg',
+                diceAnimating || petals < diceBetAmount
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl active:scale-[0.98]'
+              )}>
+              {diceAnimating ? '骰子旋转中...' : `掷骰子（下注 ${diceBetAmount} 花瓣）`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -796,11 +796,11 @@ export async function addMessage(msg: Omit<ChatMessage, 'id' | 'timestamp'>): Pr
 
 // ==================== 市场 ====================
 
-export async function getListings(itemType?: 'flower' | 'seed'): Promise<MarketListing[]> {
+export async function getListings(itemType?: 'flower' | 'seed' | 'tool'): Promise<MarketListing[]> {
   await seedDatabase()
   const sb = getSupabase()
   let query = sb.from('listings').select('*').order('created_at', { ascending: true })
-  if (itemType) query = query.eq('item_type', itemType)
+  if (itemType) query = query.eq('item_type', itemType as string)
   const { data, error } = await query
   if (error || !data) return []
   return data.map(dbRowToListing)

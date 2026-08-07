@@ -4,16 +4,16 @@ import { authRequest, jsonResponse, sanitizeUser, isSameDay } from '@/lib/auth'
 
 export const runtime = 'edge'
 
-// 每日签到奖励：连续签到递增，第7天翻倍
+// 每日签到奖励：大幅降低金币，保留少量花瓣
 function getDailyReward(dayIndex: number /* 0..6 */): { coins: number; petals: number; label: string } {
   const cycle = [
-    { coins: 100, petals: 0 },
-    { coins: 150, petals: 1 },
-    { coins: 200, petals: 1 },
-    { coins: 300, petals: 2 },
-    { coins: 400, petals: 2 },
-    { coins: 600, petals: 3 },
-    { coins: 1000, petals: 10 }, // 第7天大奖励
+    { coins: 20, petals: 0 },
+    { coins: 30, petals: 0 },
+    { coins: 40, petals: 0 },
+    { coins: 50, petals: 1 },
+    { coins: 60, petals: 1 },
+    { coins: 80, petals: 2 },
+    { coins: 150, petals: 5 }, // 第7天大奖励
   ]
   const r = cycle[dayIndex % cycle.length] || cycle[0]
   const label = dayIndex === 6 ? '7天大奖' : `第${dayIndex + 1}天`
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const today = new Date()
     const checkedInToday = isSameDay(lastDay, today)
 
-    // 判断是否断签：若昨天未签到，且今天不是第一次签到（即 streak>0 且 lastCheckInAt 时间距离今天超过2天）
+    // 判断是否断签：若昨天未签到，则断签
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
     const lastCheckDay = new Date(lastCheckInAt)
@@ -43,16 +43,21 @@ export async function GET(req: NextRequest) {
     const streak = broken ? 0 : checkInStreak
 
     // 生成7天预览
+    const dayIdx = broken ? 0 : (checkInStreak % 7)
     const preview = Array.from({ length: 7 }).map((_, i) => {
       const reward = getDailyReward(i)
+      const claimed = broken
+        ? false
+        : checkedInToday
+          ? i < dayIdx
+          : i < dayIdx
       return {
         day: i + 1,
         coins: reward.coins,
         petals: reward.petals,
         label: reward.label,
-        // 已领取的：假设 streak 表示已领取天数
-        claimed: i < (broken ? 0 : streak % 7) && (checkedInToday ? i < (streak % 7 === 0 && streak > 0 ? 7 : streak % 7) : i < (streak % 7)),
-        today: i === ((broken ? 0 : streak) % 7),
+        claimed,
+        today: !checkedInToday && i === dayIdx,
       }
     })
 
@@ -110,13 +115,19 @@ export async function POST(req: NextRequest) {
     const newlyUnlocked: string[] = []
     const totalAll = (u.totalCheckinDaysAccum || 0) + 1  // 总签到天数
     patch.totalCheckinDaysAccum = totalAll
+    const newTitles = Array.isArray((u as any).titles) ? [...(u as any).titles] : []
     for (const a of ACHIEVEMENTS) {
       if (!achieves[a.k] && totalAll >= a.need) {
         achieves[a.k] = { unlockedAt: now }
         newlyUnlocked.push(a.k)
+        if (a.k === 'checkin_1day' && !newTitles.includes('newbie')) newTitles.push('newbie')
+        if (a.k === 'checkin_7day' && !newTitles.includes('checkin_dragon')) newTitles.push('checkin_dragon')
+        if (a.k === 'checkin_30day' && !newTitles.includes('expert')) newTitles.push('expert')
+        if (a.k === 'checkin_100day' && !newTitles.includes('master')) newTitles.push('master')
       }
     }
     if (newlyUnlocked.length > 0) patch.achievements = achieves
+    if (newTitles.length > 0) patch.titles = newTitles
 
     const updated = await updateUser(u.id, patch)
 

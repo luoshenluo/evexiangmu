@@ -123,7 +123,14 @@ export default function AdminMarketPanel() {
   }
 
   const createListing = async () => {
-    if (!newRefId || !newName || !newPrice || !newQty) return showToast('请填写完整', 'error')
+    if (!newName || !newPrice || !newQty) return showToast('请填写名称、价格和数量', 'error')
+    // 自动生成 referenceId（如果没有手动指定）
+    let refId = newRefId.trim()
+    if (!refId) {
+      const prefix = newItemType === 'flower' ? 'flower' : newItemType === 'seed' ? 'seed' : 'tool'
+      refId = `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+      setNewRefId(refId)
+    }
     setLoading(true)
     try {
       const res = await apiFetch('/api/admin/market', {
@@ -131,7 +138,7 @@ export default function AdminMarketPanel() {
         body: JSON.stringify({
           mode: 'create-official-listing',
           itemType: newItemType,
-          referenceId: newRefId,
+          referenceId: refId,
           name: newName,
           emoji: newEmoji,
           price: Number(newPrice),
@@ -507,23 +514,34 @@ export default function AdminMarketPanel() {
                 ))}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">图标</label>
-                <input className="input" value={newEmoji} maxLength={4} onChange={(e) => setNewEmoji(e.target.value)} placeholder="🌱" />
+                <label className="block text-sm font-medium mb-1 text-slate-700">图标（预设）</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['🌱','🌿','🌻','🌹','🌷','🌼','🌺','🍀','🌳','💧','🧪','🧴','⚡','🔧','🎁'].map((e) => (
+                    <button key={e} type="button" onClick={() => setNewEmoji(e)}
+                      className={classNames(
+                        'w-8 h-8 rounded-lg text-lg flex items-center justify-center border',
+                        newEmoji === e ? 'border-garden-500 bg-garden-50' : 'border-slate-200 hover:bg-slate-50'
+                      )}>{e}</button>
+                  ))}
+                  <input className="input w-20 !py-1 text-center text-base" maxLength={4} value={newEmoji} onChange={(e) => setNewEmoji(e.target.value)} placeholder="🌱" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1 text-slate-700">商品名称</label>
                 <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="如：郁金香种子" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">引用ID (referenceId)</label>
-                <input className="input font-mono text-xs" value={newRefId} onChange={(e) => setNewRefId(e.target.value)} placeholder="seed_tulip" />
+                <label className="block text-sm font-medium mb-1 text-slate-700">引用ID <span className="text-xs text-slate-400 font-normal">（留空自动生成）</span></label>
+                <input className="input font-mono text-xs" value={newRefId} onChange={(e) => setNewRefId(e.target.value)} placeholder="自动生成" />
               </div>
-              {newItemType === 'flower' && (
+              {newItemType !== 'tool' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700">等级 Rank</label>
-                  <select value={newRank} onChange={(e) => { setNewRank(Number(e.target.value)); flowerPreset(newRefId) }}
+                  <label className="block text-sm font-medium mb-1 text-slate-700">
+                    {newItemType === 'flower' ? '花朵等级 Rank' : '种子等级'}
+                  </label>
+                  <select value={newRank} onChange={(e) => setNewRank(Number(e.target.value))}
                     className="input">
-                    {[1,2,3,4,5,6,7].map((r) => <option key={r} value={r}>Rank {r}</option>)}
+                    {[1,2,3,4,5,6,7].map((r) => <option key={r} value={r}>{r} 级</option>)}
                   </select>
                 </div>
               )}

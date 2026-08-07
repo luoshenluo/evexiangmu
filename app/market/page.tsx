@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { FLOWER_TYPES, SEED_TYPES, RankNames, RankColors, getFlowerSellPrice } from '@/lib/game-data'
+import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES, RankNames, RankColors, getFlowerSellPrice } from '@/lib/game-data'
 import type { MarketListing, BuyOrder, InventoryItem } from '@/lib/types'
-import { ShoppingCart, Tag, Download, Flower2, Leaf, Search, ArrowRightLeft, Coins, Plus, X, Minus, ShoppingBag, MessageCircle, Trash2 } from 'lucide-react'
+import { ShoppingCart, Tag, Download, Flower2, Leaf, Search, ArrowRightLeft, Coins, Plus, X, Minus, ShoppingBag, MessageCircle, Trash2, Sparkles } from 'lucide-react'
 
-type Tab = 'flower' | 'seed' | 'buy' | 'sell'
+type Tab = 'flower' | 'seed' | 'tool' | 'buy' | 'sell'
 
 export default function MarketPage() {
   const { user, updateUser, showToast, isGuest } = useAppStore()
@@ -33,9 +33,10 @@ export default function MarketPage() {
   const [subTab, setSubTab] = useState<'listings' | 'orders' | 'create'>('listings')
 
   const refresh = async () => {
-    const [fRes, sRes, oRes, myLRes, myORes] = await Promise.all([
+    const [fRes, sRes, tRes, oRes, myLRes, myORes] = await Promise.all([
       apiFetch('/api/market/listings?type=flower'),
       apiFetch('/api/market/listings?type=seed'),
+      apiFetch('/api/market/listings?type=tool'),
       apiFetch('/api/market/buy-orders'),
       user && !isGuest ? apiFetch('/api/market/my?kind=listings') : { data: [] },
       user && !isGuest ? apiFetch('/api/market/my?kind=orders') : { data: [] },
@@ -43,6 +44,7 @@ export default function MarketPage() {
     const allListings = [
       ...(fRes.data || []),
       ...(sRes.data || []),
+      ...(tRes.data || []),
     ] as MarketListing[]
     setListings(allListings)
     setBuyOrders((oRes.data || []) as BuyOrder[])
@@ -206,12 +208,12 @@ export default function MarketPage() {
     } finally { setLoading(null) }
   }
 
-  const renderListingList = (type: 'flower' | 'seed') => {
+  const renderListingList = (type: 'flower' | 'seed' | 'tool') => {
     let items = listings.filter(l => l.itemType === type)
     if (categoryFilter) items = items.filter(l => l.referenceId === categoryFilter)
     if (search) items = items.filter(l => l.name.includes(search))
 
-    const categories = type === 'flower' ? FLOWER_TYPES : SEED_TYPES
+    const categories = type === 'flower' ? FLOWER_TYPES : type === 'seed' ? SEED_TYPES : TOOL_TYPES
 
     return (
       <div>
@@ -253,7 +255,9 @@ export default function MarketPage() {
                   'w-14 h-14 rounded-xl flex items-center justify-center text-3xl flex-shrink-0',
                   type === 'flower'
                     ? 'bg-gradient-to-br from-pink-50 to-rose-100'
-                    : 'bg-gradient-to-br from-garden-50 to-emerald-100'
+                    : type === 'seed'
+                    ? 'bg-gradient-to-br from-garden-50 to-emerald-100'
+                    : 'bg-gradient-to-br from-amber-50 to-orange-100'
                 )}>
                   {item.emoji}
                 </div>
@@ -338,10 +342,11 @@ export default function MarketPage() {
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+      <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
         {([
           { key: 'flower', label: '鲜花', icon: Flower2 },
           { key: 'seed', label: '种子', icon: Leaf },
+          { key: 'tool', label: '工具', icon: Sparkles },
           { key: 'buy', label: '收购', icon: Download },
           { key: 'sell', label: '我的', icon: Tag },
         ] as const).map((t) => {
@@ -368,6 +373,7 @@ export default function MarketPage() {
       <div>
         {tab === 'flower' && renderListingList('flower')}
         {tab === 'seed' && renderListingList('seed')}
+        {tab === 'tool' && renderListingList('tool')}
         {tab === 'buy' && (
           <div className="space-y-2">
             <div className="text-xs text-slate-500 mb-2 px-1">

@@ -6,14 +6,14 @@ import { logger } from '@/lib/logger'
 export const runtime = 'edge'
 
 const TASK_TEMPLATES: any[] = [
-  { id: 't_daily_1', type: 'daily', title: '登录游戏', description: '今日首次登录游戏', target: 1, rewards: { coins: 20 } },
-  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵3次', target: 3, rewards: { coins: 30 } },
-  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获任意 2 朵花', target: 2, rewards: { coins: 50, items: [{ referenceId: 'seed_rose', type: 'seed', quantity: 1 }] } },
-  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, rewards: { coins: 40 } },
-  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, rewards: { coins: 20 } },
-  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, rewards: { coins: 200, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 2 }] } },
-  { id: 't_weekly_2', type: 'weekly', title: '周常·富豪', description: '累计获得 500 金币', target: 500, rewards: { coins: 100 } },
-  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, rewards: { coins: 1000, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 5 }] } },
+  { id: 't_daily_1', type: 'daily', title: '登录游戏', description: '今日首次登录游戏', target: 1, rewards: { coins: 10 } },
+  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵3次', target: 3, rewards: { coins: 15 } },
+  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获任意 2 朵花', target: 2, rewards: { coins: 25, items: [{ referenceId: 'seed_rose', type: 'seed', quantity: 1 }] } },
+  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, rewards: { coins: 20 } },
+  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, rewards: { coins: 10 } },
+  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, rewards: { coins: 80, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 1 }] } },
+  { id: 't_weekly_2', type: 'weekly', title: '周常·富豪', description: '累计获得 500 金币', target: 500, rewards: { coins: 50 } },
+  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, rewards: { coins: 300, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 3 }] } },
 ]
 
 function getPeriodStart(type: string): number {
@@ -39,7 +39,6 @@ function getTaskType(taskId: string): string {
 }
 
 function checkAndResetTasks(user: any): { progress: Record<string, number>; claimed: Record<string, boolean>; lastReset: Record<string, number> } {
-  const now = Date.now()
   const progress = { ...(user.taskProgress || {}) }
   const claimed = { ...(user.taskClaimed || {}) }
   const lastReset = { ...(user.taskLastReset || {}) }
@@ -50,7 +49,6 @@ function checkAndResetTasks(user: any): { progress: Record<string, number>; clai
     const resetKey = type
 
     if (!lastReset[resetKey] || lastReset[resetKey] < periodStart) {
-      // 周期已过，重置该类型下所有任务
       const taskTypePrefix = type === 'daily' ? 't_daily_' : type === 'weekly' ? 't_weekly_' : 't_monthly_'
       for (const key of Object.keys(progress)) {
         if (key.startsWith(taskTypePrefix)) {
@@ -58,7 +56,7 @@ function checkAndResetTasks(user: any): { progress: Record<string, number>; clai
           delete claimed[key]
         }
       }
-      lastReset[resetKey] = now
+      lastReset[resetKey] = periodStart
     }
   }
 

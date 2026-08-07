@@ -23,7 +23,10 @@ export default function FamilyPage() {
   const [editName, setEditName] = useState('')
   const [editAnnouncement, setEditAnnouncement] = useState('')
   const [editAvatar, setEditAvatar] = useState('🏰')
-  const [tab, setTab] = useState<'info' | 'members' | 'list'>('info')
+  const [tab, setTab] = useState<'info' | 'members' | 'game' | 'list'>('info')
+  const [contribAmount, setContribAmount] = useState(10)
+  const [familyTasks, setFamilyTasks] = useState<any[]>([])
+  const [myContribution, setMyContribution] = useState(0)
 
   const AVATAR_OPTIONS = ['🏰', '🌸', '🌻', '🌹', '🌺', '🌼', '🌿', '🍀', '🌳', '🌴', '🎋', '🎍', '⛩️', '🏡', '🌈', '⭐']
 
@@ -38,6 +41,8 @@ export default function FamilyPage() {
           const uRes = await apiFetch('/api/user/me')
           if (uRes.success) updateUser({ ...uRes.data, familyId: null })
         }
+        const tRes = await apiFetch('/api/family?action=tasks')
+        if (tRes.success) setFamilyTasks(tRes.data || [])
       }
       const lRes = await apiFetch(`/api/family?action=list&kw=${encodeURIComponent(searchName)}`)
       if (lRes.success) setFamilyList(lRes.data || [])
@@ -336,9 +341,10 @@ export default function FamilyPage() {
           </div>
 
           {/* Tabs */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl">
+          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl">
             {([
               { k: 'info', label: '总览' },
+              { k: 'game', label: '家族玩法' },
               { k: 'members', label: `成员 (${family.members?.length || 0})` },
               { k: 'list', label: '家族榜' },
             ] as const).map((t) => (
@@ -378,6 +384,135 @@ export default function FamilyPage() {
               >
                 <LogOut size={16} /> 退出家族
               </button>
+            </div>
+          )}
+
+          {tab === 'game' && (
+            <div className="space-y-4">
+              {/* 家族许愿池 */}
+              <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Coins size={16} className="text-amber-600" />
+                  <h3 className="font-bold text-slate-800 text-sm">家族许愿池</h3>
+                </div>
+                <div className="text-xs text-slate-600 mb-3">向家族贡献金币，换取家族经验；贡献最多的成员每周可获得额外奖励。</div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs text-slate-600">贡献：</span>
+                  {[5, 10, 50, 100, 500].map(n => (
+                    <button key={n} onClick={() => setContribAmount(n)}
+                      className={classNames(
+                        'px-2 py-1 rounded-lg text-xs font-bold',
+                        contribAmount === n ? 'bg-amber-500 text-white' : 'bg-white text-amber-700 border border-amber-200'
+                      )}>{n} 💰</button>
+                  ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!user) return
+                    if (user.coins < contribAmount) { showToast('金币不足', 'error'); return }
+                    try {
+                      const r = await apiFetch('/api/family', {
+                        method: 'POST',
+                        body: JSON.stringify({ mode: 'contribute', amount: contribAmount }),
+                      })
+                      if (r.success) {
+                        showToast(`贡献 ${contribAmount} 金币成功，获得 ${Math.floor(contribAmount / 10)} 家族经验`, 'success')
+                        updateUser(r.data?.user)
+                        setRefreshKey(k => k + 1)
+                      } else showToast(r.error || '贡献失败', 'error')
+                    } catch (e: any) { showToast(e.message || '出错', 'error') }
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm shadow hover:shadow-md transition-all"
+                >
+                  贡献 {contribAmount} 金币
+                </button>
+              </div>
+
+              {/* 家族任务 */}
+              <div className="card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <Trophy size={16} className="text-purple-500" /> 家族集体任务
+                  </h3>
+                  <span className="text-[11px] text-slate-500">所有成员共同完成</span>
+                </div>
+                {familyTasks.length === 0 ? (
+                  <div className="text-center text-slate-400 text-sm py-6">加载中...</div>
+                ) : (
+                  <div className="space-y-2">
+                    {familyTasks.map((t: any) => {
+                      const percent = Math.min(100, (t.progress / t.target) * 100)
+                      const claimed = t.claimedBy?.includes(user?.id)
+                      return (
+                        <div key={t.id} className="p-3 rounded-xl bg-slate-50">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1">
+                              <div className="font-bold text-sm text-slate-800">{t.title}</div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">{t.desc}</div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-[10px] text-slate-500">奖励</div>
+                              <div className="text-xs font-bold text-amber-600">{t.rewardCoins} 💰</div>
+                            </div>
+                          </div>
+                          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-2">
+                            <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full" style={{ width: `${percent}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500">
+                              {formatNumber(t.progress)} / {formatNumber(t.target)}
+                              {t.progress >= t.target && <span className="ml-1 text-emerald-600 font-bold">已达成！</span>}
+                            </span>
+                            {t.progress >= t.target && (
+                              <button
+                                disabled={claimed}
+                                onClick={async () => {
+                                  try {
+                                    const r = await apiFetch('/api/family', {
+                                      method: 'POST',
+                                      body: JSON.stringify({ mode: 'claim-task', taskId: t.id }),
+                                    })
+                                    if (r.success) {
+                                      showToast(`领取奖励 +${t.rewardCoins} 金币`, 'success')
+                                      updateUser(r.data?.user)
+                                      setRefreshKey(k => k + 1)
+                                    } else showToast(r.error || '领取失败', 'error')
+                                  } catch (e: any) { showToast(e.message || '出错', 'error') }
+                                }}
+                                className={classNames(
+                                  'px-3 py-1 rounded-lg text-xs font-bold',
+                                  claimed ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                )}
+                              >
+                                {claimed ? '已领取' : '领取奖励'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 我的贡献 */}
+              <div className="card p-4">
+                <h3 className="font-bold text-slate-800 text-sm mb-2 flex items-center gap-2">
+                  <Gift size={16} className="text-pink-500" /> 我的贡献
+                </h3>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 p-3 rounded-xl bg-gradient-to-br from-pink-50 to-rose-50">
+                    <div className="text-[11px] text-slate-500">累计贡献</div>
+                    <div className="text-xl font-bold text-rose-600">
+                      {formatNumber((family.members?.find((m: any) => m.userId === user?.id)?.contribution) || 0)}
+                    </div>
+                  </div>
+                  <div className="flex-1 p-3 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50">
+                    <div className="text-[11px] text-slate-500">家族等级</div>
+                    <div className="text-xl font-bold text-blue-600">Lv.{family.level}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

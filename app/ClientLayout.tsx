@@ -14,6 +14,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     isAuthenticated, isGuest, isOffline,
     setGameState, setAnnouncements,
     enterGuest, setLastActiveAt, setOffline,
+    theme, gardenBg, setTheme, setGardenBg,
   } = useAppStore()
   const hasHydrated = useAppStore(s => s._hasHydrated)
   const [showLogin, setShowLogin] = useState(false)
@@ -27,8 +28,24 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       if (gsRes.success && gsRes.data) setGameState(gsRes.data)
       const annRes = await apiFetch('/api/announcements')
       if (annRes.success && annRes.data) setAnnouncements(annRes.data)
+      // 同步用户设置到 store
+      if (isAuthenticated) {
+        const settingsRes = await apiFetch('/api/user/settings')
+        if (settingsRes.success && settingsRes.data) {
+          const s = settingsRes.data
+          setTheme(s.theme || 'light')
+          setGardenBg(s.gardenBg || 'default')
+        }
+      }
     } catch {}
-  }, [setGameState, setAnnouncements])
+  }, [setGameState, setAnnouncements, isAuthenticated, setTheme, setGardenBg])
+
+  // 应用主题到 DOM
+  useEffect(() => {
+    const html = document.documentElement
+    if (theme === 'dark') html.classList.add('dark')
+    else html.classList.remove('dark')
+  }, [theme])
 
   // 初始化游戏状态 + 定时轮询（离线时暂停，节省资源）
   useEffect(() => {

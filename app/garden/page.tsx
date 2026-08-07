@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { SEASON_NAMES, SEASON_COLORS } from '@/lib/game-data'
+import { SEASON_NAMES, SEASON_COLORS, getSeasonByMonth } from '@/lib/game-data'
 import { Sun, Coins, Package, Bell, ChevronLeft, ChevronRight, Sparkles, Users } from 'lucide-react'
 import Plot from '@/components/Plot'
 import Link from 'next/link'
@@ -12,6 +12,7 @@ import type { Plot as PlotType } from '@/lib/types'
 export default function GardenPage() {
   const { user, updateUser, gameState, announcements, showToast, isGuest } = useAppStore()
   const gardenBg = useAppStore(s => s.gardenBg)  // 顶层 Hook（必须在任何 early return 之前）
+  const currentSeason = gameState?.currentSeason || getSeasonByMonth()
   const [page, setPage] = useState(0)
   const [tick, setTick] = useState(0)
   const [loaded, setLoaded] = useState(false)
@@ -95,7 +96,7 @@ export default function GardenPage() {
 
         {/* 季节 */}
         <div className={`card p-3 flex items-center gap-3 mb-4 bg-gradient-to-br ${
-          gameState ? SEASON_COLORS[gameState.currentSeason] : SEASON_COLORS.spring
+          SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
         } text-white`}>
           <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
             <Sun size={20} />
@@ -103,7 +104,7 @@ export default function GardenPage() {
           <div>
             <div className="text-[11px] opacity-80">当前季节</div>
             <div className="text-lg font-bold">
-              {gameState ? SEASON_NAMES[gameState.currentSeason] : '春季'}
+              {SEASON_NAMES[currentSeason] || '春季'}
             </div>
           </div>
         </div>
@@ -213,7 +214,7 @@ export default function GardenPage() {
           </div>
         </div>
         <div className={`card p-3 flex items-center gap-3 bg-gradient-to-br ${
-          gameState ? SEASON_COLORS[gameState.currentSeason] : SEASON_COLORS.spring
+          SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
         } text-white`}>
           <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
             <Sun size={20} />
@@ -221,7 +222,7 @@ export default function GardenPage() {
           <div>
             <div className="text-[11px] opacity-80">当前季节</div>
             <div className="text-lg font-bold">
-              {gameState ? SEASON_NAMES[gameState.currentSeason] : '春季'}
+              {SEASON_NAMES[currentSeason] || '春季'}
             </div>
           </div>
         </div>

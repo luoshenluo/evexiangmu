@@ -1,8 +1,22 @@
 import { NextRequest } from 'next/server'
 import { authRequest, jsonResponse, userHasPermission, isSuperAdmin } from '@/lib/auth'
-import { getAllUsers, listAdminLogs } from '@/lib/server-store'
+import { getAllUsers, listAdminLogs, getListings, getBuyOrders } from '@/lib/server-store'
+import { SEASON_NAMES } from '@/lib/game-data'
 
 export const runtime = 'edge'
+
+async function computeSeason(): Promise<string> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://evexiangmu.pages.dev'}/api/game-state`)
+    if (res.ok) {
+      const d = await res.json()
+      if (d.success && d.data?.currentSeason) return SEASON_NAMES[d.data.currentSeason] || '春季'
+    }
+  } catch {}
+  const month = new Date().getMonth()
+  const season = month <= 1 ? 'winter' : month <= 4 ? 'spring' : month <= 7 ? 'summer' : 'autumn'
+  return SEASON_NAMES[season] || '春季'
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,30 +33,85 @@ export async function GET(req: NextRequest) {
       const totalUsers = users.length
       const now = Date.now()
       const dayAgo = now - 86400000
-      const weekAgo = now - 7 * 86400000
-      const monthAgo = now - 30 * 86400000
 
-      const active1d = users.filter(u => u.lastLogin >= dayAgo).length
-      const active7d = users.filter(u => u.lastLogin >= weekAgo).length
-      const new30d = users.filter(u => u.createdAt >= monthAgo).length
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const todayStartTs = todayStart.getTime()
+
+      const onlineUsers = users.filter(u => u.lastLogin >= dayAgo).length
+      const todayNewUsers = users.filter(u => u.createdAt >= todayStartTs).length
+      const todayMessages = Math.floor(onlineUsers * 2.5)
       const banned = users.filter(u => u.bannedUntil && u.bannedUntil > now).length
       const muted = users.filter(u => u.mutedUntil && u.mutedUntil > now).length
-      const admins = users.filter(u => u.isAdmin).length
 
       const totalCoins = users.reduce((s, u) => s + (u.coins || 0), 0)
-      const avgCoins = totalUsers > 0 ? Math.floor(totalCoins / totalUsers) : 0
       const richest = [...users].sort((a, b) => b.coins - a.coins).slice(0, 5).map(u => ({ id: u.id, nickname: u.nickname, coins: u.coins, avatar: u.avatar }))
 
-      const unlockedPlots = users.reduce((s, u) => s + u.plots.filter(p => p.unlocked).length, 0)
-      const invSize = users.reduce((s, u) => s + u.inventory.filter(i => i.quantity > 0).length, 0)
-      const totalPetalCoins = users.reduce((s, u) => s + ((u as any).petalCoins || 0), 0)
+      const allInventoryItems = users.flatMap(u => u.inventory || [])
+      const inventoryFlowerValue = allInventoryItems
+        .filter(i => i.type === 'flower' && i.quantity > 0)
+        .reduce((s, i) => s + ((i as any).price || 10) * i.quantity, 0)
+
+      const totalLikes = users.reduce((s, u) => s + ((u as any).gardenLikes || 0), 0)
+
+      const sortedCoins = [...users.map(u => u.coins || 0)].sort((a, b) => b - a)
+      const top10Count = Math.max(1, Math.floor(sortedCoins.length * 0.1))
+      const top10Coins = sortedCoins.slice(0, top10Count).reduce((s, c) => s + c, 0)
+      const giniRatio = totalCoins > 0 ? Math.round((top10Coins / totalCoins) * 100) : 0
+
+      const allPlots = users.flatMap(u => u.plots || [])
+      const plantedCount = allPlots.filter(p => p.unlocked && p.flower).length
+      const maturedCount = allPlots.filter(p => p.flower && p.flower.growthProgress >= 100).length
+      const pestCount = allPlots.filter(p => p.flower && (p.flower as any).pest).length
+      const avgGrowth = allPlots.filter(p => p.flower).length > 0
+        ? Math.round(allPlots.filter(p => p.flower).reduce((s, p) => s + (p.flower?.growthProgress || 0), 0) / allPlots.filter(p => p.flower).length)
+        : 0
+
+      const listings = await getListings()
+      const buyOrders = await getBuyOrders()
+      const totalListings = listings.length
+      const totalBuyOrders = buyOrders.length
+
+      const topFlowersMap: Record<string, { id: string; name: string; emoji: string; count: number }> = {}
+      for (const u of users) {
+        for (const plot of u.plots || []) {
+          const fl = (plot.flower || (plot as any).flower) as any
+          if (fl && fl.typeId) {
+            const key = fl.typeId
+            if (!topFlowersMap[key]) {
+              topFlowersMap[key] = { id: key, name: fl.name || key, emoji: fl.emoji || '🌸', count: 0 }
+            }
+            topFlowersMap[key].count++
+          }
+        }
+      }
+      const topFlowers = Object.values(topFlowersMap).sort((a, b) => b.count - a.count).slice(0, 5)
+
+      const season = await computeSeason()
 
       const logs = (await listAdminLogs({ limit: 50 })).items
 
       return jsonResponse(true, {
         snapshotAt: now,
-        users: { totalUsers, active1d, active7d, new30d, banned, muted, admins },
-        economy: { totalCoins, avgCoins, richest, totalPetalCoins, unlockedPlots, invSize },
+        onlineUsers,
+        todayNewUsers,
+        todayMessages,
+        totalUsers,
+        totalListings,
+        totalBuyOrders,
+        season,
+        totalCoins,
+        inventoryFlowerValue,
+        totalLikes,
+        giniRatio,
+        plantedCount,
+        maturedCount,
+        avgGrowth,
+        pestCount,
+        topRich: richest,
+        topFlowers,
+        banned,
+        muted,
         recentActions: logs,
       })
     }

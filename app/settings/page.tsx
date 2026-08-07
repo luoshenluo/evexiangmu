@@ -199,18 +199,44 @@ export default function SettingsPage() {
           <MapPin size={16} className="text-amber-500" /> 个人称号
         </h3>
         <div>
-          <label className="block text-sm font-medium mb-1 text-slate-600 text-xs">自定义称号（12字以内，留空则不显示）</label>
-          <div className="flex gap-2">
-            <input className="input flex-1" maxLength={12}
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="例如：花园大神、种花新人" />
-            {(user as any).title && (
-              <button onClick={() => setTitle('')} className="px-3 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50">清空</button>
-            )}
-          </div>
+          <label className="block text-sm font-medium mb-1 text-slate-600 text-xs">从已解锁称号中选择（通过成就/CDK/活动获得）</label>
+          {(() => {
+            const owned = ((user as any)?.titles || []) as string[]
+            const OPTIONS = [
+              { k: '', name: '（不显示称号）' },
+              { k: 'newbie', name: '🌱 种花新人' },
+              { k: 'green_hand', name: '🌿 园艺新秀' },
+              { k: 'expert', name: '🌻 种花专家' },
+              { k: 'master', name: '🌹 花园大师' },
+              { k: 'legend', name: '👑 传奇园丁' },
+              { k: 'first_blood', name: '⚔️ 首战告捷' },
+              { k: 'wealthy', name: '💰 小富即安' },
+              { k: 'philanthropist', name: '🎁 慷慨之心' },
+              { k: 'checkin_dragon', name: '🐉 签到达人' },
+            ]
+            const granted = owned.length > 0 ? owned : ['newbie']
+            const list = OPTIONS.filter(o => o.k === '' || granted.includes(o.k))
+            return (
+              <div className="space-y-2">
+                <select
+                  className="input w-full"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                >
+                  {list.map(o => (
+                    <option key={o.k} value={o.k}>{o.name}</option>
+                  ))}
+                </select>
+                {owned.length === 0 && (
+                  <div className="text-[11px] text-amber-600">
+                    通过成就、活动或 CDK 解锁更多称号（例如连续签到/收获花朵/消费金币等）
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           <div className="mt-2 text-xs text-slate-500">
-            效果预览：<span className="chip bg-amber-100 text-amber-700">{title || '（无称号）'}</span>
+            效果预览：<span className="chip bg-amber-100 text-amber-700">{title ? (user as any)?.titles?.includes(title) ? title : '（未解锁）' : '（无称号）'}</span>
           </div>
         </div>
       </div>

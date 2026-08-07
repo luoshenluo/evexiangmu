@@ -48,6 +48,15 @@ export async function POST(req: NextRequest) {
     }
     if (body.title !== undefined) {
       if (typeof body.title !== 'string' || body.title.length > 12) return jsonResponse(false, null, '称号长度最多12字', 400)
+      // 称号必须是用户已解锁的称号（通过 CDK / 成就 / 活动获得）
+      const grantedTitles = Array.isArray((user as any).titles) ? ((user as any).titles as string[]) : []
+      const allowed = ['', 'newbie', 'green_hand', 'expert', 'master', 'legend', 'first_blood', 'wealthy', 'philanthropist', 'checkin_dragon']
+      if (body.title && !grantedTitles.includes(body.title)) {
+        return jsonResponse(false, null, '该称号尚未解锁，请通过成就、CDK或活动获得', 400)
+      }
+      if (body.title && !allowed.includes(body.title)) {
+        return jsonResponse(false, null, '称号不合法', 400)
+      }
       mode.title = body.title
     }
     if (Object.keys(mode).length === 0) return jsonResponse(false, null, '没有要更新的内容', 400)
