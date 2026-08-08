@@ -1783,23 +1783,13 @@ export async function getChatStats(): Promise<ChatStats> {
   const userCounter: Record<string, { userId: string; userName: string; count: number }> = {}
 
   try {
-    // Single query for all channels (more reliable than 3 separate queries)
-    // 使用 select('*') 避免列名不匹配（timestamp vs created_at）导致整查询失败
-    const { data, error } = await sb
-      .from('messages')
-      .select('*')
-      .in('channel', channels)
+    // 直接查询全部消息再在内存里过滤，避免 .in() 在某些 Edge 环境下返回空集
+    // （getRecentMessagesAllChannels 用 select('*') 能正常返回，这里保持一致）
+    const { data, error } = await sb.from('messages').select('*')
 
     if (error) {
       logger.warn('chat', `获取聊天统计查询错误: ${error.message}`)
-      // Fallback: try individual queries without channel filter（避免 .in 报错）
-      try {
-        const { data: allData } = await sb.from('messages').select('*')
-        if (allData) processChannelData(allData)
-      } catch (e2: any) {
-        logger.warn('chat', `获取聊天统计 fallback 失败: ${e2?.message}`)
-      }
-    } else if (data) {
+    } else if (data && Array.isArray(data)) {
       processChannelData(data)
     }
   } catch (e: any) {
