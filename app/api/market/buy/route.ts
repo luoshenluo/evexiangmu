@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick, createNotification } from '@/lib/server-store'
+import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOLS } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -67,7 +67,12 @@ export async function POST(req: NextRequest) {
     if (!listing.isOfficial && listing.sellerId !== 'system') {
       const seller = await findUserById(listing.sellerId)
       if (seller) {
-        await updateUser(seller.id, { coins: seller.coins + totalCost * 0.95 }) // 5% 手续费
+        const sellerCoins = Math.floor(totalCost * 0.95) // 5% 手续费
+        await updateUser(seller.id, { coins: seller.coins + sellerCoins })
+
+        // 卖家任务：贸易达人（日） + 周常富豪（累计获得金币）
+        try { await incrementTaskProgress(seller.id, 'trade', 1) } catch {}
+        try { if (sellerCoins > 0) await incrementTaskProgress(seller.id, 'earn_coin', sellerCoins) } catch {}
       }
     }
 
@@ -93,6 +98,9 @@ export async function POST(req: NextRequest) {
       title: '🛒 购买成功',
       content: `购买了 ${listing.name} × ${quantity}，花费 ${totalCost} 💰`,
     })
+
+    // 买家任务：贸易达人（日）
+    try { await incrementTaskProgress(user.id, 'trade', 1) } catch {}
 
     return jsonResponse(true, { user: sanitizeUser(updatedUser), message: `购买成功！获得 ${listing.name} × ${quantity}` })
   } catch (e: any) {
