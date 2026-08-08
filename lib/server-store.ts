@@ -11,6 +11,7 @@ import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
   getPlotUnlockPrice, PEST_CONFIG, STEAL_CONFIG, rollPestSeverity,
   getFlowerSellPrice, getSeasonByMonth,
+  FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
 } from './game-data'
 import bcrypt from 'bcryptjs'
 
@@ -1085,6 +1086,8 @@ export async function createNotification(data: Omit<Notification, 'id' | 'create
 // ==================== 任务进度 ====================
 
 const TASK_INCREMENT_MAP: Record<string, string> = {
+  'login': 't_daily_1',
+  'daily_checkin': 't_daily_1',
   'plant': 't_daily_2',
   'water': 't_daily_2',
   'fertilize': 't_daily_2',
@@ -2104,17 +2107,10 @@ export async function getFriendProfiles(currentUserId: string): Promise<any[]> {
 
 // ==================== 家族系统（真实版） ====================
 
-const FAMILY_LEVEL_EXP = [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000]
-function getFamilyLevel(exp: number): number {
-  let lv = 1
-  for (let i = 1; i < FAMILY_LEVEL_EXP.length; i++) {
-    if (exp >= FAMILY_LEVEL_EXP[i]) lv = i + 1
-  }
-  return Math.min(lv, 10)
-}
-function getFamilyMaxMembers(level: number): number {
-  return 10 + (level - 1) * 10 // 1级10人，每级+10，10级100人
-}
+// 向后兼容：统一使用 game-data 中的共享阈值/算法，避免前后端不一致
+export { FAMILY_LEVEL_EXP }
+export const getFamilyLevel = calcFamilyLevel
+export const getFamilyMaxMembers = calcFamilyMaxMembers
 
 export async function getFamilies(keyword?: string, limit = 50): Promise<Family[]> {
   await seedDatabase()

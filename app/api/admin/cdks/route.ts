@@ -32,19 +32,30 @@ export async function POST(req: NextRequest) {
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
     if (!userHasPermission(admin, 3)) return jsonResponse(false, null, '无「CDK 管理」权限', 403)
 
-    const { count = 1, coins = 100, days = 30 } = await req.json()
+    const body = await req.json()
+    const count = Math.max(1, Math.min(100, Number(body.count || 1)))
+    const days = Math.max(1, Number(body.days || 30))
+
+    const rewards: CDK['rewards'] = {}
+    const coins = Number(body.coins || 0)
+    const petalCoins = Number(body.petalCoins || 0)
+    if (coins > 0) rewards.coins = coins
+    if (petalCoins > 0) rewards.petalCoins = petalCoins
+    if (Array.isArray(body.titles) && body.titles.length > 0) rewards.titles = body.titles
+    if (Array.isArray(body.items) && body.items.length > 0) rewards.items = body.items
+
     const created: CDK[] = []
-    for (let i = 0; i < Math.min(count, 100); i++) {
+    for (let i = 0; i < count; i++) {
       created.push(await createCDK({
         code: genCDKCode(),
-        rewards: { coins },
-        maxUses: 1,
+        rewards,
+        maxUses: Math.max(1, Number(body.maxUses || 1)),
         usedCount: 0,
-        expiresAt: Date.now() + (days || 30) * 24 * 60 * 60 * 1000,
+        expiresAt: Date.now() + days * 24 * 60 * 60 * 1000,
         createdAt: Date.now(),
       }))
     }
-    return jsonResponse(true, { count: created.length, firstCode: created[0]?.code })
+    return jsonResponse(true, { count: created.length, codes: created.map(c => c.code), firstCode: created[0]?.code })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
   }

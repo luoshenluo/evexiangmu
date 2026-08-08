@@ -18,9 +18,78 @@ html, body {
   font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
 }
 
-body {
+/* ======= 主题：light（日间清新）默认 ======= */
+html[data-theme="light"] body {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 30%, #f1f5f9 100%);
+  background-attachment: fixed;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgb(226 232 240);
+  --btn-primary: #475569;
+  --btn-primary-hover: #334155;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  color: #0f172a;
+}
+
+/* ======= 主题：garden（花园翠绿） ======= */
+html[data-theme="garden"] body,
+html:not([data-theme]) body {
   background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 30%, #dcfce7 100%);
   background-attachment: fixed;
+  color: #052e16;
+}
+
+/* ======= 主题：sunset（暮光橙霞） ======= */
+html[data-theme="sunset"] body {
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 30%, #ffe4e6 100%);
+  background-attachment: fixed;
+  color: #7c2d12;
+}
+
+/* ======= 主题：ocean（海洋深蓝） ======= */
+html[data-theme="ocean"] body {
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 30%, #dbeafe 100%);
+  background-attachment: fixed;
+  color: #0c4a6e;
+}
+
+/* ======= 主题：dark（夜间模式） ======= */
+html.dark body,
+html[data-theme="dark"] body {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 30%, #020617 100%);
+  background-attachment: fixed;
+  color: #e2e8f0;
+}
+html.dark .card,
+html[data-theme="dark"] .card {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: #334155;
+  color: #f1f5f9;
+}
+html.dark .card h1, html.dark .card h2, html.dark .card h3, html.dark .card h4,
+html[data-theme="dark"] .card h1, html[data-theme="dark"] .card h2, html[data-theme="dark"] .card h3, html[data-theme="dark"] .card h4 {
+  color: #f1f5f9;
+}
+html.dark .input,
+html[data-theme="dark"] .input {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: #475569;
+  color: #f8fafc;
+}
+html.dark .input::placeholder,
+html[data-theme="dark"] .input::placeholder { color: #64748b; }
+html.dark .btn-secondary,
+html[data-theme="dark"] .btn-secondary {
+  background: rgba(30, 41, 59, 0.9);
+  color: #f1f5f9;
+  border-color: #475569;
+}
+html.dark .text-slate-500, html.dark .text-slate-600, html.dark .text-slate-700, html.dark .text-slate-800,
+html[data-theme="dark"] .text-slate-500, html[data-theme="dark"] .text-slate-600, html[data-theme="dark"] .text-slate-700, html[data-theme="dark"] .text-slate-800 {
+  color: #cbd5e1 !important;
+}
+
+body {
   min-height: 100vh;
 }
 
@@ -96,53 +165,4 @@ body {
 }
 .shake-anim {
   animation: shake 0.3s infinite;
-}
-
-/* 幼苗/花苞摇曳动画 - 生长中 */
-@keyframes sway {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
-}
-.sway-anim {
-  animation: sway 2.5s ease-in-out infinite;
-  transform-origin: bottom center;
-}
-
-/* 聊天弹入 */
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-.slide-up {
-  animation: slideUp 0.3s ease-out;
-}
-
-/* 金币增加动画 */
-@keyframes coinBounce {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); color: #facc15; }
-  100% { transform: scale(1); }
-}
-.coin-bounce {
-  animation: coinBounce 0.5s ease;
-}
-
-/* Toast 动画 */
-@keyframes toastIn {
-  from { transform: translateY(-20px) scale(0.95); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
-}
-.toast-anim {
-  animation: toastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* 加载骨架 */
-.skeleton {
-  background: linear-gradient(90deg, #f0fdf4 25%, #dcfce7 50%, #f0fdf4 75%);
-  background-size: 200% 100%;
-  animation: skeleton 1.5s infinite;
-}
-@keyframes skeleton {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }

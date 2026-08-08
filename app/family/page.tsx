@@ -3,9 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { Users, Plus, Shield, Trophy, LogOut, Coins, LogIn, Search, X, Crown, Edit, Settings, UserCheck, UserX, ChevronUp, Gift } from 'lucide-react'
+import { Users, Plus, Shield, Trophy, LogOut, Coins, LogIn, Search, X, Crown, Edit, Settings, UserCheck, UserX, ChevronUp, Gift, AlertTriangle } from 'lucide-react'
+import { FAMILY_LEVEL_EXP, FAMILY_MAX_LEVEL } from '@/lib/game-data'
 
 type MemberRole = 'owner' | 'admin' | 'member'
+
+// 共享升级阈值：LEVEL_THOLDS[i] = 达到 Lv(i+1) 所需最小 exp
+const LEVEL_THOLDS: number[] = Array.isArray(FAMILY_LEVEL_EXP) ? FAMILY_LEVEL_EXP : [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000]
 
 export default function FamilyPage() {
   const { user, updateUser, showToast } = useAppStore()
@@ -34,20 +38,47 @@ export default function FamilyPage() {
     if (!user) return
     try {
       if (user.familyId) {
-        const res = await apiFetch('/api/family?action=detail')
-        if (res.success) setFamily(res.data)
-        else {
-          // 家族不存在或已退出，清空 familyId
-          const uRes = await apiFetch('/api/user/me')
-          if (uRes.success) updateUser({ ...uRes.data, familyId: null })
+        try {
+          const res = await apiFetch('/api/family?action=detail')
+          if (res.success && res.data) {
+            setFamily(res.data)
+          } else {
+            // 家族不存在或被踢出/解散 → 立即清空脏的 familyId，避免永远卡"加载中"
+            setFamily(null)
+            try {
+              const uRes = await apiFetch('/api/user/me')
+              if (uRes.success && uRes.data) {
+                updateUser({ ...uRes.data, familyId: null })
+              } else {
+                updateUser({ familyId: null } as any)
+              }
+            } catch {
+              updateUser({ familyId: null } as any)
+            }
+            if (res.error && res.error !== '你还未加入家族') {
+              showToast(`家族状态异常：${res.error}，已刷新`, 'info')
+            }
+          }
+          // 即便失败也尝试拉家族任务
+          try {
+            const tRes = await apiFetch('/api/family?action=tasks')
+            if (tRes.success) setFamilyTasks(tRes.data || [])
+          } catch {/* 任务可空 */}
+        } catch (detailErr: any) {
+          // detail 接口抛出的异常（网络/401等），统一兜底
           setFamily(null)
+          updateUser({ familyId: null } as any)
         }
-        const tRes = await apiFetch('/api/family?action=tasks')
-        if (tRes.success) setFamilyTasks(tRes.data || [])
       }
-      const lRes = await apiFetch(`/api/family?action=list&kw=${encodeURIComponent(searchName)}`)
-      if (lRes.success) setFamilyList(lRes.data || [])
-    } catch (e) { /* noop */ }
+      try {
+        const lRes = await apiFetch(`/api/family?action=list&kw=${encodeURIComponent(searchName)}`)
+        if (lRes.success) setFamilyList(lRes.data || [])
+        else setFamilyList([])
+      } catch { setFamilyList([]) }
+    } catch (e: any) {
+      setFamily(null)
+      setFamilyList([])
+    }
   }
 
   useEffect(() => { refresh() }, [user, refreshKey, searchName])
@@ -162,13 +193,21 @@ export default function FamilyPage() {
   }
 
   const expToNext = family ? (() => {
-    const lv = family.level
-    const thresholds = [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000, 999999]
-    const cur = thresholds[lv - 1] || 0
-    const next = thresholds[lv] || cur
-    const have = family.exp - cur
-    const need = next - cur
-    return { have, need, percent: need <= 0 ? 100 : Math.max(0, Math.min(100, (have / need) * 100)) }
+    const lv = Math.min(Math.max(1, family.level | 0), FAMILY_MAX_LEVEL)
+    const len = LEVEL_THOLDS.length
+    if (lv >= FAMILY_MAX_LEVEL || family.exp >= LEVEL_THOLDS[len - 1]) {
+      return { have: 0, need: 0, percent: 100, maxed: true }
+    }
+    // LEVEL_THOLDS: idx=0 -> 0 (Lv1起点), idx=1 -> 100 (Lv2起点)
+    const curStart = LEVEL_THOLDS[Math.min(lv - 1, len - 1)] || 0
+    const nextStart = LEVEL_THOLDS[Math.min(lv, len - 1)] || curStart
+    const have = Math.max(0, family.exp - curStart)
+    const need = Math.max(1, nextStart - curStart)
+    return {
+      have, need,
+      percent: Math.max(0, Math.min(100, (have / need) * 100)),
+      maxed: false,
+    }
   })() : null
 
   // =============== 渲染 ===============
@@ -317,7 +356,7 @@ export default function FamilyPage() {
                 </div>
                 <div className="text-xs opacity-80 mt-1">族长：{family.ownerName} · {family.members?.length || 0}/{family.maxMembers} 人</div>
                 {/* 经验条 */}
-                {expToNext && family.level < 10 && (
+                {expToNext && !expToNext.maxed && (
                   <div className="mt-3">
                     <div className="flex justify-between text-[11px] opacity-80 mb-1">
                       <span>家族经验</span>
@@ -329,6 +368,11 @@ export default function FamilyPage() {
                         style={{ width: `${expToNext.percent}%` }}
                       />
                     </div>
+                  </div>
+                )}
+                {expToNext && expToNext.maxed && (
+                  <div className="mt-3 text-[11px] opacity-80 flex items-center gap-1">
+                    <Crown size={12} /> 家族已达到最高 Lv.{FAMILY_MAX_LEVEL}
                   </div>
                 )}
               </div>

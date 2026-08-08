@@ -4,16 +4,39 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
 import { ADMIN_PERMISSIONS, userHasPermission, isSuperAdmin as _isSuperAdmin } from '@/lib/auth'
+import { SEED_TYPES, FLOWER_TYPES, TOOLS } from '@/lib/game-data'
+import type { ItemType } from '@/lib/types'
 import {
   Settings, Users, MessageSquare, TrendingUp, Gift, Coins, Tag, Plus, X,
   Search, Ban, Crown, Shield, AlertCircle, Bell, Trash2, Edit, Key,
-  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf
+  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf, Flower2, Medal, Sparkles, Hammer
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 import ChatManagement from '@/components/admin/ChatManagement'
 import SensitiveWords from '@/components/admin/SensitiveWords'
 import ChatSettingsPanel from '@/components/admin/ChatSettingsPanel'
 import AdminMarketPanel from '@/components/admin/AdminMarketPanel'
+
+// CDK 奖励物品行结构
+interface CDKItemReward {
+  referenceId: string
+  quantity: number
+  type: ItemType
+  name?: string
+  emoji?: string
+}
+
+const TITLE_OPTIONS: { key: string; label: string }[] = [
+  { key: 'newbie', label: '🌱 种花新人' },
+  { key: 'green_hand', label: '🌿 园艺新秀' },
+  { key: 'expert', label: '🌻 种花专家' },
+  { key: 'master', label: '🌹 花园大师' },
+  { key: 'legend', label: '👑 传奇园丁' },
+  { key: 'first_blood', label: '⚔️ 首战告捷' },
+  { key: 'wealthy', label: '💰 小富即安' },
+  { key: 'philanthropist', label: '🎁 慷慨之心' },
+  { key: 'checkin_dragon', label: '🐉 签到达人' },
+]
 
 type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'settings'
 
@@ -49,8 +72,15 @@ export default function AdminPage() {
 
   const [showCDKForm, setShowCDKForm] = useState(false)
   const [cdkCoins, setCdkCoins] = useState(0)
+  const [cdkPetalCoins, setCdkPetalCoins] = useState(0)
+  const [cdkTitles, setCdkTitles] = useState<string[]>([])
+  const [cdkItems, setCdkItems] = useState<CDKItemReward[]>([])
   const [cdkCount, setCdkCount] = useState(1)
   const [cdkDays, setCdkDays] = useState(30)
+  const [cdkMaxUses, setCdkMaxUses] = useState(1)
+  const [cdkItemTab, setCdkItemTab] = useState<'seed' | 'flower' | 'tool'>('seed')
+  const [cdkItemId, setCdkItemId] = useState('')
+  const [cdkItemQty, setCdkItemQty] = useState(1)
 
   const [loading, setLoading] = useState<string | null>(null)
   const [editingUser, setEditingUser] = useState<any>(null)
@@ -176,16 +206,51 @@ export default function AdminPage() {
 
   const genCDK = async () => {
     if (cdkCount < 1) return showToast('数量无效', 'error')
+    const hasReward = cdkCoins > 0 || cdkPetalCoins > 0 || cdkTitles.length > 0 || cdkItems.length > 0
+    if (!hasReward) return showToast('至少填写一种奖励', 'error')
     setLoading('cdk')
     const res = await apiFetch('/api/admin/cdks', {
       method: 'POST',
-      body: JSON.stringify({ count: cdkCount, coins: cdkCoins, days: cdkDays })
+      body: JSON.stringify({
+        count: cdkCount,
+        days: cdkDays,
+        maxUses: cdkMaxUses,
+        coins: cdkCoins,
+        petalCoins: cdkPetalCoins,
+        titles: cdkTitles,
+        items: cdkItems,
+      })
     })
     if (res.success) {
       showToast(`生成了 ${cdkCount} 个 CDK`, 'success')
-      setShowCDKForm(false); loadAll()
+      setShowCDKForm(false); setCdkCoins(0); setCdkPetalCoins(0); setCdkTitles([]); setCdkItems([])
+      loadAll()
     } else showToast(res.error || '生成失败', 'error')
     setLoading(null)
+  }
+
+  const addCDKItem = () => {
+    if (!cdkItemId || cdkItemQty < 1) return showToast('请选择物品和数量', 'error')
+    let name = ''
+    let emoji = ''
+    if (cdkItemTab === 'seed') {
+      const s = (SEED_TYPES as any[]).find(x => x.id === cdkItemId); if (s) { name = s.name; emoji = s.emoji || '🌱' }
+    } else if (cdkItemTab === 'flower') {
+      const f = (FLOWER_TYPES as any[]).find(x => x.id === cdkItemId); if (f) { name = f.name; emoji = f.emoji }
+    } else if (cdkItemTab === 'tool') {
+      const t = (TOOLS as any[]).find(x => x.id === cdkItemId); if (t) { name = t.name; emoji = t.emoji || '🧰' }
+    }
+    setCdkItems(prev => [...prev, {
+      referenceId: cdkItemId,
+      quantity: Number(cdkItemQty),
+      type: cdkItemTab as ItemType,
+      name, emoji,
+    }])
+    setCdkItemId(''); setCdkItemQty(1)
+  }
+
+  const toggleCdkTitle = (key: string) => {
+    setCdkTitles(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }
 
   const muteUser = async (userId: string, days: number) => {
@@ -784,7 +849,24 @@ export default function AdminPage() {
                       {cdks.map((c, idx) => (
                         <tr key={idx} className="border-t border-slate-100">
                           <td className="p-3 font-mono font-bold text-purple-600">{c.code}</td>
-                          <td className="p-3 text-slate-600">{c.rewards?.coins ? `${c.rewards.coins} 💰` : '-'}</td>
+                          <td className="p-3 text-slate-600">
+                            <div className="flex flex-wrap gap-1.5 text-xs">
+                              {c.rewards?.coins ? <span className="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">{c.rewards.coins} 💰</span> : null}
+                              {c.rewards?.petalCoins ? <span className="px-2 py-0.5 bg-pink-50 text-pink-700 rounded-full">{c.rewards.petalCoins} 🌸</span> : null}
+                              {c.rewards?.titles?.length ? c.rewards.titles.map((k: string, i: number) => {
+                                const t = TITLE_OPTIONS.find(o => o.key === k)
+                                return <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full">{t?.label || k}</span>
+                              }) : null}
+                              {c.rewards?.items?.length ? c.rewards.items.map((r: any, i: number) => (
+                                <span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full">
+                                  {r.emoji || '🎁'} {r.name || r.referenceId} ×{r.quantity}
+                                </span>
+                              )) : null}
+                              {!c.rewards?.coins && !c.rewards?.petalCoins && !(c.rewards?.titles?.length) && !(c.rewards?.items?.length) && (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-3 text-slate-600">{c.usedCount} / {c.maxUses}</td>
                           <td className="p-3 text-slate-600 text-xs">{c.expiresAt ? formatDateTime(c.expiresAt).slice(0, 16) : '永久'}</td>
                         </tr>
@@ -867,32 +949,130 @@ export default function AdminPage() {
       )}
 
       {showCDKForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowCDKForm(false)}>
-          <div className="card w-full max-w-md p-5 slide-up" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto" onClick={() => setShowCDKForm(false)}>
+          <div className="card w-full max-w-2xl p-5 slide-up my-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Gift size={20} className="text-purple-500" /> 生成 CDK</h2>
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Gift size={20} className="text-purple-500" /> 生成 CDK（支持所有游戏物品）</h2>
               <button onClick={() => setShowCDKForm(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
-            <div className="space-y-3">
+
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              {/* 基础参数 */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-slate-600">生成数量</label>
+                  <input type="number" min={1} max={100} className="input py-2" value={cdkCount} onChange={e => setCdkCount(Math.max(1, parseInt(e.target.value) || 1))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-slate-600">有效期 (天)</label>
+                  <input type="number" min={1} className="input py-2" value={cdkDays} onChange={e => setCdkDays(Math.max(1, parseInt(e.target.value) || 1))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-slate-600">最大使用次数</label>
+                  <input type="number" min={1} className="input py-2" value={cdkMaxUses} onChange={e => setCdkMaxUses(Math.max(1, parseInt(e.target.value) || 1))} />
+                </div>
+              </div>
+
+              {/* 货币奖励 */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700">数量</label>
-                  <input type="number" min={1} max={100} className="input" value={cdkCount} onChange={e => setCdkCount(Math.max(1, parseInt(e.target.value) || 1))} />
+                <div className="p-3 bg-yellow-50 rounded-xl">
+                  <label className="block text-xs font-medium mb-1 text-yellow-700 flex items-center gap-1"><Coins size={14} /> 金币</label>
+                  <input type="number" min={0} className="input py-2 bg-white" value={cdkCoins} onChange={e => setCdkCoins(Math.max(0, parseInt(e.target.value) || 0))} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-700">有效期 (天)</label>
-                  <input type="number" min={1} className="input" value={cdkDays} onChange={e => setCdkDays(Math.max(1, parseInt(e.target.value) || 1))} />
+                <div className="p-3 bg-pink-50 rounded-xl">
+                  <label className="block text-xs font-medium mb-1 text-pink-700 flex items-center gap-1"><Flower2 size={14} /> 花瓣</label>
+                  <input type="number" min={0} className="input py-2 bg-white" value={cdkPetalCoins} onChange={e => setCdkPetalCoins(Math.max(0, parseInt(e.target.value) || 0))} />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">金币奖励</label>
-                <input type="number" min={0} className="input" value={cdkCoins} onChange={e => setCdkCoins(Math.max(0, parseInt(e.target.value) || 0))} />
+
+              {/* 称号奖励 */}
+              <div className="p-3 bg-indigo-50 rounded-xl">
+                <label className="block text-xs font-medium mb-2 text-indigo-700 flex items-center gap-1"><Medal size={14} /> 称号（可多选）</label>
+                <div className="flex flex-wrap gap-2">
+                  {TITLE_OPTIONS.map(o => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      onClick={() => toggleCdkTitle(o.key)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-all ${cdkTitles.includes(o.key) ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="p-3 bg-purple-50 rounded-xl text-sm text-purple-700">
-                即将生成 <b>{cdkCount}</b> 个 CDK，每个奖励 <b>{cdkCoins} 💰</b>，有效期 <b>{cdkDays} 天</b>
+
+              {/* 物品奖励（种子/花卉/工具） */}
+              <div className="p-3 bg-emerald-50 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-emerald-700 flex items-center gap-1"><Sparkles size={14} /> 物品奖励：种子、花卉、工具</label>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {(['seed', 'flower', 'tool'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setCdkItemTab(t); setCdkItemId('') }}
+                      className={`text-xs py-2 rounded-xl font-medium transition-all flex items-center justify-center gap-1 ${cdkItemTab === t ? 'bg-emerald-600 text-white shadow' : 'bg-white text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                    >
+                      {t === 'seed' ? '🌱 种子' : t === 'flower' ? '🌸 花卉' : '🧰 工具'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-5 gap-2">
+                  <div className="col-span-3">
+                    <select
+                      value={cdkItemId}
+                      onChange={e => setCdkItemId(e.target.value)}
+                      className="input py-2 bg-white w-full"
+                    >
+                      <option value="">-- 选择{cdkItemTab === 'seed' ? '种子' : cdkItemTab === 'flower' ? '花卉' : '工具'} --</option>
+                      {(cdkItemTab === 'seed' ? (SEED_TYPES as any[]) : cdkItemTab === 'flower' ? (FLOWER_TYPES as any[]) : (TOOLS as any[])).map((it: any) => (
+                        <option key={it.id} value={it.id}>{it.emoji || '🎁'} {it.name} {it.id}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <input type="number" min={1} className="input py-2 bg-white" value={cdkItemQty} onChange={e => setCdkItemQty(Math.max(1, parseInt(e.target.value) || 1))} placeholder="数量" />
+                  </div>
+                  <div className="col-span-1">
+                    <button type="button" onClick={addCDKItem} className="btn-primary py-2 px-3 text-sm w-full flex items-center justify-center gap-1">
+                      <Plus size={14} /> 添加
+                    </button>
+                  </div>
+                </div>
+
+                {cdkItems.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {cdkItems.map((it, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-emerald-800 border border-emerald-200 text-xs">
+                        {it.emoji || '🎁'} {it.name || it.referenceId} ×{it.quantity}
+                        <button type="button" className="ml-1 hover:text-red-500" onClick={() => setCdkItems(p => p.filter((_, j) => j !== i))}>
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* 预览 */}
+              <div className="p-3 bg-purple-50 rounded-xl text-sm text-purple-700 space-y-1">
+                <div>即将生成 <b>{cdkCount}</b> 个 CDK，有效期 <b>{cdkDays} 天</b>，每个 CDK 可使用 <b>{cdkMaxUses}</b> 次</div>
+                <div className="text-xs opacity-90">
+                  奖励预览：
+                  {cdkCoins > 0 && <span className="mx-1">· {cdkCoins} 💰</span>}
+                  {cdkPetalCoins > 0 && <span className="mx-1">· {cdkPetalCoins} 🌸</span>}
+                  {cdkTitles.map(k => { const t = TITLE_OPTIONS.find(o => o.key === k); return <span key={k} className="mx-1">· {t?.label || k}</span> })}
+                  {cdkItems.map((it, i) => <span key={i} className="mx-1">· {it.emoji || '🎁'}{it.name || it.referenceId}×{it.quantity}</span>)}
+                  {cdkCoins <= 0 && cdkPetalCoins <= 0 && cdkTitles.length === 0 && cdkItems.length === 0 && <span className="opacity-70">（未设置任何奖励）</span>}
+                </div>
+              </div>
+
               <button onClick={genCDK} disabled={loading === 'cdk'} className="btn-primary w-full py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
-                {loading === 'cdk' ? '生成中...' : '确认生成'}
+                {loading === 'cdk' ? '生成中...' : '确认生成 CDK'}
               </button>
             </div>
           </div>

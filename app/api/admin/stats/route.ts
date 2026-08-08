@@ -1,21 +1,13 @@
 import { NextRequest } from 'next/server'
 import { authRequest, jsonResponse, userHasPermission, isSuperAdmin } from '@/lib/auth'
 import { getAllUsers, listAdminLogs, getListings, getBuyOrders } from '@/lib/server-store'
-import { SEASON_NAMES } from '@/lib/game-data'
+import { SEASON_NAMES, getCurrentSeason } from '@/lib/game-data'
 
 export const runtime = 'edge'
 
 async function computeSeason(): Promise<string> {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://evexiangmu.pages.dev'}/api/game-state`)
-    if (res.ok) {
-      const d = await res.json()
-      if (d.success && d.data?.currentSeason) return SEASON_NAMES[d.data.currentSeason] || '春季'
-    }
-  } catch {}
-  const month = new Date().getMonth()
-  const season = month <= 1 ? 'winter' : month <= 4 ? 'spring' : month <= 7 ? 'summer' : 'autumn'
-  return SEASON_NAMES[season] || '春季'
+  // 统一 8 小时 = 1 季规则，与前台 getCurrentSeason 一致
+  return SEASON_NAMES[getCurrentSeason()] || '春季'
 }
 
 export async function GET(req: NextRequest) {

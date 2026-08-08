@@ -10,6 +10,8 @@ import {
   updateFamilyInfo,
   getAllUsers,
   findUserById,
+  getFamilyLevel,
+  getFamilyMaxMembers,
 } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { createNotification } from '@/lib/server-store'
@@ -164,13 +166,9 @@ export async function POST(req: NextRequest) {
       // 增加家族经验（1金币=0.1经验，取整至少1）
       const expGain = Math.max(1, Math.floor(amount / 10))
       const newExp = (fam.exp || 0) + expGain
-      const levelUpThresholds = [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000, 999999]
-      let newLevel = fam.level
-      for (let i = levelUpThresholds.length - 1; i >= 0; i--) {
-        if (newExp >= levelUpThresholds[i]) { newLevel = i; break }
-      }
-      // 扩容：每升级增加 2 个成员上限，最多 50
-      const newMax = Math.min(50, 10 + Math.max(0, newLevel - 1) * 2)
+      const newLevel = getFamilyLevel(newExp)
+      // 扩容：Lv1=10人，每升级增加10人上限，Lv10=100人（百人）
+      const newMax = getFamilyMaxMembers(newLevel)
 
       // 更新用户贡献
       const newMembers = (fam.members || []).map((m: any) =>
@@ -195,7 +193,7 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           type: 'reward',
           title: '🎉 家族升级',
-          content: `家族已升级到 Lv.${newLevel}！`,
+          content: `家族已升级到 Lv.${newLevel}！成员上限提升至 ${newMax} 人。`,
         })
       }
       return jsonResponse(true, { user: updated ? sanitizeUser(updated) : null, expGained: expGain })

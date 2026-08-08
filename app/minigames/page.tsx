@@ -165,7 +165,7 @@ export default function MiniGamesPage() {
             <Gift size={40} className="text-white" />
           </div>
           <h2 className="font-bold text-lg mb-1 text-slate-800">请先登录</h2>
-          <p className="text-sm text-slate-500 mb-5">登录后即可参与小游戏赢取花瓣兑换金币</p>
+          <p className="text-sm text-slate-500 mb-5">登录后即可参与小游戏，消耗花瓣赢金币</p>
           <button onClick={() => setShowLogin(true)} className="btn-primary">登录 / 注册</button>
         </div>
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />}

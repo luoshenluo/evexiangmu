@@ -252,7 +252,9 @@ export interface CDK {
   code: string
   rewards: {
     coins?: number
-    items?: { referenceId: string; quantity: number; type: ItemType }[]
+    petalCoins?: number
+    titles?: string[] // 称号key：newbie/checkin_dragon/expert 等
+    items?: { referenceId: string; quantity: number; type: ItemType; name?: string; emoji?: string }[]
   }
   maxUses: number
   usedCount: number

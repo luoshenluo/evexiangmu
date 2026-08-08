@@ -89,7 +89,7 @@ export default function ProfilePage() {
     { icon: Award, label: '排行榜', tip: '查看全服排名', onClick: loadRanking, color: 'from-amber-400 to-orange-500' },
     { icon: ShieldAlert, label: '偷花记录', tip: '谁动了我的花', onClick: loadStealLogs, color: 'from-red-400 to-rose-600' },
     { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-purple-400 to-pink-500' },
-    { icon: Sparkles, label: '活动中心', tip: '小游戏每日福利', onClick: () => window.location.href = '/minigames', color: 'from-fuchsia-400 to-purple-600' },
+    { icon: Sparkles, label: '小游戏', tip: '转盘 & 猜大小，消耗花瓣赢金币', onClick: () => window.location.href = '/minigames', color: 'from-fuchsia-400 to-purple-600' },
     { icon: Users, label: '好友系统', tip: `${user?.friends?.length || 0}位好友`, onClick: () => window.location.href = '/friends', color: 'from-green-400 to-emerald-600' },
     { icon: HelpCircle, label: '帮助反馈', tip: '游戏介绍', onClick: () => setShowAnnouncements(true), color: 'from-slate-400 to-slate-600' },
   ]

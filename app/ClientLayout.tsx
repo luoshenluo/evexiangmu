@@ -40,12 +40,29 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     } catch {}
   }, [setGameState, setAnnouncements, isAuthenticated, setTheme, setGardenBg])
 
-  // 应用主题到 DOM
+  // 应用主题到 DOM：dataset.theme + dark class（全局 CSS 监听 html[data-theme]）
   useEffect(() => {
+    if (typeof document === 'undefined') return
     const html = document.documentElement
+    html.dataset.theme = theme || 'garden'
     if (theme === 'dark') html.classList.add('dark')
     else html.classList.remove('dark')
   }, [theme])
+
+  // 启动时立即从 Zustand 持久化中应用一次主题（避免 SSR 后默认绿）
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const html = document.documentElement
+    // store 的初始值（可能来自 user 或持久化）
+    const state = useAppStore.getState()
+    const initialTheme = state.theme || (state.user?.theme as any) || 'garden'
+    const initialBg = state.gardenBg || (state.user?.gardenBg as any) || 'default'
+    html.dataset.theme = initialTheme
+    if (initialTheme === 'dark') html.classList.add('dark')
+    else html.classList.remove('dark')
+    if (!state.theme) setTheme(initialTheme)
+    if (!state.gardenBg) setGardenBg(initialBg)
+  }, [setTheme, setGardenBg])
 
   // 初始化游戏状态 + 定时轮询（离线时暂停，节省资源）
   useEffect(() => {

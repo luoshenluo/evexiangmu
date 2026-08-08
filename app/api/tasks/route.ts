@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, findUserById } from '@/lib/server-store'
+import { updateUser, findUserById, incrementTaskProgress } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -67,6 +67,9 @@ export async function GET(req: NextRequest) {
   try {
     const user = await authRequest(req)
     if (!user) return jsonResponse(false, null, '请先登录', 401)
+
+    // 进入任务页时先推进一次登录任务（幂等：目标是 1，多次调用不会超过 target）
+    try { await incrementTaskProgress(user.id, 'login', 1) } catch {}
 
     // 从数据库获取最新用户数据，确保任务数据是最新的
     const freshUser = await findUserById(user.id)

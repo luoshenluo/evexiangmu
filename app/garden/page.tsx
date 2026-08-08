@@ -12,7 +12,8 @@ import type { Plot as PlotType } from '@/lib/types'
 export default function GardenPage() {
   const { user, updateUser, gameState, announcements, showToast, isGuest } = useAppStore()
   const gardenBg = useAppStore(s => s.gardenBg)  // 顶层 Hook（必须在任何 early return 之前）
-  const currentSeason = gameState?.currentSeason || getSeasonByMonth()
+  // 按月份优先计算季节，确保与真实天文季节一致，避免 DB 旧值导致不一致
+  const currentSeason = getSeasonByMonth()
   const [page, setPage] = useState(0)
   const [tick, setTick] = useState(0)
   const [loaded, setLoaded] = useState(false)

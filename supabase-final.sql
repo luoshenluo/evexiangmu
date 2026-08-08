@@ -310,15 +310,15 @@ insert into public.buy_orders (id, buyer_id, buyer_name, is_official, item_type,
    (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint - 40000::bigint)
 on conflict (id) do nothing;
 
--- 公告（来自你的原始脚本）
+-- 公告
 insert into public.announcements (id, title, content, priority, created_at) values
   ('ann_1', '🎉 欢迎来到花园！',
-   '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。初始赠送 200 金币和一些种子，快去你的花园看看吧！',
+   '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。完成签到和任务获取金币与花瓣奖励，解锁称号和外观，快去你的花园看看吧！',
    'urgent',
    (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint),
 
   ('ann_2', '📖 游戏玩法介绍',
-   E'1. 在花园中种植花朵，浇水施肥加速成长。\n2. 收获的花朵可以卖给系统或挂到市场。\n3. 解锁更多地块和背包格扩大经营。\n4. 和世界频道的玩家交流心得吧！',
+   E'1. 在花园中种植花朵，浇水、施肥、除虫、使用加速卡加速成长，注意虫灾哦。\n2. 收获的花朵可卖给系统，或在市场自由定价挂售/收购（支持花朵、种子、工具）。\n3. 解锁更多地块和背包格，使用工坊制作花束与培育珍稀品种。\n4. 完成每日/每周/每月任务和每日签到，获取金币与花瓣奖励。\n5. 加入家族：贡献金币、完成家族集体任务、升级家族、解锁更多成员名额。\n6. 小游戏：消耗花瓣玩幸运转盘和猜大小，赢取丰厚金币。\n7. 成就系统：连续签到、收获花朵、消费金币，解锁专属称号。\n8. 外观设置：切换界面主题与花园背景皮肤，打造专属花园。',
    'important',
    (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint - 3600000::bigint)
 on conflict (id) do nothing;

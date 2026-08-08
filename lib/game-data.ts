@@ -143,21 +143,36 @@ export const TOOLS: Tool[] = [
   },
 ]
 
-// 初始游戏状态 - 季节按月份自动计算，不再使用固定时长
+// 初始游戏状态 - 每8小时切换一个季度（现实 1 天 = 游戏内 4 季循环）
+export const SEASON_CYCLE_MS = 8 * 60 * 60 * 1000 // 8小时
+export const SEASON_ORDER: ('spring' | 'summer' | 'autumn' | 'winter')[] = ['spring', 'summer', 'autumn', 'winter']
+
 export const INITIAL_GAME_STATE: GameState = {
-  currentSeason: getSeasonByMonth(),
-  seasonStartAt: Date.now(),
-  seasonDuration: 30 * 24 * 60 * 60 * 1000, // 兜底
+  currentSeason: getCurrentSeason(),
+  seasonStartAt: getSeasonStartAt(),
+  seasonDuration: SEASON_CYCLE_MS,
 }
 
-// 按月份计算当前季节（天文季节简化版）
-export function getSeasonByMonth(): 'spring' | 'summer' | 'autumn' | 'winter' {
-  const month = new Date().getMonth()
-  if (month <= 1) return 'winter'
-  if (month <= 4) return 'spring'
-  if (month <= 7) return 'summer'
-  if (month <= 10) return 'autumn'
-  return 'winter'
+// 获取游戏内当前季节（现实8小时 = 游戏内 1 季，1天循环春夏秋冬）
+export function getCurrentSeason(): 'spring' | 'summer' | 'autumn' | 'winter' {
+  const now = Date.now()
+  const cycleIdx = Math.floor(now / SEASON_CYCLE_MS) % SEASON_ORDER.length
+  return SEASON_ORDER[cycleIdx]
+}
+
+// 兼容旧接口：别名，避免改大量调用点
+export const getSeasonByMonth = getCurrentSeason
+
+// 当前季度的起点时间戳
+export function getSeasonStartAt(): number {
+  const now = Date.now()
+  return Math.floor(now / SEASON_CYCLE_MS) * SEASON_CYCLE_MS
+}
+
+// 距离下一个季度的剩余毫秒数
+export function getSeasonRemainingMs(): number {
+  const now = Date.now()
+  return SEASON_CYCLE_MS - (now % SEASON_CYCLE_MS)
 }
 
 // 初始公告
@@ -165,14 +180,14 @@ export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   {
     id: 'announce_1',
     title: '🎉 欢迎来到花园！',
-    content: '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。完成签到和任务获取金币，快去你的花园看看吧！',
+    content: '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。完成签到和任务获取金币与花瓣奖励，解锁称号和外观，快去你的花园看看吧！',
     createdAt: Date.now(),
     priority: 'urgent',
   },
   {
     id: 'announce_2',
     title: '📖 游戏玩法介绍',
-    content: '1. 在花园中种植花朵，浇水施肥加速成长。\n2. 收获的花朵可以卖给系统或挂到市场自由定价。\n3. 解锁更多地块和背包格扩大经营规模。\n4. 完成每日任务和签到获取金币奖励。\n5. 加入家族与伙伴一起经营，参与家族任务。\n6. 在市场买卖花朵、种子和工具，体验自由交易。',
+    content: '1. 在花园中种植花朵，浇水、施肥、除虫、使用加速卡加速成长，注意虫灾哦。\n2. 收获的花朵可卖给系统，或在市场自由定价挂售/收购（支持花朵、种子、工具）。\n3. 解锁更多地块和背包格，使用工坊制作花束与培育珍稀品种。\n4. 完成每日/每周/每月任务和每日签到，获取金币与花瓣奖励。\n5. 加入家族：贡献金币、完成家族集体任务、升级家族、解锁更多成员名额。\n6. 小游戏：消耗花瓣玩幸运转盘和猜大小，赢取丰厚金币。\n7. 成就系统：连续签到、收获花朵、消费金币，解锁专属称号。\n8. 外观设置：切换界面主题与花园背景皮肤，打造专属花园。',
     createdAt: Date.now() - 3600000,
     priority: 'important',
   },
@@ -184,6 +199,22 @@ export const SEASON_NAMES: Record<string, string> = {
   summer: '夏季',
   autumn: '秋季',
   winter: '冬季',
+}
+
+// ===== 家族系统：等级/成员上限（前后端共享，避免不一致） =====
+export const FAMILY_LEVEL_EXP = [0, 100, 300, 700, 1500, 3000, 6000, 12000, 24000, 50000]
+export const FAMILY_MAX_LEVEL = 10
+/** 传入当前家族总exp，返回1-10级 */
+export function calcFamilyLevel(exp: number): number {
+  let lv = 1
+  for (let i = 1; i < FAMILY_LEVEL_EXP.length; i++) {
+    if (exp >= FAMILY_LEVEL_EXP[i]) lv = i + 1
+  }
+  return Math.min(lv, FAMILY_MAX_LEVEL)
+}
+/** Lv1=10人，每升级+10人；Lv10=100人（"最多百人"宣传文案对应） */
+export function calcFamilyMaxMembers(level: number): number {
+  return 10 + (Math.min(FAMILY_MAX_LEVEL, Math.max(1, level)) - 1) * 10
 }
 
 // 季节颜色

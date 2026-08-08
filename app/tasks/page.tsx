@@ -65,7 +65,7 @@ export default function TasksPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-800">任务中心</h1>
-            <p className="text-xs text-slate-500 mt-0.5">完成任务获取丰厚奖励</p>
+            <p className="text-xs text-slate-500 mt-0.5">完成任务获取奖励</p>
           </div>
         </div>
         <div className="card p-8 text-center text-slate-400 text-sm">
@@ -87,7 +87,7 @@ export default function TasksPage() {
           </div>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-slate-800">任务中心</h1>
-            <p className="text-xs text-slate-500 mt-0.5">完成任务获取丰厚奖励</p>
+            <p className="text-xs text-slate-500 mt-0.5">完成任务获取奖励</p>
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500">完成度</div>
