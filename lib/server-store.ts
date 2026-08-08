@@ -280,7 +280,12 @@ export async function listAdminLogs(options: {
 
 export async function seedDatabase(): Promise<void> {
   if (seedPromise) return seedPromise
-  seedPromise = doSeed()
+  // 失败时重置缓存，避免 isolate 内永久持有 rejected promise 导致后续全部请求失败
+  seedPromise = doSeed().catch((e) => {
+    seedPromise = null
+    logger.error('system', `seedDatabase 失败已重置缓存: ${e?.message || 'unknown'}`)
+    // 不抛出，让调用方继续走（各数据函数已有兜底）
+  })
   return seedPromise
 }
 
@@ -372,51 +377,16 @@ async function doSeed(): Promise<void> {
     logger.warn('system', `检测 users 列名失败: ${e?.message || 'unknown'}`)
   }
 
-  // 检查是否已有用户
-  const { data: allUsers, error: listErr } = await sb.from('users').select('id, plots, inventory, is_admin, task_progress, task_claimed, task_last_reset')
+  // 轻量存在性检查：只取 id 判断是否已有用户，避免拉取重量级 JSONB 列导致 Edge 超时
+  // 注意：空 plots / 缺失 task 字段等已在 dbRowToUser 读取层用 || [] / || {} 兜底，无需在 seed 阶段逐条 UPDATE 修复
+  const { data: existingIds, error: listErr } = await sb.from('users').select('id').limit(1)
   if (listErr) {
     logger.error('system', '查询用户列表失败', { error: listErr.message })
     return
   }
 
-  // 修复：对已有用户检查并修复空 plots + 缺失任务字段
-  if (allUsers && allUsers.length > 0) {
-    for (const u of allUsers) {
-      const plots = u.plots
-      const isEmpty = !plots || plots.length === 0
-      const hasUnlocked = plots && plots.some((p: any) => p.unlocked)
-      const needsTaskFix = !u.task_progress || !u.task_claimed || !u.task_last_reset
-
-      if (isEmpty || !hasUnlocked || needsTaskFix) {
-        const updates: Record<string, any> = {}
-        if (isEmpty || !hasUnlocked) {
-          const unlockedCount = u.is_admin ? 30 : isEmpty ? 1 : Math.max(3, (plots?.length || 0))
-          updates.plots = createInitialPlots(unlockedCount)
-          const existingInv = u.inventory
-          updates.inventory = !existingInv || existingInv.length === 0
-            ? (u.is_admin ? [] : [
-                { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-                { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
-                { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
-              ])
-            : existingInv
-        }
-        if (needsTaskFix) {
-          updates.task_progress = u.task_progress || {}
-          updates.task_claimed = u.task_claimed || {}
-          updates.task_last_reset = u.task_last_reset || {}
-        }
-        const { error } = await sb.from('users')
-          .update(updates)
-          .eq('id', u.id)
-        if (error) {
-          logger.error('system', `修复用户 ${u.id} 失败`, { error: error.message })
-        } else {
-          logger.info('system', `修复用户 ${u.id}`, { fields: Object.keys(updates).join(',') })
-        }
-      }
-    }
-    logger.info('system', '数据库已有用户数据，检查并修复完成')
+  if (existingIds && existingIds.length > 0) {
+    logger.info('system', '数据库已有用户数据，跳过种子初始化')
     return
   }
 
@@ -566,13 +536,24 @@ export async function findUserById(id: string): Promise<User | null> {
   return dbRowToUser(data)
 }
 
-export async function getAllUsers(): Promise<User[]> {
+// 管理后台用的轻量列集：排除 task_* / achievements / titles / *_friend_requests / password 等重量级 JSONB
+// 这些列在后台统计/列表/权限场景均不需要，且 dbRowToUser 已用 || 兜底缺失列
+const ADMIN_USER_COLUMNS =
+  'id,username,nickname,avatar,coins,created_at,last_login,plots,inventory,inventory_size,' +
+  'is_admin,muted_until,banned_until,family_id,friends,deleted,admin_permissions,petal_coins,title'
+
+export async function getAllUsers(columns?: string): Promise<User[]> {
   await seedDatabase()
   const sb = getSupabase()
   const { data, error } = await sb.from('users')
-    .select('*')
+    .select(columns || ADMIN_USER_COLUMNS)
     .order('created_at', { ascending: true })
-  if (error || !data) return []
+  if (error) {
+    // 不再静默吞错：记录原因便于定位超时/缺列/RLS 问题
+    logger.error('system', `getAllUsers 查询失败: ${error.message}`, { code: error.code })
+    return []
+  }
+  if (!data) return []
   return data.map(dbRowToUser)
 }
 

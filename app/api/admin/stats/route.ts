@@ -21,8 +21,6 @@ export async function GET(req: NextRequest) {
     const action = url.searchParams.get('action') || 'overview'
 
     if (action === 'overview') {
-      const users = await getAllUsers()
-      const totalUsers = users.length
       const now = Date.now()
       const dayAgo = now - 86400000
 
@@ -30,6 +28,16 @@ export async function GET(req: NextRequest) {
       todayStart.setHours(0, 0, 0, 0)
       const todayStartTs = todayStart.getTime()
 
+      // 并发拉取四类数据（seedDatabase 已缓存，并发可显著降低总耗时，避免 Edge 超时）
+      const [users, listings, buyOrders, logsResult] = await Promise.all([
+        getAllUsers(),
+        getListings(),
+        getBuyOrders(),
+        listAdminLogs({ limit: 50 }),
+      ])
+      const logs = logsResult.items
+
+      const totalUsers = users.length
       const onlineUsers = users.filter(u => u.lastLogin >= dayAgo).length
       const todayNewUsers = users.filter(u => u.createdAt >= todayStartTs).length
       const todayMessages = Math.floor(onlineUsers * 2.5)
@@ -59,8 +67,6 @@ export async function GET(req: NextRequest) {
         ? Math.round(allPlots.filter(p => p.flower).reduce((s, p) => s + (p.flower?.growthProgress || 0), 0) / allPlots.filter(p => p.flower).length)
         : 0
 
-      const listings = await getListings()
-      const buyOrders = await getBuyOrders()
       const totalListings = listings.length
       const totalBuyOrders = buyOrders.length
 
@@ -80,8 +86,6 @@ export async function GET(req: NextRequest) {
       const topFlowers = Object.values(topFlowersMap).sort((a, b) => b.count - a.count).slice(0, 5)
 
       const season = await computeSeason()
-
-      const logs = (await listAdminLogs({ limit: 50 })).items
 
       return jsonResponse(true, {
         snapshotAt: now,

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
       return jsonResponse(false, null, '无「权限管理」权限', 403)
     }
 
-    const users = await getAllUsers()
+    const users = await getAllUsers('id,username,nickname,avatar,is_admin,admin_permissions,created_at')
     const admins = users
       .filter((u) => u.isAdmin)
       .map((u) => {

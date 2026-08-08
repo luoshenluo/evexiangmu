@@ -66,7 +66,7 @@ export default function ChatSettingsPanel() {
   }
 
   const dirty =
-    settings &&
+    !settings ||
     (settings.maxMessagesPerMinute !== maxPerMin ||
       settings.maxMessageLength !== maxLen ||
       settings.minMessageIntervalMs !== minInterval ||
