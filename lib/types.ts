@@ -227,6 +227,24 @@ export interface Task {
   }
 }
 
+// 管理员可配置的任务模板（存储在 task_templates 表中）
+export interface TaskTemplate {
+  id: string
+  type: 'daily' | 'weekly' | 'monthly'
+  title: string
+  description: string
+  target: number
+  action: string // 触发行为：login/plant/water/fertilize/pesticide/harvest/chat/trade/unlock/earn_coin
+  rewards: {
+    coins?: number
+    items?: { referenceId: string; quantity: number; type: ItemType }[]
+  }
+  enabled: boolean
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Family {
   id: string
   name: string
