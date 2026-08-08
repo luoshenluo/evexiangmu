@@ -151,6 +151,8 @@ export async function POST(req: NextRequest) {
     // 任务进度
     await incrementTaskProgress(u.id, 'login', 1)
     await incrementTaskProgress(u.id, 'daily_checkin', 1)
+    // 周常·富豪：签到获得金币计入累计获得
+    try { if (reward.coins > 0) await incrementTaskProgress(u.id, 'earn_coin', reward.coins) } catch {}
 
     return jsonResponse(true, {
       user: updated ? sanitizeUser(updated) : null,
