@@ -256,3 +256,20 @@ alter table public.game_state disable row level security;
 alter table public.steal_logs disable row level security;
 alter table public.plot_steal_records disable row level security;
 alter table public.official_buy_prices disable row level security;
+
+-- 13. 任务模板表（管理员可配置的任务中心）
+create table if not exists public.task_templates (
+  id text primary key,
+  type text not null default 'daily',          -- daily / weekly / monthly
+  title text not null,
+  description text default '',
+  target integer not null default 1,           -- 完成目标数
+  action text not null default 'login',        -- 触发行为
+  rewards jsonb default '{}'::jsonb,           -- { coins: number, items: [...] }
+  enabled boolean default true,
+  sort_order integer default 99,
+  created_at bigint default (EXTRACT(EPOCH FROM now()) * 1000)::bigint,
+  updated_at bigint default (EXTRACT(EPOCH FROM now()) * 1000)::bigint
+);
+
+alter table public.task_templates disable row level security;
