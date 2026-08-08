@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick } from '@/lib/server-store'
+import { updateUser, ensureSeasonTick, incrementTaskProgress } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
 
     const newPlots = user.plots.map(p => p.id === plotId ? { ...p, unlocked: true } : p)
     const updated = await updateUser(user.id, { plots: newPlots, coins: user.coins - plot.unlockPrice })
+
+    // 任务进度：周常·花园扩张（解锁或打理共 10 次）
+    try { await incrementTaskProgress(user.id, 'unlock', 1) } catch {}
 
     logger.info('garden', '解锁地块', {
       userId: user.id, plotId, cost: plot.unlockPrice,
