@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { ensureSeasonTick, updateUser, createNotification } from '@/lib/server-store'
+import { ensureSeasonTick, updateUser, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES } from '@/lib/game-data'
 import type { PlantedFlower } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
       title: '🌱 种植成功',
       content: `在第 ${plotId} 块地种下了 ${flowerType.name}，剩余 ${seedInv.quantity - 1} 颗种子`,
     })
+
+    // 任务进度：勤劳花农 + 周常花园扩张
+    try { await incrementTaskProgress(user.id, 'plant', 1) } catch {}
 
     return jsonResponse(true, { user: sanitizeUser(updatedUser), message: `种植成功！种下了 ${flowerType.name}` })
   } catch (e: any) {
