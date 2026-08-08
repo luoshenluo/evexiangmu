@@ -1,5 +1,5 @@
 import { findUserById, updateUser } from '@/lib/server-store'
-import bcrypt from 'bcryptjs'
+import { verifyPassword, hashPassword } from '@/lib/password'
 import { authRequest, jsonResponse } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -13,11 +13,11 @@ export async function POST(req: Request) {
     if (!oldPassword || !newPassword) return jsonResponse(false, null, '请填写完整', 400)
     if (newPassword.length < 4) return jsonResponse(false, null, '新密码至少4位', 400)
 
-    if (!bcrypt.compareSync(oldPassword, admin.password)) {
+    if (!(await verifyPassword(oldPassword, admin.password))) {
       return jsonResponse(false, null, '原密码不正确', 400)
     }
 
-    const newHash = bcrypt.hashSync(newPassword, 10)
+    const newHash = await hashPassword(newPassword)
     await updateUser(admin.id, { password: newHash })
     return jsonResponse(true, { ok: true })
   } catch (e: any) {
