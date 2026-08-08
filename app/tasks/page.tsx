@@ -58,7 +58,7 @@ export default function TasksPage() {
   // 游客模式：任务列表为空，提示登录后查看
   if (isGuest) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-3xl md:pt-6">
+      <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
         <div className="card p-4 mb-4 flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-md shadow-orange-200">
             <ClipboardList size={24} className="text-white" />
@@ -77,7 +77,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-3xl md:pt-6">
+    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       {/* 顶部 */}
       <div className="card p-4 mb-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-garden-200/50 rounded-full -translate-y-16 translate-x-16" />
