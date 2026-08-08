@@ -1,20 +1,9 @@
 import { NextRequest } from 'next/server'
-import { updateUser, findUserById, incrementTaskProgress } from '@/lib/server-store'
+import { updateUser, findUserById, incrementTaskProgress, getAllTaskTemplates } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
-
-const TASK_TEMPLATES: any[] = [
-  { id: 't_daily_1', type: 'daily', title: '登录游戏', description: '今日首次登录游戏', target: 1, rewards: { coins: 10 } },
-  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵3次', target: 3, rewards: { coins: 15 } },
-  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获任意 2 朵花', target: 2, rewards: { coins: 25, items: [{ referenceId: 'seed_rose', type: 'seed', quantity: 1 }] } },
-  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, rewards: { coins: 20 } },
-  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, rewards: { coins: 10 } },
-  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, rewards: { coins: 80, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 1 }] } },
-  { id: 't_weekly_2', type: 'weekly', title: '周常·富豪', description: '累计获得 500 金币', target: 500, rewards: { coins: 50 } },
-  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, rewards: { coins: 300, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 3 }] } },
-]
 
 function getPeriodStart(type: string): number {
   const now = new Date()
@@ -31,27 +20,20 @@ function getPeriodStart(type: string): number {
   return 0
 }
 
-function getTaskType(taskId: string): string {
-  if (taskId.includes('daily')) return 'daily'
-  if (taskId.includes('weekly')) return 'weekly'
-  if (taskId.includes('monthly')) return 'monthly'
-  return 'daily'
-}
-
-function checkAndResetTasks(user: any): { progress: Record<string, number>; claimed: Record<string, boolean>; lastReset: Record<string, number> } {
+function checkAndResetTasks(user: any, templates: any[]): { progress: Record<string, number>; claimed: Record<string, boolean>; lastReset: Record<string, number> } {
   const progress = { ...(user.taskProgress || {}) }
   const claimed = { ...(user.taskClaimed || {}) }
   const lastReset = { ...(user.taskLastReset || {}) }
 
-  for (const task of TASK_TEMPLATES) {
-    const type = task.type
+  // 收集所有用到的任务类型
+  const types = new Set(templates.map(t => t.type))
+  for (const type of types) {
     const periodStart = getPeriodStart(type)
     const resetKey = type
-
     if (!lastReset[resetKey] || lastReset[resetKey] < periodStart) {
-      const taskTypePrefix = type === 'daily' ? 't_daily_' : type === 'weekly' ? 't_weekly_' : 't_monthly_'
+      const prefix = `t_${type}_`
       for (const key of Object.keys(progress)) {
-        if (key.startsWith(taskTypePrefix)) {
+        if (key.startsWith(prefix)) {
           progress[key] = 0
           delete claimed[key]
         }
@@ -68,14 +50,17 @@ export async function GET(req: NextRequest) {
     const user = await authRequest(req)
     if (!user) return jsonResponse(false, null, '请先登录', 401)
 
-    // 进入任务页时先推进一次登录任务（幂等：目标是 1，多次调用不会超过 target）
+    // 进入任务页时先推进一次登录任务
     try { await incrementTaskProgress(user.id, 'login', 1) } catch {}
 
-    // 从数据库获取最新用户数据，确保任务数据是最新的
+    // 从数据库获取最新用户数据
     const freshUser = await findUserById(user.id)
     if (!freshUser) return jsonResponse(false, null, '用户不存在', 404)
 
-    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser)
+    // 从数据库获取已启用的任务模板
+    const templates = await getAllTaskTemplates(true)
+
+    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser, templates)
 
     // 如果有重置，保存回数据库
     const needSave = JSON.stringify(progress) !== JSON.stringify(freshUser.taskProgress || {}) ||
@@ -84,11 +69,16 @@ export async function GET(req: NextRequest) {
       await updateUser(freshUser.id, { taskProgress: progress, taskClaimed: claimed, taskLastReset: lastReset })
     }
 
-    const tasks = TASK_TEMPLATES.map(t => {
+    const tasks = templates.map(t => {
       const prog = progress[t.id] || 0
       const completed = prog >= t.target
       return {
-        ...t,
+        id: t.id,
+        type: t.type,
+        title: t.title,
+        description: t.description,
+        target: t.target,
+        rewards: t.rewards,
         progress: prog,
         completed,
         claimed: !!claimed[t.id],
@@ -117,7 +107,9 @@ export async function POST(req: NextRequest) {
     const taskId = body?.taskId
     if (!taskId) return jsonResponse(false, null, '缺少任务ID', 400)
 
-    const task = TASK_TEMPLATES.find(t => t.id === taskId)
+    // 从数据库获取已启用的任务模板
+    const templates = await getAllTaskTemplates(true)
+    const task = templates.find(t => t.id === taskId)
     if (!task) return jsonResponse(false, null, '任务不存在', 404)
 
     // 从数据库获取最新用户数据
@@ -125,7 +117,7 @@ export async function POST(req: NextRequest) {
     if (!freshUser) return jsonResponse(false, null, '用户不存在', 404)
 
     // 检查并重置过期任务
-    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser)
+    const { progress, claimed, lastReset } = checkAndResetTasks(freshUser, templates)
 
     // 检查任务进度
     const currentProgress = progress[taskId] || 0
