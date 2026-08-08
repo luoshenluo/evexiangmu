@@ -156,7 +156,7 @@ export default function GardenPage() {
   const bgIsDark = gardenBg === 'night'
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-4xl md:pt-6">
       {/* 顶部状态栏 */}
       <div className="card p-3 mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -169,19 +169,19 @@ export default function GardenPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/inventory" className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+          <Link href="/inventory" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center">
             <Package size={20} className="text-slate-600" />
             <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-bold">
               {user.inventory.filter(i => i.quantity > 0).length}
             </span>
           </Link>
-          <Link href="/profile" className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+          <Link href="/profile" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center">
             <Bell size={20} className="text-slate-600" />
             {announcements.filter(a => a.priority === 'urgent').length > 0 && (
               <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
             )}
           </Link>
-          <Link href="/visit" className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors" title="访问好友花园">
+          <Link href="/visit" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center" title="访问好友花园">
             <Users size={20} className="text-slate-600" />
           </Link>
         </div>
@@ -262,16 +262,16 @@ export default function GardenPage() {
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="p-1.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40"
+            className="p-2.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40 min-h-[44px] flex items-center"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={18} />
           </button>
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="p-1.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40"
+            className="p-2.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40 min-h-[44px] flex items-center"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={18} />
           </button>
         </div>
       </div>
