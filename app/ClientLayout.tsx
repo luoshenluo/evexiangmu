@@ -119,7 +119,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showChrome = !isOffline && (isAuthenticated || isGuest)
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen md:pl-20 lg:pl-56">
       {children}
       {showChrome && <BottomNav />}
       {showChrome && <ChatWidget onRequestLogin={() => setShowLogin(true)} />}
