@@ -353,8 +353,8 @@ export default function WorkshopPage() {
 
       {/* 结果展示 */}
       {result && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setResult(null)}>
-          <div className="card p-6 max-w-sm w-full text-center slide-up" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setResult(null)}>
+          <div className="card p-6 max-w-sm w-full text-center slide-up rounded-t-3xl sm:rounded-xl" onClick={e => e.stopPropagation()}>
             <button onClick={() => setResult(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600">
               <X size={18} />
             </button>
