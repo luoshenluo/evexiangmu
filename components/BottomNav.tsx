@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Flower2, ShoppingCart, Beaker, ClipboardList, Package, Users, User } from 'lucide-react'
+import { Home, ShoppingBag, ClipboardList, Backpack, Users, User, Beaker } from 'lucide-react'
 import { classNames } from '@/lib/utils'
 
 const navItems = [
-  { href: '/garden', label: '花园', icon: Flower2 },
-  { href: '/market', label: '市场', icon: ShoppingCart },
+  { href: '/garden', label: '花园', icon: Home },
+  { href: '/market', label: '市场', icon: ShoppingBag },
   { href: '/workshop', label: '工坊', icon: Beaker },
   { href: '/tasks', label: '任务', icon: ClipboardList },
-  { href: '/inventory', label: '背包', icon: Package },
+  { href: '/inventory', label: '背包', icon: Backpack },
   { href: '/family', label: '家族', icon: Users },
   { href: '/profile', label: '我的', icon: User },
 ]
@@ -18,14 +18,10 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname()
 
-  // 全平台统一底部导航栏
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-garden-100 shadow-[0_-4px_20px_-4px_rgba(34,197,94,0.15)]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-garden-100 shadow-[0_-4px_20px_-4px_rgba(34,197,94,0.15)]">
       <div className="max-w-2xl mx-auto px-1">
-        <div className="grid grid-cols-7 gap-0.5 py-1.5">
+        <div className="grid grid-cols-7 gap-0.5 py-2">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href || pathname?.startsWith(item.href + '/')
@@ -34,14 +30,14 @@ export default function BottomNav() {
                 key={item.href}
                 href={item.href}
                 className={classNames(
-                  'flex flex-col items-center justify-center py-2 rounded-xl transition-all min-h-[48px]',
+                  'flex flex-col items-center justify-center py-1.5 rounded-xl transition-all',
                   active
                     ? 'text-garden-600 bg-garden-50 scale-105'
                     : 'text-slate-500 hover:text-garden-500 hover:bg-garden-50/50'
                 )}
               >
                 <Icon
-                  size={22}
+                  size={20}
                   strokeWidth={active ? 2.5 : 2}
                   className={active ? 'drop-shadow-sm' : ''}
                 />

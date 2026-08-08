@@ -60,7 +60,7 @@ export default function CheckInPage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
         <div className="card p-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-300 to-orange-500 flex items-center justify-center shadow-md">
             <Calendar size={40} className="text-white" />
@@ -79,7 +79,7 @@ export default function CheckInPage() {
   const totalCount = Object.keys(ACHIEVEMENT_DEFS).length
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-10">
       {/* 头部 */}
       <div className="card p-4 mb-4 overflow-hidden relative bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 text-white shadow-lg">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />

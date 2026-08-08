@@ -26,7 +26,7 @@ export default function WorkshopPage() {
 
   if (isGuest) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
         <div className="card p-8 text-center text-slate-400 text-sm">
           <Beaker size={40} className="mx-auto mb-2 text-slate-300" />
           登录后解锁花艺工坊
@@ -106,7 +106,7 @@ export default function WorkshopPage() {
   ]
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 标题 */}
       <div className="card p-4 mb-4 flex items-center gap-3 bg-gradient-to-br from-purple-500 to-pink-500 text-white">
         <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
@@ -353,8 +353,8 @@ export default function WorkshopPage() {
 
       {/* 结果展示 */}
       {result && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4" onClick={() => setResult(null)}>
-          <div className="card p-6 max-w-sm w-full text-center slide-up rounded-t-3xl sm:rounded-xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setResult(null)}>
+          <div className="card p-6 max-w-sm w-full text-center slide-up" onClick={e => e.stopPropagation()}>
             <button onClick={() => setResult(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600">
               <X size={18} />
             </button>

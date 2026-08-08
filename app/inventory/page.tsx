@@ -118,7 +118,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 顶部 */}
       <div className="card p-3 mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export default function InventoryPage() {
           onClick={expandInventory}
           disabled={loading === 'expand' || user.coins < expandPrice}
           className={classNames(
-            'px-3 py-2.5 rounded-xl text-xs font-medium flex items-center gap-1 transition-all',
+            'px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1 transition-all',
             user.coins >= expandPrice
               ? 'bg-garden-500 text-white hover:bg-garden-600 active:scale-95'
               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -161,7 +161,7 @@ export default function InventoryPage() {
       </div>
 
       {/* 背包网格 */}
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-6">
+      <div className="grid grid-cols-5 gap-2 mb-6">
         {Array.from({ length: user.inventorySize }).map((_, idx) => {
           const item = user.inventory.filter(i => i.quantity > 0)[idx]
           const typeInfo = item ? getTypeLabel(item.type) : null
@@ -182,7 +182,7 @@ export default function InventoryPage() {
                   {/* 等级标签：仅鲜花显示，工具/种子不显示 */}
                   {item.type === 'flower' && item.rank && (
                     <span
-                      className="absolute top-1 left-1 text-[9px] px-1 rounded font-bold"
+                      className="absolute top-1 left-1 text-[8px] px-1 rounded font-bold"
                       style={{ backgroundColor: RankColors[item.rank], color: 'white' }}
                     >
                       {RankNames[item.rank]}
@@ -191,7 +191,7 @@ export default function InventoryPage() {
                   {/* 数量标签：工具用蓝底、鲜花/种子用 typeInfo 颜色 */}
                   <span
                     className={classNames(
-                      'absolute top-1 right-1 text-[10px] px-1.5 rounded-full font-bold',
+                      'absolute top-1 right-1 text-[9px] px-1.5 rounded-full font-bold',
                       item.type === 'tool' ? 'bg-blue-100 text-blue-700' : (typeInfo?.color || 'bg-slate-100 text-slate-700')
                     )}
                   >
@@ -199,7 +199,7 @@ export default function InventoryPage() {
                   </span>
                   {/* 工具名称小字 */}
                   {item.type === 'tool' && (
-                    <span className="absolute bottom-1 text-[9px] text-slate-500 font-medium truncate px-1">
+                    <span className="absolute bottom-1 text-[8px] text-slate-500 font-medium truncate px-1">
                       {item.name}
                     </span>
                   )}
@@ -215,11 +215,11 @@ export default function InventoryPage() {
       {/* 物品详情弹窗 */}
       {selectedItem && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
           onClick={() => setSelectedItem(null)}
         >
           <div
-            className="card w-full max-w-md p-5 slide-up rounded-t-3xl sm:rounded-2xl"
+            className="card w-full max-w-md p-5 slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-4 mb-4">

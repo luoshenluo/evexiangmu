@@ -293,7 +293,7 @@ export default function MarketPage() {
                       onClick={() => buy(item)}
                       disabled={loading === item.id || !user}
                       className={classNames(
-                        'px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 transition-all',
+                        'px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-all',
                         loading === item.id
                           ? 'bg-slate-200 text-slate-400'
                           : user && user.coins >= item.price
@@ -317,7 +317,7 @@ export default function MarketPage() {
   const tradeableItems = (user?.inventory || []).filter((i) => i.tradeable && i.quantity > 0)
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-200">
           <ShoppingCart size={22} className="text-white" />
@@ -342,7 +342,7 @@ export default function MarketPage() {
         />
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+      <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
         {([
           { key: 'flower', label: '鲜花', icon: Flower2 },
           { key: 'seed', label: '种子', icon: Leaf },
@@ -420,7 +420,7 @@ export default function MarketPage() {
                       <button
                         onClick={() => sellToSystem(order)}
                         disabled={loading === order.id}
-                        className="px-3 py-2 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all flex items-center gap-1"
+                        className="px-3 py-1 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all flex items-center gap-1"
                       >
                         <ArrowRightLeft size={12} />
                         出售
@@ -744,7 +744,7 @@ export default function MarketPage() {
                 {createItemType === 'flower' && createReferenceId && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-slate-700">品质（越高价越高）</label>
-                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
+                    <div className="grid grid-cols-7 gap-1">
                       {([1, 2, 3, 4, 5, 6, 7] as const).map((r) => (
                         <button key={r}
                           onClick={() => {

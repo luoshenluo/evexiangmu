@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     const user = await findUserByUsername(username.trim())
     if (!user) return jsonResponse(false, null, '账号不存在', 400)
 
+    // 检查临时封禁是否已过期
     if (user.bannedUntil && user.bannedUntil > Date.now()) {
       const remainingMs = user.bannedUntil - Date.now()
       const days = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, `账号已被封禁，剩余约${timeStr}`, 403)
     }
 
+    // 永久封禁
     if (user.deleted) {
       return jsonResponse(false, null, '账号已被永久封禁，请联系管理员', 403)
     }
@@ -33,6 +35,7 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, '密码错误', 400)
     }
 
+    // 封禁已过期，自动解除
     if (user.bannedUntil && user.bannedUntil <= Date.now()) {
       await updateUser(user.id, { deleted: false, bannedUntil: null })
     }

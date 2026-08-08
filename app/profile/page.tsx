@@ -66,7 +66,7 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
         <div className="card p-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-garden-100 flex items-center justify-center">
             <User size={40} className="text-garden-500" />
@@ -103,7 +103,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 用户卡片 */}
       <div className="card p-5 mb-4 relative overflow-hidden bg-gradient-to-br from-garden-500 to-emerald-600 text-white">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
@@ -184,8 +184,8 @@ export default function ProfilePage() {
 
       {/* CDK 弹窗 */}
       {showCDK && (
-        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCDK(false)}>
-          <div className="card w-full max-w-md p-5 slide-up rounded-t-3xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowCDK(false)}>
+          <div className="card w-full max-w-md p-5 slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                 <Gift size={20} className="text-purple-500" /> CDK 兑换

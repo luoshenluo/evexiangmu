@@ -2850,33 +2850,4 @@ export async function getAllFamilies(): Promise<Family[]> {
   return getFamilies(undefined, 500)
 }
 
-export async function findAdminByUserId(userId: string) {
-  const { supabaseClient } = getSupabase()
-  const { data, error } = await supabaseClient
-    .from('admins')
-    .select('*')
-    .eq('userId', userId)
-    .single()
-  if (error && error.code !== 'PGRST116') throw error
-  return data || null
-}
 
-export async function updateAdminPassword(userId: string, passwordHash: string) {
-  const { supabaseClient } = getSupabase()
-  const { error } = await supabaseClient
-    .from('admins')
-    .update({ password: passwordHash, updatedAt: Date.now() })
-    .eq('userId', userId)
-  if (error) throw error
-  return true
-}
-
-export async function updateUserPassword(userId: string, passwordHash: string) {
-  const { supabaseClient } = getSupabase()
-  const { error } = await supabaseClient
-    .from('users')
-    .update({ password: passwordHash, updatedAt: Date.now() })
-    .eq('id', userId)
-  if (error) throw error
-  return true
-}

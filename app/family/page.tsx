@@ -229,7 +229,7 @@ export default function FamilyPage() {
   // =============== 渲染 ===============
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
         <div className="card p-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={40} className="text-blue-500" />
@@ -242,7 +242,7 @@ export default function FamilyPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 顶部 */}
       <div className="card p-4 mb-4">
         <div className="flex items-center gap-3">

@@ -58,8 +58,8 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
-      <div className="card w-full max-w-md p-6 relative slide-up rounded-t-3xl sm:rounded-xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="card w-full max-w-md p-6 relative slide-up">
         {onClose && (
           <button
             onClick={onClose}

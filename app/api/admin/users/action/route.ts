@@ -1,91 +1,100 @@
 import { NextRequest } from 'next/server'
+import { findUserById, updateUser } from '@/lib/server-store'
 import bcrypt from 'bcryptjs'
-import { findUserById, updateUser, updateUserPassword } from '@/lib/server-store'
-import { jsonResponse, authRequest, hasPermission, isSuperAdmin } from '@/lib/auth'
-import { logger } from '@/lib/logger'
+import { authRequest, jsonResponse, isSuperAdmin, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const admin = await authRequest(req)
-    if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权限', 403)
-    if (!hasPermission(admin.id, admin.isAdmin, admin.adminPermissions, 0)) {
-      return jsonResponse(false, null, '无用户管理权限', 403)
+    if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
+
+    const { userId, newPassword, makeAdmin, banUser, unbanUser, banDays, nickname, avatar, adminPermissions } = await req.json()
+    const target = await findUserById(userId)
+    if (!target) return jsonResponse(false, null, '用户不存在', 404)
+
+    const updates: Record<string, any> = {}
+
+    if (newPassword) {
+      if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
+      if (newPassword.length < 4) return jsonResponse(false, null, '密码至少4位', 400)
+      updates.password = bcrypt.hashSync(newPassword, 10)
     }
 
-    const body = await req.json()
-    const { userId, action, data } = body
-    if (!userId || !action) return jsonResponse(false, null, '缺少参数', 400)
-
-    const targetUser = await findUserById(userId)
-    if (!targetUser) return jsonResponse(false, null, '用户不存在', 400)
-
-    const updates: any = {}
-
-    switch (action) {
-      case 'edit_profile':
-        if (data?.nickname !== undefined) updates.nickname = String(data.nickname).slice(0, 32)
-        if (data?.avatar !== undefined) updates.avatar = String(data.avatar).slice(0, 16)
-        if (data?.coins !== undefined) {
-          const coins = parseInt(data.coins)
-          if (!isNaN(coins) && coins >= 0) updates.coins = coins
+    if (makeAdmin !== undefined) {
+      if (!userHasPermission(admin, 5)) return jsonResponse(false, null, '无「权限管理」权限', 403)
+      if (!isSuperAdmin(admin.id) && isSuperAdmin(target.id)) {
+        return jsonResponse(false, null, '不能修改超级管理员权限', 403)
+      }
+      if (target.id === admin.id) {
+        return jsonResponse(false, null, '不能修改自己的权限', 403)
+      }
+      updates.isAdmin = makeAdmin
+      if (makeAdmin) {
+        // 首次任命管理员时：如果前端没有传 adminPermissions，给默认基础权限 0b0000_0111 = Bit0+Bit1+Bit2
+        if (adminPermissions === undefined) {
+          updates.adminPermissions = (1 | 2 | 4)
         }
-        break
+      } else {
+        // 撤管时清除权限位
+        updates.adminPermissions = 0
+      }
+    }
 
-      case 'reset_password':
-        const newPassword = String(data?.newPassword || '123456').slice(0, 64)
-        updates.password = bcrypt.hashSync(newPassword, 10)
-        break
+    // 设置子管理员权限位
+    if (adminPermissions !== undefined) {
+      if (!userHasPermission(admin, 5)) return jsonResponse(false, null, '无「权限管理」权限', 403)
+      if (!isSuperAdmin(admin.id) && isSuperAdmin(target.id)) {
+        return jsonResponse(false, null, '不能修改超级管理员权限', 403)
+      }
+      // 权限位只允许低 8 位
+      const masked = Number(adminPermissions) & 0xff
+      if (!Number.isInteger(masked) || masked < 0 || masked > 0xff) {
+        return jsonResponse(false, null, '权限位不合法', 400)
+      }
+      updates.adminPermissions = masked
+      // 有任意权限位 => 自动设为管理员；无权限位 => 撤管
+      if (masked > 0 && updates.isAdmin === undefined) updates.isAdmin = true
+    }
 
-      case 'mute':
-        const duration = parseInt(data?.durationHours) || 24
-        updates.mutedUntil = Date.now() + duration * 60 * 60 * 1000
-        logger.info('admin', '用户禁言', { adminId: admin.id, userId, duration })
-        break
-
-      case 'unmute':
-        updates.mutedUntil = 0
-        logger.info('admin', '解除禁言', { adminId: admin.id, userId })
-        break
-
-      case 'ban':
-        const banDays = parseInt(data?.banDays) || 7
+    if (banUser) {
+      if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
+      if (target.isAdmin && !isSuperAdmin(admin.id)) return jsonResponse(false, null, '不能封号管理员', 403)
+      if (banDays !== undefined && banDays > 0) {
+        updates.deleted = true
         updates.bannedUntil = Date.now() + banDays * 24 * 60 * 60 * 1000
-        updates.deleted = false
-        logger.info('admin', '封禁用户', { adminId: admin.id, userId, banDays })
-        break
-
-      case 'unban':
+      } else {
+        updates.deleted = true
         updates.bannedUntil = null
-        updates.deleted = false
-        logger.info('admin', '解除封禁', { adminId: admin.id, userId })
-        break
-
-      case 'set_admin':
-        if (!isSuperAdmin(admin.id)) return jsonResponse(false, null, '只有超管可操作', 403)
-        updates.isAdmin = !!data?.isAdmin
-        if (data?.adminPermissions !== undefined) {
-          updates.adminPermissions = parseInt(data.adminPermissions) || 0
-        }
-        logger.info('admin', '设为管理员', { adminId: admin.id, userId, isAdmin: updates.isAdmin })
-        break
-
-      default:
-        return jsonResponse(false, null, '未知操作', 400)
+      }
     }
 
-    const password = updates.password
-    delete updates.password
-    if (Object.keys(updates).length > 0) {
-      await updateUser(userId, updates)
-    }
-    if (password) {
-      await updateUserPassword(userId, password)
+    if (unbanUser) {
+      if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
+      updates.deleted = false
+      updates.bannedUntil = null
     }
 
-    return jsonResponse(true, { message: '操作成功' })
+    if (nickname !== undefined) {
+      if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
+      if (!nickname.trim()) return jsonResponse(false, null, '昵称不能为空', 400)
+      if (nickname.length > 20) return jsonResponse(false, null, '昵称最长20字', 400)
+      updates.nickname = nickname.trim()
+    }
+
+    if (avatar !== undefined) {
+      if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
+      updates.avatar = avatar
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return jsonResponse(false, null, '没有要修改的内容', 400)
+    }
+
+    await updateUser(userId, updates)
+    return jsonResponse(true, { ok: true })
   } catch (e: any) {
-    return jsonResponse(false, null, e.message || '操作失败', 500)
+    return jsonResponse(false, null, e.message, 500)
   }
 }

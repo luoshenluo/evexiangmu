@@ -151,7 +151,7 @@ export default function VisitPage() {
   )
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
       {/* 顶部 */}
       <div className="flex items-center gap-3 mb-4">
         {tab === 'garden' && (
