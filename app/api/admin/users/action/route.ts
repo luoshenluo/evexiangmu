@@ -31,8 +31,15 @@ export async function POST(req: Request) {
         return jsonResponse(false, null, '不能修改自己的权限', 403)
       }
       updates.is_admin = makeAdmin
-      // 撤管时清除权限位
-      if (!makeAdmin) updates.admin_permissions = 0
+      if (makeAdmin) {
+        // 首次任命管理员时：如果前端没有传 adminPermissions，给默认基础权限 0b0000_0111 = Bit0+Bit1+Bit2
+        if (adminPermissions === undefined) {
+          updates.admin_permissions = (1 | 2 | 4)
+        }
+      } else {
+        // 撤管时清除权限位
+        updates.admin_permissions = 0
+      }
     }
 
     // 设置子管理员权限位
