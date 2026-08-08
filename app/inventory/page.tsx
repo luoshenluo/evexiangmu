@@ -179,7 +179,8 @@ export default function InventoryPage() {
               {item ? (
                 <>
                   <div className="text-2xl mb-0.5">{item.emoji}</div>
-                  {item.rank && (
+                  {/* 等级标签：仅鲜花显示，工具/种子不显示 */}
+                  {item.type === 'flower' && item.rank && (
                     <span
                       className="absolute top-1 left-1 text-[8px] px-1 rounded font-bold"
                       style={{ backgroundColor: RankColors[item.rank], color: 'white' }}
@@ -187,14 +188,21 @@ export default function InventoryPage() {
                       {RankNames[item.rank]}
                     </span>
                   )}
+                  {/* 数量标签：工具用蓝底、鲜花/种子用 typeInfo 颜色 */}
                   <span
                     className={classNames(
-                      'absolute top-1 right-1 text-[9px] px-1 rounded-full font-medium',
-                      typeInfo?.color
+                      'absolute top-1 right-1 text-[9px] px-1.5 rounded-full font-bold',
+                      item.type === 'tool' ? 'bg-blue-100 text-blue-700' : (typeInfo?.color || 'bg-slate-100 text-slate-700')
                     )}
                   >
-                    {item.quantity}
+                    ×{item.quantity}
                   </span>
+                  {/* 工具名称小字 */}
+                  {item.type === 'tool' && (
+                    <span className="absolute bottom-1 text-[8px] text-slate-500 font-medium truncate px-1">
+                      {item.name}
+                    </span>
+                  )}
                 </>
               ) : (
                 <div className="text-slate-300 text-xs">空格</div>
@@ -217,7 +225,8 @@ export default function InventoryPage() {
             <div className="flex items-start gap-4 mb-4">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 flex items-center justify-center text-5xl relative">
                 {selectedItem.emoji}
-                {selectedItem.rank && (
+                {/* 等级标签：仅鲜花显示 */}
+                {selectedItem.type === 'flower' && selectedItem.rank && (
                   <span
                     className="absolute -top-2 -left-2 chip text-xs font-bold"
                     style={{ backgroundColor: RankColors[selectedItem.rank], color: 'white' }}
