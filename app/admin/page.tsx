@@ -389,7 +389,7 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="font-bold text-lg">花园 · 管理员后台</h1>
-            <p className="text-xs text-slate-400">管理用户、公告、市场、CDK</p>
+            <p className="text-xs text-slate-400">管理用户、公告、市场、CDK、敏感词、系统设置</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <button

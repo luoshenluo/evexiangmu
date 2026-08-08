@@ -10,7 +10,7 @@ import type {
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
   getPlotUnlockPrice, PEST_CONFIG, STEAL_CONFIG, rollPestSeverity,
-  getFlowerSellPrice,
+  getFlowerSellPrice, getSeasonByMonth,
 } from './game-data'
 import bcrypt from 'bcryptjs'
 
@@ -680,29 +680,13 @@ export async function setGameState(state: Partial<GameState>): Promise<void> {
 
 export async function ensureSeasonTick(): Promise<GameState> {
   const gs = await getGameState()
-  const now = Date.now()
-  const seasonOrder: GameState['currentSeason'][] = ['spring', 'summer', 'autumn', 'winter']
-
-  let changed = false
-  let currentSeason = gs.currentSeason
-  let seasonStartAt = gs.seasonStartAt
-
-  while (now - seasonStartAt >= gs.seasonDuration) {
-    const idx = seasonOrder.indexOf(currentSeason)
-    const oldSeason = currentSeason
-    currentSeason = seasonOrder[(idx + 1) % 4]
-    seasonStartAt += gs.seasonDuration
-    changed = true
-    logger.info('season', `季节切换: ${oldSeason} → ${currentSeason}`, {
-      oldSeason, newSeason: currentSeason, seasonStartAt,
-    })
+  // 按月份计算季节，确保与真实季节一致
+  const monthSeason = getSeasonByMonth()
+  if (gs.currentSeason !== monthSeason) {
+    await setGameState({ currentSeason: monthSeason, seasonStartAt: Date.now() })
+    return { ...gs, currentSeason: monthSeason, seasonStartAt: Date.now() }
   }
-
-  if (changed) {
-    await setGameState({ currentSeason, seasonStartAt })
-  }
-
-  return { ...gs, currentSeason, seasonStartAt }
+  return gs
 }
 
 // ==================== 聊天 ====================

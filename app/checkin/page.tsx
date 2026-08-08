@@ -171,7 +171,7 @@ export default function CheckInPage() {
             <div className="mt-3 text-[11px] text-slate-500 flex items-start gap-1.5">
               <Sparkles size={11} className="text-amber-500 mt-0.5 flex-shrink-0" />
               <div>
-                说明：连续签到满7天可获得 <b>1000金币 + 10花瓣</b> 大奖励，漏签则连续天数归零。
+                说明：连续签到满7天可获得 <b>150金币 + 5花瓣</b> 大奖励，漏签则连续天数归零。
               </div>
             </div>
           </div>

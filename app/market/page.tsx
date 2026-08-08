@@ -324,7 +324,7 @@ export default function MarketPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-800">花市</h1>
-          <p className="text-xs text-slate-500">买卖花朵、种子，自由交易</p>
+          <p className="text-xs text-slate-500">买卖花朵、种子、工具，自由交易</p>
         </div>
         <div className="ml-auto flex items-center gap-1 bg-white rounded-xl px-3 py-1.5 border border-amber-200">
           <Coins size={16} className="text-amber-500" />

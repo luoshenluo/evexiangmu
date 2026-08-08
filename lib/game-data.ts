@@ -165,14 +165,14 @@ export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   {
     id: 'announce_1',
     title: '🎉 欢迎来到花园！',
-    content: '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。初始赠送100金币和一些种子，快去你的花园看看吧！',
+    content: '欢迎来到花园模拟经营游戏！在这里你可以种花、交易、交友。完成签到和任务获取金币，快去你的花园看看吧！',
     createdAt: Date.now(),
     priority: 'urgent',
   },
   {
     id: 'announce_2',
     title: '📖 游戏玩法介绍',
-    content: '1. 在花园中种植花朵，浇水施肥加速成长。\n2. 收获的花朵可以卖给系统或挂到市场。\n3. 解锁更多地块和背包格扩大经营。\n4. 和世界频道的玩家交流心得吧！',
+    content: '1. 在花园中种植花朵，浇水施肥加速成长。\n2. 收获的花朵可以卖给系统或挂到市场自由定价。\n3. 解锁更多地块和背包格扩大经营规模。\n4. 完成每日任务和签到获取金币奖励。\n5. 加入家族与伙伴一起经营，参与家族任务。\n6. 在市场买卖花朵、种子和工具，体验自由交易。',
     createdAt: Date.now() - 3600000,
     priority: 'important',
   },
@@ -222,7 +222,7 @@ export const WHEEL_REWARDS: { key: string; label: string; weight: number; coins:
   { key: 'coins_200',   label: '200 金币', weight: 8, coins: 200 },
   { key: 'coins_500',   label: '500 金币', weight: 2, coins: 500 },
   { key: 'petal_2',     label: '+2 花瓣',   weight: 9, coins: 0, petals: 2 },
-  { key: 'jackpot',     label: '🎉 大奖 2000 金币', weight: 1, coins: 2000 },
+  { key: 'jackpot',     label: '🎉 2000💰', weight: 1, coins: 2000 },
   { key: 'nothing',     label: '谢谢参与',   weight: 5, coins: 0 },
 ]
 

@@ -36,10 +36,11 @@ export default function FamilyPage() {
       if (user.familyId) {
         const res = await apiFetch('/api/family?action=detail')
         if (res.success) setFamily(res.data)
-        else if (res.error?.includes('未加入')) {
-          // 用户 familyId 有但数据库无，清空前端状态
+        else {
+          // 家族不存在或已退出，清空 familyId
           const uRes = await apiFetch('/api/user/me')
           if (uRes.success) updateUser({ ...uRes.data, familyId: null })
+          setFamily(null)
         }
         const tRes = await apiFetch('/api/family?action=tasks')
         if (tRes.success) setFamilyTasks(tRes.data || [])
@@ -286,6 +287,13 @@ export default function FamilyPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 加载中：familyId 有值但家族数据尚未加载 */}
+      {user?.familyId && !family && (
+        <div className="card p-8 text-center">
+          <div className="text-slate-400 text-sm">正在加载家族信息...</div>
         </div>
       )}
 
