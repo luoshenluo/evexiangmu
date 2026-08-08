@@ -84,7 +84,7 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
               <p className="text-slate-400 text-xs mt-1">去市场购买一些吧~</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {seeds.map((seed) => {
                 const flowerInfo = getSeedInfo(seed.referenceId)
                 if (!flowerInfo) return null
@@ -96,7 +96,7 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
                     onClick={() => setSelectedSeed(seed.referenceId)}
                     disabled={!isRightSeason}
                     className={classNames(
-                      'p-3 rounded-2xl border-2 text-left transition-all relative',
+                      'p-2.5 sm:p-3 rounded-2xl border-2 text-left transition-all relative',
                       isSelected
                         ? 'border-garden-500 bg-garden-50 scale-[1.02] shadow-lg shadow-garden-100'
                         : isRightSeason
@@ -109,23 +109,23 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
                         季节不符
                       </div>
                     )}
-                    <div className="flex items-start gap-2">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-garden-100 to-garden-200 flex items-center justify-center text-2xl flex-shrink-0">
+                    <div className="flex items-start gap-2 sm:gap-2">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-garden-100 to-garden-200 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0">
                         {isRightSeason ? '🌱' : '🥀'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-slate-800 text-sm truncate">
+                        <div className="font-bold text-slate-800 text-sm sm:text-sm truncate">
                           {flowerInfo.name}种子
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
+                        <div className="text-[10px] sm:text-[10px] text-slate-500 mt-0.5">
                           盛开：{flowerInfo.emoji} {flowerInfo.name}
                         </div>
-                        <div className="flex items-center gap-1 mt-1.5">
+                        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                           <span className="chip bg-garden-100 text-garden-700 text-[10px]">
                             数量 {seed.quantity}
                           </span>
                           <span
-                            className="chip text-[10px]"
+                            className="chip text-[10px] whitespace-nowrap"
                             style={{ backgroundColor: RankColors[flowerInfo.maxRank] + '33', color: RankColors[flowerInfo.maxRank] }}
                           >
                             最高{RankNames[flowerInfo.maxRank]}
