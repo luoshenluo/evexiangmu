@@ -15,7 +15,7 @@ export default function Toast() {
   }
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 toast-anim">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 toast-anim safe-top">
       <div className="bg-white rounded-xl shadow-2xl border border-slate-100 flex items-center gap-3 px-4 py-3 pr-2 max-w-sm">
         {iconMap[toast.type]}
         <span className="text-sm font-medium text-slate-700">{toast.message}</span>
