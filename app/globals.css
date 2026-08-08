@@ -16,7 +16,17 @@ html, body {
   margin: 0;
   min-height: 100vh;
   font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  /* 防止移动端双击缩放和点击高亮 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior-y: none;
 }
+
+/* 安全区域适配：iPhone 刘海/底部横条 */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-left { padding-left: env(safe-area-inset-left); }
+.safe-right { padding-right: env(safe-area-inset-right); }
 
 /* ======= 主题：light（日间清新）默认 ======= */
 html[data-theme="light"] body {
