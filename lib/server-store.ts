@@ -13,7 +13,7 @@ import {
   getFlowerSellPrice, getSeasonByMonth,
   FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
 } from './game-data'
-import bcrypt from 'bcryptjs'
+import { hashPassword } from './password'
 
 // ==================== 工具函数 ====================
 
@@ -395,7 +395,7 @@ async function doSeed(): Promise<void> {
   const now = Date.now()
 
   // 创建管理员用户
-  const adminHash = bcrypt.hashSync('admin123', 10)
+  const adminHash = await hashPassword('admin123')
   const adminPlots = createInitialPlots(30)
   const { error: adminErr } = await sb.from('users').upsert({
     id: 'admin',
@@ -434,7 +434,7 @@ async function doSeed(): Promise<void> {
   else logger.info('system', '管理员账号创建成功')
 
   // 创建演示用户
-  const userHash = bcrypt.hashSync('123456', 10)
+  const userHash = await hashPassword('123456')
   const demoPlots = createInitialPlots(3)
   const { error: demoErr } = await sb.from('users').upsert({
     id: 'user1',
@@ -679,7 +679,7 @@ export async function createUser(data: { username: string; password: string; nic
   const sb = getSupabase()
   const userId = genId('u')
   const now = Date.now()
-  const hash = bcrypt.hashSync(data.password, 10)
+  const hash = await hashPassword(data.password)
 
   const newRow = {
     id: userId,
