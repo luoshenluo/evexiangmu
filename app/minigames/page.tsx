@@ -159,7 +159,7 @@ export default function MiniGamesPage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
+      <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
         <div className="card p-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-fuchsia-400 to-purple-600 flex items-center justify-center shadow-md">
             <Gift size={40} className="text-white" />
@@ -174,7 +174,7 @@ export default function MiniGamesPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-10">
+    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       <div className="card p-4 mb-4 overflow-hidden relative bg-gradient-to-br from-fuchsia-500 via-purple-600 to-indigo-600 text-white shadow-lg">
         <div className="absolute -top-16 -right-10 w-48 h-48 rounded-full bg-white/10" />
         <div className="absolute -bottom-24 -left-8 w-48 h-48 rounded-full bg-white/5" />
