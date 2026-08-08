@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { verifyPassword } from '@/lib/password'
 import { findUserByUsername, createUser, updateUserLogin, updateUser } from '@/lib/server-store'
 import { signToken, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, '账号已被永久封禁，请联系管理员', 403)
     }
 
-    const valid = bcrypt.compareSync(password, user.password)
+    const valid = await verifyPassword(password, user.password)
     if (!valid) {
       logger.warn('auth', '登录失败: 密码错误', { username })
       return jsonResponse(false, null, '密码错误', 400)
