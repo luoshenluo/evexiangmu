@@ -66,7 +66,7 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 text-center">
+      <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
         <div className="card p-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-garden-100 flex items-center justify-center">
             <User size={40} className="text-garden-500" />
@@ -103,7 +103,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       {/* 用户卡片 */}
       <div className="card p-5 mb-4 relative overflow-hidden bg-gradient-to-br from-garden-500 to-emerald-600 text-white">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
