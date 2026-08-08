@@ -536,20 +536,26 @@ export async function findUserById(id: string): Promise<User | null> {
   return dbRowToUser(data)
 }
 
-// 管理后台用的轻量列集：排除 task_* / achievements / titles / *_friend_requests / password 等重量级 JSONB
-// 这些列在后台统计/列表/权限场景均不需要，且 dbRowToUser 已用 || 兜底缺失列
-const ADMIN_USER_COLUMNS =
-  'id,username,nickname,avatar,coins,created_at,last_login,plots,inventory,inventory_size,' +
-  'is_admin,muted_until,banned_until,family_id,friends,deleted,admin_permissions,petal_coins,title'
-
 export async function getAllUsers(columns?: string): Promise<User[]> {
   await seedDatabase()
   const sb = getSupabase()
-  const { data, error } = await sb.from('users')
-    .select(columns || ADMIN_USER_COLUMNS)
-    .order('created_at', { ascending: true })
+  // 优先用调用方指定的轻量列集；若因数据库缺列报错，自动降级为 select('*')（已被
+  // findUserById 验证可用），避免显式列名引用不存在的列导致整查询失败返回空。
+  const trySelect = async (cols: string) => {
+    const { data, error } = await sb.from('users')
+      .select(cols)
+      .order('created_at', { ascending: true })
+    return { data, error }
+  }
+  let { data, error } = await trySelect(columns || '*')
+  if (error && columns) {
+    // 指定列失败（可能缺列），降级为全列重试
+    logger.warn('system', `getAllUsers 指定列查询失败，降级为 select(*): ${error.message}`)
+    const fallback = await trySelect('*')
+    data = fallback.data
+    error = fallback.error
+  }
   if (error) {
-    // 不再静默吞错：记录原因便于定位超时/缺列/RLS 问题
     logger.error('system', `getAllUsers 查询失败: ${error.message}`, { code: error.code })
     return []
   }
