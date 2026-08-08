@@ -576,6 +576,50 @@ async function doSeed(): Promise<void> {
 
 // ==================== 用户 ====================
 
+/**
+ * 确保用户背包拥有 4 种基础工具（水壶/化肥/除虫剂/加速卡）。
+ * 每次 findUserById / findUserByUsername 返回前调用，
+ * 缺失的工具自动补齐并写回 DB。这样无论 seed 是否跑过，
+ * 老用户登录时都会被兜底。
+ */
+const DEFAULT_TOOLS = [
+  { ref: 'watering_can', name: '水壶',   emoji: '💧', quantity: 5 },
+  { ref: 'fertilizer',   name: '化肥',   emoji: '🧪', quantity: 3 },
+  { ref: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2 },
+  { ref: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1 },
+]
+
+async function ensureUserTools(row: any): Promise<any> {
+  if (!row || row.deleted) return row
+  const inv = Array.isArray(row.inventory) ? [...row.inventory] : []
+  let changed = false
+  const uid = String(row.id || '').replace(/[^a-zA-Z0-9_]/g, '')
+  DEFAULT_TOOLS.forEach((tool, idx) => {
+    const exists = inv.find((i: any) => i && i.type === 'tool' && i.referenceId === tool.ref)
+    if (!exists) {
+      inv.push({
+        id: `inv_t_${uid}_${idx}`,
+        type: 'tool',
+        referenceId: tool.ref,
+        name: tool.name,
+        emoji: tool.emoji,
+        quantity: tool.quantity,
+        maxStack: 99,
+        sellable: true,
+        tradeable: true,
+      })
+      changed = true
+    }
+  })
+  if (changed) {
+    const sb = getSupabase()
+    const { error } = await sb.from('users').update({ inventory: inv }).eq('id', row.id)
+    if (error) logger.warn('system', `补全用户 ${row.id} 工具失败: ${error.message}`)
+    else { logger.info('system', `已为用户 ${row.id} 补全背包基础工具`); row.inventory = inv }
+  }
+  return row
+}
+
 export async function findUserByUsername(username: string): Promise<User | null> {
   await seedDatabase()
   const sb = getSupabase()
@@ -584,6 +628,7 @@ export async function findUserByUsername(username: string): Promise<User | null>
     .eq('username', username)
     .single()
   if (error || !data) return null
+  await ensureUserTools(data)
   return dbRowToUser(data)
 }
 
@@ -595,6 +640,7 @@ export async function findUserById(id: string): Promise<User | null> {
     .eq('id', id)
     .single()
   if (error || !data) return null
+  await ensureUserTools(data)
   return dbRowToUser(data)
 }
 
