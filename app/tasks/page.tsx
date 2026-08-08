@@ -58,7 +58,7 @@ export default function TasksPage() {
   // 游客模式：任务列表为空，提示登录后查看
   if (isGuest) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-3xl md:pt-6">
         <div className="card p-4 mb-4 flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-md shadow-orange-200">
             <ClipboardList size={24} className="text-white" />
@@ -77,7 +77,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-3xl md:pt-6">
       {/* 顶部 */}
       <div className="card p-4 mb-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-garden-200/50 rounded-full -translate-y-16 translate-x-16" />
@@ -107,7 +107,7 @@ export default function TasksPage() {
               key={key}
               onClick={() => setTab(key)}
               className={classNames(
-                'card p-3 text-left transition-all',
+                'card py-3.5 px-3 text-left transition-all',
                 active ? 'ring-2 ring-garden-400 border-garden-300 bg-garden-50/50' : ''
               )}
             >
@@ -128,7 +128,7 @@ export default function TasksPage() {
           暂无任务
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
           {filteredTasks.map(task => {
             const percent = Math.min(task.progress / task.target * 100, 100)
             return (
@@ -189,7 +189,7 @@ export default function TasksPage() {
                         onClick={() => claim(task.id)}
                         disabled={task.claimed || !task.completed || loading === task.id}
                         className={classNames(
-                          'px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all',
+                          'px-3 py-2 rounded-lg text-xs min-h-[40px] font-medium flex items-center gap-1 transition-all',
                           task.claimed
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                             : task.completed
