@@ -38,7 +38,7 @@ const TITLE_OPTIONS: { key: string; label: string }[] = [
   { key: 'checkin_dragon', label: '🐉 签到达人' },
 ]
 
-type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'settings'
+type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'permissions' | 'settings'
 
 // 将 Tab 映射到权限位
 const TAB_PERM_BIT: Record<Tab, number | null> = {
@@ -49,6 +49,7 @@ const TAB_PERM_BIT: Record<Tab, number | null> = {
   sensitive: 2,
   market: 4,
   cdk: 3,
+  permissions: 5, // 权限管理（仅超级管理员或具备权限管理位的管理员）
   settings: null, // 改自己密码和权限说明，所有 admin 可见
 }
 
@@ -62,6 +63,10 @@ export default function AdminPage() {
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [cdks, setCdks] = useState<any[]>([])
+  const [admins, setAdmins] = useState<any[]>([])
+  const [permMeta, setPermMeta] = useState<any[]>([])
+  const [selectedAdmin, setSelectedAdmin] = useState<any>(null)
+  const [tempPerms, setTempPerms] = useState<Record<string, boolean>>({})
   const [searchTerm, setSearchTerm] = useState('')
   const [refreshing, setRefreshing] = useState(false)
 
@@ -110,16 +115,21 @@ export default function AdminPage() {
   const loadAll = useCallback(async () => {
     setRefreshing(true)
     try {
-      const [uRes, aRes, sRes, cRes] = await Promise.all([
+      const [uRes, aRes, sRes, cRes, pRes] = await Promise.all([
         apiFetch('/api/admin/users'),
         apiFetch('/api/admin/announcements'),
         apiFetch('/api/admin/stats'),
         apiFetch('/api/admin/cdks'),
+        apiFetch('/api/admin/permissions'),
       ])
       if (uRes.success) setUsers(uRes.data)
       if (aRes.success) setAnnouncements(aRes.data)
       if (sRes.success) setStats(sRes.data)
       if (cRes.success) setCdks(cRes.data)
+      if (pRes.success) {
+        setAdmins(pRes.data?.admins || [])
+        setPermMeta(pRes.data?.permMeta || [])
+      }
     } finally {
       setRefreshing(false)
     }
@@ -428,6 +438,7 @@ export default function AdminPage() {
     { k: 'sensitive', label: '敏感词库', icon: Shield },
     { k: 'market', label: '市场调控', icon: Tag },
     { k: 'cdk', label: 'CDK管理', icon: Gift },
+    { k: 'permissions', label: '权限管理', icon: Crown },
     { k: 'settings', label: '系统设置', icon: Settings },
   ]
 
@@ -873,6 +884,183 @@ export default function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'permissions' && (
+            <div className="space-y-4">
+              <div className="card p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <Crown size={18} className="text-amber-500" /> 管理员权限管理
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">管理所有管理员账号，分配细粒度权限位</p>
+                </div>
+                {canSetAdminPerms ? (
+                  <button onClick={() => showToast('在「用户管理」中点击普通用户的皇冠图标即可提升为管理员', 'info')} className="btn-secondary text-sm py-1.5 px-3">
+                    + 任命新管理员
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400">仅超级管理员可修改权限</span>
+                )}
+              </div>
+
+              {/* 权限位说明 */}
+              <div className="card p-4">
+                <h3 className="font-bold text-slate-800 text-sm mb-3">权限位说明（Bit 位标识）</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {permMeta.map((p: any) => (
+                    <div key={p.bit} className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="flex items-center gap-1">
+                        <span className="chip bg-indigo-100 text-indigo-700 text-[9px]">Bit {p.bit}</span>
+                        <span className="font-bold text-xs text-slate-700">{p.name}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1 leading-snug">{p.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 管理员列表 */}
+              <div className="card overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800 text-sm">管理员列表（{admins.length}人）</h3>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {admins.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-sm">暂无管理员</div>
+                  )}
+                  {admins.map((a: any) => (
+                    <div key={a.id} className="p-4 flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center text-2xl">
+                        {a.avatar}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-800 truncate">{a.nickname}</span>
+                          {a.isSuperAdmin ? (
+                            <span className="chip bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px]">👑 超级管理员</span>
+                          ) : (
+                            <span className="chip bg-indigo-100 text-indigo-700 text-[10px]">管理员</span>
+                          )}
+                          {!a.isSuperAdmin && (
+                            <span className="chip bg-slate-100 text-slate-500 text-[10px]">权限位 {a.adminPermissions}</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          @{a.username} · ID: {a.id}
+                        </div>
+                        {!a.isSuperAdmin && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {permMeta.map((p: any) => a.permFlags?.[p.key] && (
+                              <span key={p.bit} className="px-1.5 py-0.5 rounded bg-garden-50 text-garden-700 text-[9px]">{p.name}</span>
+                            ))}
+                            {Object.values(a.permFlags || {}).every(v => !v) && (
+                              <span className="text-[10px] text-slate-400">（无任何权限）</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {canSetAdminPerms && !a.isSuperAdmin && (
+                          <button
+                            onClick={() => {
+                              setSelectedAdmin(a)
+                              const flags: Record<string, boolean> = {}
+                              permMeta.forEach((p: any) => { flags[p.key] = !!a.permFlags?.[p.key] })
+                              setTempPerms(flags)
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          >
+                            <Edit size={12} className="inline mr-1" /> 编辑权限
+                          </button>
+                        )}
+                        {canSetAdminPerms && a.id !== (user?.id || '') && !a.isSuperAdmin && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`确定撤销 ${a.nickname} 的管理员权限？`)) return
+                              setLoading(`perm_${a.id}`)
+                              const r = await apiFetch('/api/admin/users/action', {
+                                method: 'POST',
+                                body: JSON.stringify({ userId: a.id, makeAdmin: false }),
+                              })
+                              if (r.success) { showToast('已撤销管理员权限', 'success'); loadAll() }
+                              else showToast(r.error || '操作失败', 'error')
+                              setLoading(null)
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100"
+                          >
+                            <UserX size={12} className="inline mr-1" /> 撤管
+                          </button>
+                        )}
+                        {a.isSuperAdmin && (
+                          <span className="text-[10px] text-amber-600">不可修改</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 编辑权限弹窗 */}
+          {selectedAdmin && (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedAdmin(null)}>
+              <div className="card w-full max-w-md p-5 slide-up" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <Shield size={18} className="text-indigo-500" /> 编辑权限：{selectedAdmin.nickname}
+                  </h2>
+                  <button onClick={() => setSelectedAdmin(null)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+                </div>
+                <div className="space-y-2 mb-4">
+                  {permMeta.map((p: any) => (
+                    <label key={p.bit} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                      <input
+                        type="checkbox"
+                        checked={!!tempPerms[p.key]}
+                        onChange={(e) => setTempPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
+                        className="mt-1 w-4 h-4 accent-indigo-600"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-800">{p.name}</span>
+                          <span className="chip bg-indigo-100 text-indigo-700 text-[9px]">Bit {p.bit}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{p.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setSelectedAdmin(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600">取消</button>
+                  <button
+                    onClick={async () => {
+                      if (!selectedAdmin) return
+                      setLoading(`perm_${selectedAdmin.id}`)
+                      // 计算位掩码
+                      let bits = 0
+                      permMeta.forEach((p: any) => { if (tempPerms[p.key]) bits |= (1 << p.bit) })
+                      const r = await apiFetch('/api/admin/users/action', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          userId: selectedAdmin.id,
+                          adminPermissions: bits,
+                          makeAdmin: bits > 0,
+                        }),
+                      })
+                      if (r.success) { showToast('权限已保存', 'success'); setSelectedAdmin(null); loadAll() }
+                      else showToast(r.error || '保存失败', 'error')
+                      setLoading(null)
+                    }}
+                    disabled={loading?.startsWith('perm_')}
+                    className="flex-1 btn-primary py-2.5"
+                  >
+                    {loading?.startsWith('perm_') ? '保存中...' : '保存权限'}
+                  </button>
                 </div>
               </div>
             </div>
