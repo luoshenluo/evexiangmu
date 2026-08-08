@@ -1234,29 +1234,40 @@ const TASK_INCREMENT_MAP: Record<string, string> = {
   'harvest': 't_daily_3',
   'chat': 't_daily_5',
   'trade': 't_daily_4',
+  'unlock': 't_weekly_1', // 解锁地块：同时计入周常花园扩张
+  'earn_coin': 't_weekly_2', // 赚金币：计入周常富豪
 }
 
 export async function incrementTaskProgress(userId: string, action: string, amount = 1): Promise<void> {
-  const taskId = TASK_INCREMENT_MAP[action]
-  if (!taskId) return
-
   const user = await findUserById(userId)
   if (!user) return
 
   const progress = { ...(user.taskProgress || {}) }
-  progress[taskId] = (progress[taskId] || 0) + amount
 
-  // 同时推进对应的周任务/月任务
+  // 主任务推进（按映射）
+  const dailyTaskId = TASK_INCREMENT_MAP[action]
+  if (dailyTaskId) {
+    progress[dailyTaskId] = (progress[dailyTaskId] || 0) + amount
+  }
+
+  // 同步推进对应的周任务 / 月任务
+  // 周常·花园扩张：解锁 / 种植 / 浇水 / 施肥 / 除虫 / 加速卡 都算（打理类行为 + 解锁）
+  if (action === 'unlock' || action === 'plant' || action === 'water' ||
+      action === 'fertilize' || action === 'pesticide' || action === 'speedup') {
+    progress['t_weekly_1'] = (progress['t_weekly_1'] || 0) + amount
+  }
+  // 周常·富豪（累计获得金币）：amount = 本次获得的金币数
+  if (action === 'earn_coin' && amount > 0) {
+    progress['t_weekly_2'] = (progress['t_weekly_2'] || 0) + amount
+  }
+  // 日常收获同时推进月常·大收藏家（收获 20 朵花）
   if (action === 'harvest') {
     progress['t_monthly_1'] = (progress['t_monthly_1'] || 0) + amount
   }
-  if (action === 'plant' || action === 'water' || action === 'fertilize') {
-    progress['t_weekly_1'] = (progress['t_weekly_1'] || 0) + amount
-  }
 
-  // 登录任务特殊处理
-  if (action === 'login') {
-    progress['t_daily_1'] = 1
+  // 登录任务特殊处理：幂等，最多到 1（避免重复累加）
+  if (action === 'login' || action === 'daily_checkin') {
+    progress['t_daily_1'] = Math.max(1, progress['t_daily_1'] || 1)
   }
 
   const lastReset = { ...(user.taskLastReset || {}) }
