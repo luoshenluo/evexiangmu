@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import {
   getMessages, addMessage, ensureSeasonTick,
   getSensitiveWordList, checkMessageRateLimit, recordServerMessageTime, getChatSettings,
+  incrementTaskProgress,
 } from '@/lib/server-store'
 import { filterSensitiveWords, containsSensitiveWords } from '@/lib/game-data'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -80,6 +81,9 @@ export async function POST(
 
     // 记录服务端发言时间
     recordServerMessageTime(user.id)
+
+    // 任务进度：聊天爱好者（世界频道发言 3 次，家族/私聊也计入总发言）
+    try { await incrementTaskProgress(user.id, 'chat', 1) } catch {}
 
     logger.info('chat', '用户发言', {
       userId: user.id, channel,
