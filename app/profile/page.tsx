@@ -184,8 +184,8 @@ export default function ProfilePage() {
 
       {/* CDK 弹窗 */}
       {showCDK && (
-        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowCDK(false)}>
-          <div className="card w-full max-w-md p-5 slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCDK(false)}>
+          <div className="card w-full max-w-md p-5 slide-up rounded-t-3xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                 <Gift size={20} className="text-purple-500" /> CDK 兑换
