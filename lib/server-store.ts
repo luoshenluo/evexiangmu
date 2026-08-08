@@ -13,7 +13,7 @@ import {
   getFlowerSellPrice, getSeasonByMonth,
   FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
 } from './game-data'
-import { hashPassword } from './password'
+import bcrypt from 'bcryptjs'
 
 // ==================== 工具函数 ====================
 
@@ -395,7 +395,7 @@ async function doSeed(): Promise<void> {
   const now = Date.now()
 
   // 创建管理员用户
-  const adminHash = await hashPassword('admin123')
+  const adminHash = bcrypt.hashSync('admin123', 10)
   const adminPlots = createInitialPlots(30)
   const { error: adminErr } = await sb.from('users').upsert({
     id: 'admin',
@@ -434,7 +434,7 @@ async function doSeed(): Promise<void> {
   else logger.info('system', '管理员账号创建成功')
 
   // 创建演示用户
-  const userHash = await hashPassword('123456')
+  const userHash = bcrypt.hashSync('123456', 10)
   const demoPlots = createInitialPlots(3)
   const { error: demoErr } = await sb.from('users').upsert({
     id: 'user1',
@@ -679,7 +679,7 @@ export async function createUser(data: { username: string; password: string; nic
   const sb = getSupabase()
   const userId = genId('u')
   const now = Date.now()
-  const hash = await hashPassword(data.password)
+  const hash = bcrypt.hashSync(data.password, 10)
 
   const newRow = {
     id: userId,
@@ -2850,4 +2850,33 @@ export async function getAllFamilies(): Promise<Family[]> {
   return getFamilies(undefined, 500)
 }
 
+export async function findAdminByUserId(userId: string) {
+  const { supabaseClient } = getSupabase()
+  const { data, error } = await supabaseClient
+    .from('admins')
+    .select('*')
+    .eq('userId', userId)
+    .single()
+  if (error && error.code !== 'PGRST116') throw error
+  return data || null
+}
 
+export async function updateAdminPassword(userId: string, passwordHash: string) {
+  const { supabaseClient } = getSupabase()
+  const { error } = await supabaseClient
+    .from('admins')
+    .update({ password: passwordHash, updatedAt: Date.now() })
+    .eq('userId', userId)
+  if (error) throw error
+  return true
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string) {
+  const { supabaseClient } = getSupabase()
+  const { error } = await supabaseClient
+    .from('users')
+    .update({ password: passwordHash, updatedAt: Date.now() })
+    .eq('id', userId)
+  if (error) throw error
+  return true
+}
