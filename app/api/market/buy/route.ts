@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick, createNotification } from '@/lib/server-store'
-import { FLOWER_TYPES, SEED_TYPES } from '@/lib/game-data'
+import { FLOWER_TYPES, SEED_TYPES, TOOLS } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
@@ -26,9 +26,14 @@ export async function POST(req: NextRequest) {
     // 添加物品到背包
     let newInventory = [...user.inventory]
     for (let i = 0; i < quantity; i++) {
-      const baseInfo = listing.itemType === 'flower'
-        ? FLOWER_TYPES.find(f => f.id === listing.referenceId)
-        : SEED_TYPES.find(s => s.id === listing.referenceId)
+      let baseInfo: any = null
+      if (listing.itemType === 'flower') {
+        baseInfo = FLOWER_TYPES.find(f => f.id === listing.referenceId)
+      } else if (listing.itemType === 'seed') {
+        baseInfo = SEED_TYPES.find(s => s.id === listing.referenceId)
+      } else if (listing.itemType === 'tool') {
+        baseInfo = TOOLS.find(t => t.id === listing.referenceId)
+      }
       if (!baseInfo) continue
 
       const existing = newInventory.find(
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
           referenceId: listing.referenceId,
           name: listing.name,
           emoji: listing.emoji,
-          rank: listing.rank,
+          rank: listing.itemType === 'flower' ? listing.rank : undefined,
           quantity: 1,
           maxStack: 99,
           sellable: listing.itemType !== 'seed',
