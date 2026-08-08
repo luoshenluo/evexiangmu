@@ -49,15 +49,15 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col slide-up"
+        className="card w-full max-w-lg max-h-[70vh] sm:max-h-[80vh] overflow-hidden flex flex-col slide-up rounded-t-3xl sm:rounded-xl seed-selector-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 flex-shrink-0 sm:rounded-t-xl rounded-t-3xl">
           <div>
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <Leaf size={20} className="text-garden-500" />
