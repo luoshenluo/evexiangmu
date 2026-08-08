@@ -30,15 +30,15 @@ export async function POST(req: Request) {
       if (target.id === admin.id) {
         return jsonResponse(false, null, '不能修改自己的权限', 403)
       }
-      updates.is_admin = makeAdmin
+      updates.isAdmin = makeAdmin
       if (makeAdmin) {
         // 首次任命管理员时：如果前端没有传 adminPermissions，给默认基础权限 0b0000_0111 = Bit0+Bit1+Bit2
         if (adminPermissions === undefined) {
-          updates.admin_permissions = (1 | 2 | 4)
+          updates.adminPermissions = (1 | 2 | 4)
         }
       } else {
         // 撤管时清除权限位
-        updates.admin_permissions = 0
+        updates.adminPermissions = 0
       }
     }
 
@@ -53,7 +53,9 @@ export async function POST(req: Request) {
       if (!Number.isInteger(masked) || masked < 0 || masked > 0xff) {
         return jsonResponse(false, null, '权限位不合法', 400)
       }
-      updates.admin_permissions = masked
+      updates.adminPermissions = masked
+      // 有任意权限位 => 自动设为管理员；无权限位 => 撤管
+      if (masked > 0 && updates.isAdmin === undefined) updates.isAdmin = true
     }
 
     if (banUser) {
@@ -61,17 +63,17 @@ export async function POST(req: Request) {
       if (target.isAdmin && !isSuperAdmin(admin.id)) return jsonResponse(false, null, '不能封号管理员', 403)
       if (banDays !== undefined && banDays > 0) {
         updates.deleted = true
-        updates.banned_until = Date.now() + banDays * 24 * 60 * 60 * 1000
+        updates.bannedUntil = Date.now() + banDays * 24 * 60 * 60 * 1000
       } else {
         updates.deleted = true
-        updates.banned_until = null
+        updates.bannedUntil = null
       }
     }
 
     if (unbanUser) {
       if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
       updates.deleted = false
-      updates.banned_until = null
+      updates.bannedUntil = null
     }
 
     if (nickname !== undefined) {
