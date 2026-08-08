@@ -9,13 +9,15 @@ import type { ItemType } from '@/lib/types'
 import {
   Settings, Users, MessageSquare, TrendingUp, Gift, Coins, Tag, Plus, X,
   Search, Ban, Crown, Shield, AlertCircle, Bell, Trash2, Edit, Key,
-  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf, Flower2, Medal, Sparkles, Hammer
+  RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf, Flower2, Medal, Sparkles, Hammer,
+  ClipboardList
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 import ChatManagement from '@/components/admin/ChatManagement'
 import SensitiveWords from '@/components/admin/SensitiveWords'
 import ChatSettingsPanel from '@/components/admin/ChatSettingsPanel'
 import AdminMarketPanel from '@/components/admin/AdminMarketPanel'
+import TaskManagement from '@/components/admin/TaskManagement'
 
 // CDK 奖励物品行结构
 interface CDKItemReward {
@@ -38,7 +40,7 @@ const TITLE_OPTIONS: { key: string; label: string }[] = [
   { key: 'checkin_dragon', label: '🐉 签到达人' },
 ]
 
-type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'cdk' | 'permissions' | 'settings'
+type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'tasks' | 'cdk' | 'permissions' | 'settings'
 
 // 将 Tab 映射到权限位
 const TAB_PERM_BIT: Record<Tab, number | null> = {
@@ -48,6 +50,7 @@ const TAB_PERM_BIT: Record<Tab, number | null> = {
   chat: 2,
   sensitive: 2,
   market: 4,
+  tasks: 7,       // 任务管理 - 经济调控权限
   cdk: 3,
   permissions: 5, // 权限管理（仅超级管理员或具备权限管理位的管理员）
   settings: null, // 改自己密码和权限说明，所有 admin 可见
@@ -437,6 +440,7 @@ export default function AdminPage() {
     { k: 'chat', label: '聊天管理', icon: MessageSquare },
     { k: 'sensitive', label: '敏感词库', icon: Shield },
     { k: 'market', label: '市场调控', icon: Tag },
+    { k: 'tasks', label: '任务管理', icon: ClipboardList },
     { k: 'cdk', label: 'CDK管理', icon: Gift },
     { k: 'permissions', label: '权限管理', icon: Crown },
     { k: 'settings', label: '系统设置', icon: Settings },
@@ -832,6 +836,10 @@ export default function AdminPage() {
             <div className="space-y-4">
               <AdminMarketPanel />
             </div>
+          )}
+
+          {tab === 'tasks' && (
+            <TaskManagement />
           )}
 
           {tab === 'cdk' && (
