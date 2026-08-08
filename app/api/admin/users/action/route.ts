@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { findUserById, updateUser } from '@/lib/server-store'
-import bcrypt from 'bcryptjs'
+import { hashPassword } from '@/lib/password'
 import { authRequest, jsonResponse, isSuperAdmin, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (newPassword) {
       if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
       if (newPassword.length < 4) return jsonResponse(false, null, '密码至少4位', 400)
-      updates.password = bcrypt.hashSync(newPassword, 10)
+      updates.password = await hashPassword(newPassword)
     }
 
     if (makeAdmin !== undefined) {
@@ -32,29 +32,24 @@ export async function POST(req: Request) {
       }
       updates.isAdmin = makeAdmin
       if (makeAdmin) {
-        // 首次任命管理员时：如果前端没有传 adminPermissions，给默认基础权限 0b0000_0111 = Bit0+Bit1+Bit2
         if (adminPermissions === undefined) {
           updates.adminPermissions = (1 | 2 | 4)
         }
       } else {
-        // 撤管时清除权限位
         updates.adminPermissions = 0
       }
     }
 
-    // 设置子管理员权限位
     if (adminPermissions !== undefined) {
       if (!userHasPermission(admin, 5)) return jsonResponse(false, null, '无「权限管理」权限', 403)
       if (!isSuperAdmin(admin.id) && isSuperAdmin(target.id)) {
         return jsonResponse(false, null, '不能修改超级管理员权限', 403)
       }
-      // 权限位只允许低 8 位
       const masked = Number(adminPermissions) & 0xff
       if (!Number.isInteger(masked) || masked < 0 || masked > 0xff) {
         return jsonResponse(false, null, '权限位不合法', 400)
       }
       updates.adminPermissions = masked
-      // 有任意权限位 => 自动设为管理员；无权限位 => 撤管
       if (masked > 0 && updates.isAdmin === undefined) updates.isAdmin = true
     }
 
