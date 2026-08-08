@@ -331,6 +331,47 @@ async function doSeed(): Promise<void> {
     logger.warn('system', `检测 buy_orders 列名失败: ${e?.message || 'unknown'}`)
   }
 
+  // ============================================================
+  //  自修复 3：检测 users 表是否缺少 admin_permissions / family_id 等关键列
+  //  （线上老用户如果数据库没迁移，会导致管理员/家族功能写入失败）
+  //  如缺列则通过内部 _garden_ensure_users_cols RPC 自动补列；无 RPC 则打 warn
+  // ============================================================
+  try {
+    const { data: cols } = await sb
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'users')
+    const colNames = new Set((cols || []).map((c: any) => c.column_name))
+    const REQUIRED_COLS: { name: string; type: string; def: string }[] = [
+      { name: 'admin_permissions', type: 'INTEGER',   def: 'DEFAULT 0' },
+      { name: 'family_id',        type: 'TEXT',      def: '' },
+      { name: 'is_admin',         type: 'BOOLEAN',   def: 'DEFAULT FALSE' },
+      { name: 'petal_coins',      type: 'INTEGER',   def: 'DEFAULT 0' },
+      { name: 'title',            type: 'TEXT',      def: "DEFAULT ''" },
+      { name: 'titles',           type: 'JSONB',     def: "DEFAULT '[]'::jsonb" },
+      { name: 'achievements',     type: 'JSONB',     def: "DEFAULT '[]'::jsonb" },
+      { name: 'muted_until',      type: 'BIGINT',    def: '' },
+      { name: 'banned_until',     type: 'BIGINT',    def: '' },
+    ]
+    const missing = REQUIRED_COLS.filter(c => !colNames.has(c.name))
+    if (missing.length > 0) {
+      logger.warn('system', `users 表缺少列: ${missing.map(c=>c.name).join(',')}。尝试补列...`)
+      // 尝试通过 RPC 补列（需要管理员先在 Supabase SQL Editor 创建该 RPC，见 hotupdate_supabase.sql）
+      try {
+        const { error } = await sb.rpc('_garden_ensure_users_cols', {})
+        if (error) logger.warn('system', `RPC 补列失败（需先创建 _garden_ensure_users_cols）: ${error.message}`)
+        else logger.info('system', 'users 缺失列已通过 RPC 自动补齐')
+      } catch (rpcE: any) {
+        logger.warn('system', `users 缺列补 RPC 失败，请手动执行 hotupdate_supabase.sql: ${rpcE?.message || 'unknown'}`)
+      }
+    } else {
+      logger.info('system', 'users 表字段完整校验通过')
+    }
+  } catch (e: any) {
+    logger.warn('system', `检测 users 列名失败: ${e?.message || 'unknown'}`)
+  }
+
   // 检查是否已有用户
   const { data: allUsers, error: listErr } = await sb.from('users').select('id, plots, inventory, is_admin, task_progress, task_claimed, task_last_reset')
   if (listErr) {
@@ -2220,7 +2261,45 @@ export async function joinFamily(userId: string, familyId: string): Promise<{ su
 
 export async function leaveFamilyReal(userId: string): Promise<{ success: boolean; error?: string }> {
   const u = await findUserById(userId)
-  if (!u || !u.familyId) return { success: false, error: '你未加入任何家族' }
+  const sb = getSupabase()
+
+  // Step 1: 强制清理所有 families 表中 members 数组里的该用户记录（跨表兜底，解决用户在 family.members 里但 family_id 为空或不一致的脏数据）
+  try {
+    const { data: allFamilies } = await sb.from('families').select('id, members')
+    if (allFamilies && Array.isArray(allFamilies)) {
+      for (const fam of allFamilies as any[]) {
+        if (!Array.isArray(fam.members)) continue
+        if (fam.members.some((m: any) => m && m.userId === userId)) {
+          const newMembers = fam.members.filter((m: any) => m && m.userId !== userId)
+          let updates: Record<string, any> = { members: newMembers }
+          // 如果该用户是族长，并且删完之后还有人，自动转让
+          if (fam.owner_id === userId && newMembers.length > 0) {
+            const newOwner = newMembers.find((m: any) => m.role === 'admin') || newMembers[0]
+            updates.owner_id = newOwner.userId
+            updates.members = newMembers.map((m: any) =>
+              m.userId === newOwner.userId ? { ...m, role: 'owner' } : m
+            )
+          }
+          // 如果删完没人了，直接解散家族
+          if (newMembers.length === 0) {
+            await sb.from('families').delete().eq('id', fam.id)
+          } else {
+            await sb.from('families').update(updates).eq('id', fam.id)
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    logger.warn('family', `leaveFamilyReal 清理 families.members 脏数据失败: ${e?.message}`)
+  }
+
+  // Step 2: 常规 leave 逻辑
+  if (!u) return { success: false, error: '用户不存在' }
+  // 不管 familyId 是否为空，最后都强制设空，保证本地/DB一致
+  if (!u.familyId) {
+    await updateUser(userId, { familyId: null })
+    return { success: true }
+  }
   const fam = await findFamilyById(u.familyId)
   if (!fam) {
     // 家族已不存在（可能被解散或数据异常）：强制清空用户 familyId，避免卡死
@@ -2229,7 +2308,6 @@ export async function leaveFamilyReal(userId: string): Promise<{ success: boolea
   }
 
   const isOwner = fam.ownerId === userId
-  const sb = getSupabase()
 
   if (isOwner) {
     // 族长退出 = 解散家族（仅当只剩族长1人时，否则转移给 admin 或报错）
