@@ -192,6 +192,9 @@ export async function POST(req: NextRequest) {
 
     logger.info('tasks', '任务奖励领取', { userId: freshUser.id, taskId, coins: task.rewards.coins })
 
+    // 周常·富豪：领取到的金币计入"累计获得"
+    try { if (task.rewards.coins > 0) await incrementTaskProgress(freshUser.id, 'earn_coin', task.rewards.coins) } catch {}
+
     return jsonResponse(true, {
       user: sanitizeUser(updated),
       rewards: {
