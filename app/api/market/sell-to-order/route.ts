@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import {
   updateUser, findUserById, ensureSeasonTick, getBuyOrders,
-  updateBuyOrderQuantity, addInventoryItem, createNotification,
+  updateBuyOrderQuantity, addInventoryItem, createNotification, incrementTaskProgress,
 } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
       title: '出售成功',
       content: `出售 ${order.emoji} ${order.name} x${quantity}，获得 ${coinsEarned} 金币。`,
     })
+
+    // 任务进度：贸易达人（日） + 周常富豪（累计获得金币）
+    try { await incrementTaskProgress(user.id, 'trade', 1) } catch {}
+    try { if (coinsEarned > 0) await incrementTaskProgress(user.id, 'earn_coin', coinsEarned) } catch {}
 
     return jsonResponse(true, { user: sanitizeUser(updated), coinsEarned })
   } catch (e: any) {
