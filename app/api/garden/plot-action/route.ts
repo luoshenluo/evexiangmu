@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick, createNotification } from '@/lib/server-store'
+import { updateUser, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES, TOOLS, getFlowerSellPrice, PEST_CONFIG } from '@/lib/game-data'
 import type { InventoryItem, PlantedFlower } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -113,6 +113,9 @@ export async function POST(req: NextRequest) {
         title: '🌸 收获成功',
         content: `收获了 ${flowerType.name}（${rankLabel(plot.flower.rank)}级），已存入背包，出售可得 ${sellPrice} 💰`,
       })
+
+      // 任务进度：收获季节（日） + 大收藏家（月）
+      try { await incrementTaskProgress(user.id, 'harvest', 1) } catch {}
 
       logger.info('garden', '收获成功', {
         userId: user.id, plotId,
@@ -275,6 +278,12 @@ async function executeAction(
 
   const newPlots = user.plots.map((p: any) => p.id === plotId ? { ...p, flower: f } : p)
   const updated = await updateUser(user.id, { plots: newPlots, inventory, coins })
+
+  // 任务进度：根据操作类型推进每日任务 + 周常花园扩张
+  if (action === 'water' || action === 'fertilize' || action === 'pesticide' || action === 'speedup') {
+    try { await incrementTaskProgress(user.id, action, 1) } catch {}
+  }
+
   return jsonResponse(true, {
     user: sanitizeUser(updated),
     plot: updated?.plots.find((p: any) => p.id === plotId),
