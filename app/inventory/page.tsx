@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { RankNames, RankColors, getInventoryExpandPrice } from '@/lib/game-data'
-import { Package, Trash2, Tag, Droplets, Sparkles, Bug, Zap, Plus, X, Coins } from 'lucide-react'
+import { RankNames, RankColors, getInventoryExpandPrice, FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { Package, Trash2, Tag, Droplets, Sparkles, Bug, Zap, Plus, X, Coins, ShoppingCart } from 'lucide-react'
 import type { InventoryItem } from '@/lib/types'
 
 export default function InventoryPage() {
+  const router = useRouter()
   const { user, updateUser, showToast } = useAppStore()
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
@@ -55,8 +57,25 @@ export default function InventoryPage() {
     }
   }
 
+  // 计算花朵官方收购价（用户提示用途）
+  const getOfficialPrice = (item: InventoryItem): number | null => {
+    if (item.type !== 'flower') return null
+    const ft = FLOWER_TYPES.find(f => f.id === item.referenceId)
+    if (!ft) return null
+    return getFlowerSellPrice(ft, (item.rank || 1) as any)
+  }
+
   const sellItem = async () => {
     if (!selectedItem || !selectedItem.sellable) return
+    // 鲜花：跳转到市场上架（直接出售的bug修复）；非鲜花（种子/道具）仍可直接卖给官方
+    if (selectedItem.type === 'flower') {
+      const officialPrice = getOfficialPrice(selectedItem)
+      const ok = confirm(
+        `鲜花不能直接出售。请前往市场上架挂售，可自行设定价格；\n官方收购价约 ${officialPrice} 💰 / 朵，是否前往市场？`
+      )
+      if (ok) router.push('/market')
+      return
+    }
     setLoading('sell')
     try {
       const res = await apiFetch('/api/inventory/sell', {
@@ -227,15 +246,33 @@ export default function InventoryPage() {
               </button>
             </div>
 
+            {/* 鲜花：跳转市场上架；非鲜花：直接出售给官方 */}
+            {selectedItem.type === 'flower' && selectedItem.sellable && (
+              <div className="mb-2 p-2.5 rounded-xl bg-pink-50 border border-pink-200">
+                <div className="text-[11px] text-pink-800">
+                  <span className="font-bold">🌸 鲜花挂售提示：</span>
+                  鲜花需前往市场上架，可自定义价格卖给其他玩家；
+                  官方收购价约 <span className="font-bold text-amber-700">{getOfficialPrice(selectedItem)} 💰</span> / 朵。
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 mt-4">
               {selectedItem.sellable && (
                 <button
                   onClick={sellItem}
                   disabled={loading === 'sell'}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 active:scale-95 transition-all"
+                  className={classNames(
+                    'flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-medium active:scale-95 transition-all',
+                    selectedItem.type === 'flower'
+                      ? 'bg-garden-500 text-white hover:bg-garden-600'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                  )}
                 >
-                  <Coins size={18} />
-                  出售 1 个
+                  {selectedItem.type === 'flower' ? (
+                    <><ShoppingCart size={18} /> 前往市场上架</>
+                  ) : (
+                    <><Coins size={18} /> 出售 1 个</>
+                  )}
                 </button>
               )}
               <button

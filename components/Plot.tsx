@@ -5,7 +5,8 @@ import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
 import { FLOWER_TYPES, SEASON_NAMES, SEASON_COLORS, TOOLS, getFlowerSellPrice, RankNames, RankColors } from '@/lib/game-data'
 import type { Plot as PlotType, InventoryItem, SeedType, PlantedFlower } from '@/lib/types'
-import { Lock, Droplets, Sparkles, Bug, Leaf, Coins, AlertTriangle, ChevronLeft, ChevronRight, Store } from 'lucide-react'
+import { Lock, Droplets, Sparkles, Bug, Leaf, Coins, AlertTriangle, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import SeedSelector from './SeedSelector'
 
 interface Props {
@@ -36,11 +37,20 @@ function getGrowthStage(progress: number, isReady: boolean): GrowthStage {
 
 export default function Plot({ plot, onUpdate }: Props) {
   const { user, updateUser, showToast, isGuest } = useAppStore()
+  const router = useRouter()
   const [showPlant, setShowPlant] = useState(false)
   const [showActions, setShowActions] = useState(false)
   const [loading, setLoading] = useState(false)
   const flower = plot.flower
   const flowerType = flower ? FLOWER_TYPES.find(f => f.id === flower.flowerTypeId) : null
+
+  // 从背包获取指定工具的剩余数量
+  const getToolCount = (toolRefId: string) => {
+    if (!user) return 0
+    return user.inventory
+      .filter(i => i.type === 'tool' && i.referenceId === toolRefId && i.quantity > 0)
+      .reduce((s, i) => s + i.quantity, 0)
+  }
 
   const unlock = async () => {
     if (isGuest) { showToast('请先登录', 'info'); return }
@@ -76,7 +86,11 @@ export default function Plot({ plot, onUpdate }: Props) {
       })
       if (res.success) {
         if (action === 'harvest') {
-          showToast(`🎉 收获成功！获得 ${res.data.rewardName}，金币+${res.data.coinsEarned || 0}`, 'success')
+          // 收获：存入背包（不再直接售卖给金币）
+          const fs = res.data?.flowerStored
+          showToast(fs
+            ? `🌸 收获了 ${fs.name}（${RankNames[(fs.rank || 1) as keyof typeof RankNames] || ''}级），已存入背包，可在市场出售得 ${fs.sellPrice} 💰`
+            : (res.data?.message || '🌸 收获成功，花朵已存入背包'), 'success')
         } else {
           const names = { water: '浇水', fertilize: '施肥', pesticide: '除虫', speedup: '加速' }
           showToast(`${names[action as keyof typeof names]}成功！`, 'success')
@@ -285,62 +299,100 @@ export default function Plot({ plot, onUpdate }: Props) {
               </div>
             )}
 
-            {/* 操作按钮 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {!flower.isReady && (
-                <>
-                  <button
-                    onClick={() => performAction('water')}
-                    disabled={loading}
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all active:scale-95"
-                  >
-                    <Droplets size={20} className="text-blue-500" />
-                    <span className="text-xs font-medium text-blue-700">浇水</span>
-                  </button>
-                  <button
-                    onClick={() => performAction('fertilize')}
-                    disabled={loading}
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all active:scale-95"
-                  >
-                    <Sparkles size={20} className="text-purple-500" />
-                    <span className="text-xs font-medium text-purple-700">施肥</span>
-                  </button>
-                  <button
-                    onClick={() => performAction('speedup')}
-                    disabled={loading}
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 transition-all active:scale-95"
-                  >
-                    <Leaf size={20} className="text-yellow-600" />
-                    <span className="text-xs font-medium text-yellow-700">加速</span>
-                  </button>
-                  <button
-                    onClick={() => performAction('pesticide')}
-                    disabled={loading}
-                    className={classNames(
-                      'flex flex-col items-center gap-1 py-3 rounded-xl transition-all active:scale-95',
-                      flower.hasPest
-                        ? 'bg-red-50 hover:bg-red-100 border-2 border-red-400 animate-pulse'
-                        : 'bg-slate-50 hover:bg-slate-100 border border-slate-200'
-                    )}
-                  >
-                    <Bug size={20} className={flower.hasPest ? 'text-red-500' : 'text-slate-500'} />
-                    <span className={classNames(
-                      'text-xs font-medium',
-                      flower.hasPest ? 'text-red-700' : 'text-slate-600'
-                    )}>除虫</span>
-                  </button>
-                </>
-              )}
-            </div>
+            {/* 操作按钮：显示道具剩余量，无道具时提示金币价格 */}
+            {!flower.isReady && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                  {(() => {
+                    const actions: { key: 'water' | 'fertilize' | 'speedup' | 'pesticide'; toolId: string; label: string; Icon: any; color: string }[] = [
+                      { key: 'water', toolId: 'watering_can', label: '浇水', Icon: Droplets, color: 'blue' },
+                      { key: 'fertilize', toolId: 'fertilizer', label: '施肥', Icon: Sparkles, color: 'purple' },
+                      { key: 'speedup', toolId: 'speedup_card', label: '加速', Icon: Leaf, color: 'yellow' },
+                      { key: 'pesticide', toolId: 'pesticide', label: '除虫', Icon: Bug, color: 'red' },
+                    ]
+                    const colorMap: Record<string, { bg: string; hover: string; border: string; text: string; pulse?: string }> = {
+                      blue:   { bg: 'bg-blue-50', hover: 'hover:bg-blue-100',     border: 'border-blue-200',    text: 'text-blue-700' },
+                      purple: { bg: 'bg-purple-50', hover: 'hover:bg-purple-100', border: 'border-purple-200',  text: 'text-purple-700' },
+                      yellow: { bg: 'bg-yellow-50', hover: 'hover:bg-yellow-100', border: 'border-yellow-200',  text: 'text-yellow-700' },
+                      red:    { bg: 'bg-slate-50', hover: 'hover:bg-red-100',    border: 'border-slate-200',   text: 'text-slate-600' },
+                    }
+                    return actions.map(({ key, toolId, label, Icon, color }) => {
+                      const tool = TOOLS.find(t => t.id === toolId)!
+                      const cnt = getToolCount(toolId)
+                      const hasTool = cnt > 0
+                      const cm = color === 'red' && flower.hasPest
+                        ? { bg: 'bg-red-50', hover: 'hover:bg-red-100', border: 'border-2 border-red-400 animate-pulse', text: 'text-red-700' }
+                        : colorMap[color]
+                      const iconClass = color === 'red' && flower.hasPest ? 'text-red-500' : color === 'yellow' ? 'text-yellow-600' : `text-${color}-500`
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => performAction(key)}
+                          disabled={loading}
+                          className={classNames(
+                            'flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl transition-all active:scale-95 border',
+                            cm.bg, cm.hover, cm.border
+                          )}
+                        >
+                          <Icon size={18} className={iconClass} />
+                          <span className={classNames('text-xs font-medium', cm.text)}>{label}</span>
+                          <span className={classNames(
+                            'text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full',
+                            hasTool ? 'bg-white/80 text-slate-700' : 'bg-amber-50 text-amber-700'
+                          )}>
+                            {hasTool ? `剩余 ${cnt}` : `💰${tool.price}/次`}
+                          </span>
+                        </button>
+                      )
+                    })
+                  })()}
+                </div>
+                {/* 道具购买提示 */}
+                {(() => {
+                  const lacking = ['watering_can', 'fertilizer', 'speedup_card', 'pesticide']
+                    .map(id => ({ id, tool: TOOLS.find(t => t.id === id)!, cnt: getToolCount(id) }))
+                    .filter(x => x.cnt === 0 && x.tool)
+                  if (lacking.length === 0) return null
+                  return (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 mb-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="text-[11px] text-amber-800">
+                          <span className="font-bold">💡 道具不足：</span>
+                          {lacking.map(x => `${x.tool.name}（${x.tool.price}💰）`).join(' · ')}
+                          ，无道具时将直接扣除金币使用；也可前往市场购买入背包。
+                        </div>
+                        <button
+                          onClick={() => router.push('/market')}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 transition-all flex items-center gap-1"
+                        >
+                          <ShoppingCart size={12} /> 去市场
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </>
+            )}
 
             {flower.isReady && (
-              <button
-                onClick={() => performAction('harvest')}
-                disabled={loading}
-                className="w-full btn-primary py-3 mt-3 text-base bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-              >
-                🎉 立即收获（获得金币 +{sellPrice}）
-              </button>
+              <div className="mt-3">
+                <div className="text-xs text-slate-500 mb-2 flex items-center justify-between">
+                  <span>售价：{sellPrice} 💰 / 朵（需存入背包后到市场上架出售）</span>
+                  <button
+                    onClick={() => router.push('/market')}
+                    className="text-[11px] font-semibold text-garden-600 hover:text-garden-700 flex items-center gap-0.5"
+                  >
+                    <ShoppingCart size={12} /> 前往市场
+                  </button>
+                </div>
+                <button
+                  onClick={() => performAction('harvest')}
+                  disabled={loading}
+                  className="w-full btn-primary py-3 text-base bg-gradient-to-r from-garden-500 to-emerald-500 hover:from-garden-600 hover:to-emerald-600"
+                >
+                  🎁 收获并存入背包
+                </button>
+              </div>
             )}
 
             <button

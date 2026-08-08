@@ -95,19 +95,19 @@ export default function GardenPage() {
           <span>你是游客模式，登录后解锁完整玩法</span>
         </div>
 
-        {/* 季节 */}
-        <div className={`card p-3 flex items-center gap-3 mb-4 bg-gradient-to-br ${
+        {/* 季节：统一加白色半透明底层 + 深色文字，保证任意渐变背景下都清晰可读 */}
+        <div className={`card p-0 mb-4 overflow-hidden bg-gradient-to-br ${
           SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
-        } ${['spring', 'summer'].includes(currentSeason) ? 'text-slate-900' : 'text-white'}`}>
-          <div className={`w-10 h-10 rounded-xl backdrop-blur flex items-center justify-center ${
-            ['spring', 'summer'].includes(currentSeason) ? 'bg-white/40' : 'bg-white/20'
-          }`}>
-            <Sun size={20} className={['spring', 'summer'].includes(currentSeason) ? 'text-slate-800' : ''} />
-          </div>
-          <div>
-            <div className={`text-[11px] ${['spring', 'summer'].includes(currentSeason) ? 'opacity-70' : 'opacity-80'}`}>当前季节</div>
-            <div className="text-lg font-bold">
-              {SEASON_NAMES[currentSeason] || '春季'}
+        }`}>
+          <div className="p-3 flex items-center gap-3 bg-white/55 backdrop-blur-[1px] text-slate-900">
+            <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
+              <Sun size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-600/90">当前季节</div>
+              <div className="text-lg font-bold text-slate-900">
+                {SEASON_NAMES[currentSeason] || '春季'}
+              </div>
             </div>
           </div>
         </div>
@@ -216,18 +216,19 @@ export default function GardenPage() {
             <div className="text-lg font-bold text-amber-600">{formatNumber(user.coins)}</div>
           </div>
         </div>
-        <div className={`card p-3 flex items-center gap-3 bg-gradient-to-br ${
+        {/* 季节：统一加白色半透明底层 + 深色文字，保证任意渐变背景下都清晰可读 */}
+        <div className={`card p-0 overflow-hidden bg-gradient-to-br ${
           SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
-        } ${['spring', 'summer'].includes(currentSeason) ? 'text-slate-900' : 'text-white'}`}>
-          <div className={`w-10 h-10 rounded-xl backdrop-blur flex items-center justify-center ${
-            ['spring', 'summer'].includes(currentSeason) ? 'bg-white/40' : 'bg-white/20'
-          }`}>
-            <Sun size={20} className={['spring', 'summer'].includes(currentSeason) ? 'text-slate-800' : ''} />
-          </div>
-          <div>
-            <div className={`text-[11px] ${['spring', 'summer'].includes(currentSeason) ? 'opacity-70' : 'opacity-80'}`}>当前季节</div>
-            <div className="text-lg font-bold">
-              {SEASON_NAMES[currentSeason] || '春季'}
+        }`}>
+          <div className="p-3 flex items-center gap-3 bg-white/55 backdrop-blur-[1px] text-slate-900">
+            <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
+              <Sun size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-600/90">当前季节</div>
+              <div className="text-lg font-bold text-slate-900">
+                {SEASON_NAMES[currentSeason] || '春季'}
+              </div>
             </div>
           </div>
         </div>
