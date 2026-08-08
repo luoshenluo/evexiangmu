@@ -98,12 +98,14 @@ export default function GardenPage() {
         {/* 季节 */}
         <div className={`card p-3 flex items-center gap-3 mb-4 bg-gradient-to-br ${
           SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
-        } text-white`}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-            <Sun size={20} />
+        } ${['spring', 'summer'].includes(currentSeason) ? 'text-slate-900' : 'text-white'}`}>
+          <div className={`w-10 h-10 rounded-xl backdrop-blur flex items-center justify-center ${
+            ['spring', 'summer'].includes(currentSeason) ? 'bg-white/40' : 'bg-white/20'
+          }`}>
+            <Sun size={20} className={['spring', 'summer'].includes(currentSeason) ? 'text-slate-800' : ''} />
           </div>
           <div>
-            <div className="text-[11px] opacity-80">当前季节</div>
+            <div className={`text-[11px] ${['spring', 'summer'].includes(currentSeason) ? 'opacity-70' : 'opacity-80'}`}>当前季节</div>
             <div className="text-lg font-bold">
               {SEASON_NAMES[currentSeason] || '春季'}
             </div>
@@ -216,12 +218,14 @@ export default function GardenPage() {
         </div>
         <div className={`card p-3 flex items-center gap-3 bg-gradient-to-br ${
           SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
-        } text-white`}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-            <Sun size={20} />
+        } ${['spring', 'summer'].includes(currentSeason) ? 'text-slate-900' : 'text-white'}`}>
+          <div className={`w-10 h-10 rounded-xl backdrop-blur flex items-center justify-center ${
+            ['spring', 'summer'].includes(currentSeason) ? 'bg-white/40' : 'bg-white/20'
+          }`}>
+            <Sun size={20} className={['spring', 'summer'].includes(currentSeason) ? 'text-slate-800' : ''} />
           </div>
           <div>
-            <div className="text-[11px] opacity-80">当前季节</div>
+            <div className={`text-[11px] ${['spring', 'summer'].includes(currentSeason) ? 'opacity-70' : 'opacity-80'}`}>当前季节</div>
             <div className="text-lg font-bold">
               {SEASON_NAMES[currentSeason] || '春季'}
             </div>

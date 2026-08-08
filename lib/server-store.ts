@@ -1735,7 +1735,6 @@ export async function getChatStats(): Promise<ChatStats> {
   const now = Date.now()
   const todayStart = now - 24 * 60 * 60 * 1000
 
-  // 各频道消息数
   const channels: ChatChannel[] = ['world', 'family', 'friend']
   const counts: Record<string, number> = { world: 0, family: 0, friend: 0 }
   let totalCount = 0
@@ -1743,25 +1742,44 @@ export async function getChatStats(): Promise<ChatStats> {
   const userCounter: Record<string, { userId: string; userName: string; count: number }> = {}
 
   try {
-    for (const ch of channels) {
-      const { data } = await sb.from('messages').select('user_id, user_name, is_system, created_at, timestamp').eq('channel', ch)
-      if (data) {
-        counts[ch] = data.length
-        totalCount += data.length
-        for (const m of data) {
-          const ts = (typeof m.timestamp === 'number' ? m.timestamp : m.created_at) || 0
-          if (ts > todayStart && !m.is_system) todayCount++
-          if (m.user_id && m.user_id !== 'system' && !m.is_system) {
-            if (!userCounter[m.user_id]) {
-              userCounter[m.user_id] = { userId: m.user_id, userName: m.user_name || '未知', count: 0 }
-            }
-            userCounter[m.user_id].count++
-          }
-        }
+    // Single query for all channels (more reliable than 3 separate queries)
+    const { data, error } = await sb
+      .from('messages')
+      .select('channel, user_id, user_name, is_system, created_at, timestamp')
+      .in('channel', channels)
+
+    if (error) {
+      logger.warn('chat', `获取聊天统计查询错误: ${error.message}`)
+      // Fallback: try individual queries
+      for (const ch of channels) {
+        try {
+          const { data: chData } = await sb.from('messages').select('channel, user_id, user_name, is_system, created_at, timestamp').eq('channel', ch)
+          if (chData) processChannelData(chData)
+        } catch {}
       }
+    } else if (data) {
+      processChannelData(data)
     }
   } catch (e: any) {
     logger.warn('chat', `获取聊天统计失败: ${e?.message}`)
+  }
+
+  function processChannelData(msgs: any[]) {
+    for (const m of msgs) {
+      const ch = m.channel as ChatChannel
+      if (ch && channels.includes(ch)) {
+        counts[ch]++
+        totalCount++
+      }
+      const ts = (typeof m.timestamp === 'number' ? m.timestamp : m.created_at) || 0
+      if (ts > todayStart && !m.is_system) todayCount++
+      if (m.user_id && m.user_id !== 'system' && !m.is_system) {
+        if (!userCounter[m.user_id]) {
+          userCounter[m.user_id] = { userId: m.user_id, userName: m.user_name || '未知', count: 0 }
+        }
+        userCounter[m.user_id].count++
+      }
+    }
   }
 
   const topUsers = Object.values(userCounter).sort((a, b) => b.count - a.count).slice(0, 10)
@@ -2205,6 +2223,7 @@ export async function leaveFamilyReal(userId: string): Promise<{ success: boolea
   if (!u || !u.familyId) return { success: false, error: '你未加入任何家族' }
   const fam = await findFamilyById(u.familyId)
   if (!fam) {
+    // 家族已不存在（可能被解散或数据异常）：强制清空用户 familyId，避免卡死
     await updateUser(userId, { familyId: null })
     return { success: true }
   }

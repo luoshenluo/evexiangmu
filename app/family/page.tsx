@@ -134,9 +134,25 @@ export default function FamilyPage() {
         showToast('已退出家族', 'info')
         const uRes = await apiFetch('/api/user/me')
         if (uRes.success) updateUser(uRes.data)
+        else updateUser({ familyId: null } as any)
         setFamily(null)
         setRefreshKey((k) => k + 1)
-      } else showToast(res.error || '操作失败', 'error')
+      } else {
+        // 已知服务端错误：家族不存在/未加入 → 强制清除本地脏状态
+        if (res.error === '家族不存在' || res.error === '你未加入任何家族' || res.error === '家族已解散') {
+          updateUser({ familyId: null } as any)
+          setFamily(null)
+          showToast('家族状态已刷新', 'info')
+        } else {
+          showToast(res.error || '操作失败', 'error')
+        }
+      }
+    } catch (e: any) {
+      // 网络/未知错误：强制退出本地家族状态，避免用户卡死
+      updateUser({ familyId: null } as any)
+      setFamily(null)
+      showToast('网络异常，已强制退出家族', 'error')
+      setRefreshKey((k) => k + 1)
     } finally { setLoading(false) }
   }
 
