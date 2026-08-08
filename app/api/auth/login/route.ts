@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { verifyPassword } from '@/lib/password'
+import bcrypt from 'bcryptjs'
 import { findUserByUsername, createUser, updateUserLogin, updateUser } from '@/lib/server-store'
 import { signToken, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
     const user = await findUserByUsername(username.trim())
     if (!user) return jsonResponse(false, null, '账号不存在', 400)
 
-    // 检查临时封禁是否已过期
     if (user.bannedUntil && user.bannedUntil > Date.now()) {
       const remainingMs = user.bannedUntil - Date.now()
       const days = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
@@ -24,18 +23,16 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, `账号已被封禁，剩余约${timeStr}`, 403)
     }
 
-    // 永久封禁
     if (user.deleted) {
       return jsonResponse(false, null, '账号已被永久封禁，请联系管理员', 403)
     }
 
-    const valid = await verifyPassword(password, user.password)
+    const valid = bcrypt.compareSync(password, user.password)
     if (!valid) {
       logger.warn('auth', '登录失败: 密码错误', { username })
       return jsonResponse(false, null, '密码错误', 400)
     }
 
-    // 封禁已过期，自动解除
     if (user.bannedUntil && user.bannedUntil <= Date.now()) {
       await updateUser(user.id, { deleted: false, bannedUntil: null })
     }
