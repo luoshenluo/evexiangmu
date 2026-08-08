@@ -407,7 +407,16 @@ async function doSeed(): Promise<void> {
     created_at: now - 86400000,
     last_login: now,
     plots: adminPlots,
-    inventory: [],
+    inventory: [
+      { id: 'inv_admin_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 999, maxStack: 9999, sellable: true, tradeable: true },
+      { id: 'inv_admin_t2', type: 'tool', referenceId: 'fertilizer',   name: '化肥', emoji: '🧪', quantity: 999, maxStack: 9999, sellable: true, tradeable: true },
+      { id: 'inv_admin_t3', type: 'tool', referenceId: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 999, maxStack: 9999, sellable: true, tradeable: true },
+      { id: 'inv_admin_t4', type: 'tool', referenceId: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 999, maxStack: 9999, sellable: true, tradeable: true },
+      { id: 'inv_admin_s1', type: 'seed', referenceId: 'seed_rose',   name: '玫瑰种子',   emoji: '🌱', quantity: 99, maxStack: 99, sellable: false, tradeable: true },
+      { id: 'inv_admin_s2', type: 'seed', referenceId: 'seed_daisy',  name: '雏菊种子',   emoji: '🌱', quantity: 99, maxStack: 99, sellable: false, tradeable: true },
+      { id: 'inv_admin_s3', type: 'seed', referenceId: 'seed_tulip',  name: '郁金香种子', emoji: '🌱', quantity: 99, maxStack: 99, sellable: false, tradeable: true },
+      { id: 'inv_admin_s4', type: 'seed', referenceId: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', quantity: 99, maxStack: 99, sellable: false, tradeable: true },
+    ],
     inventory_size: 50,
     is_admin: true,
     muted_until: null,
@@ -484,6 +493,10 @@ async function doSeed(): Promise<void> {
     { id: 'l2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_tulip', name: '郁金香种子', emoji: '🌱', price: 15, quantity: 99, created_at: now - 90000 },
     { id: 'l3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_daisy', name: '雏菊种子', emoji: '🌱', price: 8, quantity: 99, created_at: now - 80000 },
     { id: 'l4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'flower', reference_id: 'sunflower', name: '向日葵', emoji: '🌻', rank: 3, price: 45, quantity: 5, created_at: now - 70000 },
+    { id: 'l_t1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'watering_can', name: '水壶', emoji: '💧', price: 10, quantity: 99, created_at: now - 65000 },
+    { id: 'l_t2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'fertilizer', name: '化肥', emoji: '🧪', price: 25, quantity: 99, created_at: now - 60000 },
+    { id: 'l_t3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'pesticide', name: '除虫剂', emoji: '🧴', price: 30, quantity: 99, created_at: now - 55000 },
+    { id: 'l_t4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'speedup_card', name: '加速卡', emoji: '⚡', price: 100, quantity: 50, created_at: now - 50000 },
   ]
   for (const l of listings) {
     await sb.from('listings').upsert(l)
@@ -507,6 +520,55 @@ async function doSeed(): Promise<void> {
       priority: ann.priority,
       created_at: ann.createdAt,
     })
+  }
+
+  // ============================================================
+  //  自修复 4：给所有已有用户补齐 4 种基础工具
+  // （老用户/用老版本 seed 创建的用户 inventory 里没有 pesticide 和 speedup_card，
+  //   导致背包和地块操作弹窗看不到数量。这里在每次 seed 时做一次补齐。）
+  // ============================================================
+  try {
+    const { data: allUsers, error: usersErr } = await sb
+      .from('users')
+      .select('id, inventory, deleted')
+    if (!usersErr && allUsers) {
+      const DEFAULT_TOOLS = [
+        { ref: 'watering_can', name: '水壶', emoji: '💧', quantity: 5 },
+        { ref: 'fertilizer',   name: '化肥', emoji: '🧪', quantity: 3 },
+        { ref: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2 },
+        { ref: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1 },
+      ]
+      for (const u of allUsers) {
+        if (u.deleted) continue
+        const inv = Array.isArray(u.inventory) ? [...u.inventory] : []
+        const toolIdPrefix = `t_${u.id.replace(/[^a-zA-Z0-9_]/g, '')}`
+        let changed = false
+        DEFAULT_TOOLS.forEach((tool, idx) => {
+          const exists = inv.find(i => i && i.type === 'tool' && i.referenceId === tool.ref)
+          if (!exists) {
+            inv.push({
+              id: `inv_${toolIdPrefix}_${idx}`,
+              type: 'tool',
+              referenceId: tool.ref,
+              name: tool.name,
+              emoji: tool.emoji,
+              quantity: tool.quantity,
+              maxStack: 99,
+              sellable: true,
+              tradeable: true,
+            })
+            changed = true
+          }
+        })
+        if (changed) {
+          const { error: updErr } = await sb.from('users').update({ inventory: inv }).eq('id', u.id)
+          if (updErr) logger.warn('system', `补全用户 ${u.id} 工具失败: ${updErr.message}`)
+          else logger.info('system', `已为用户 ${u.id} 补全背包基础工具`)
+        }
+      }
+    }
+  } catch (e: any) {
+    logger.warn('system', `补全所有用户基础工具失败: ${e?.message || 'unknown'}`)
   }
 
   logger.info('system', '数据库种子数据初始化完成')
@@ -587,6 +649,9 @@ export async function createUser(data: { username: string; password: string; nic
       { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
       { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
       { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
+      { id: 'inv_t2', type: 'tool', referenceId: 'fertilizer',   name: '化肥', emoji: '🧪', quantity: 3, maxStack: 99, sellable: true, tradeable: true },
+      { id: 'inv_t3', type: 'tool', referenceId: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2, maxStack: 99, sellable: true, tradeable: true },
+      { id: 'inv_t4', type: 'tool', referenceId: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1, maxStack: 99, sellable: true, tradeable: true },
     ],
     inventory_size: 5,
     is_admin: false,
