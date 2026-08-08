@@ -1784,19 +1784,20 @@ export async function getChatStats(): Promise<ChatStats> {
 
   try {
     // Single query for all channels (more reliable than 3 separate queries)
+    // 使用 select('*') 避免列名不匹配（timestamp vs created_at）导致整查询失败
     const { data, error } = await sb
       .from('messages')
-      .select('channel, user_id, user_name, is_system, created_at, timestamp')
+      .select('*')
       .in('channel', channels)
 
     if (error) {
       logger.warn('chat', `获取聊天统计查询错误: ${error.message}`)
-      // Fallback: try individual queries
-      for (const ch of channels) {
-        try {
-          const { data: chData } = await sb.from('messages').select('channel, user_id, user_name, is_system, created_at, timestamp').eq('channel', ch)
-          if (chData) processChannelData(chData)
-        } catch {}
+      // Fallback: try individual queries without channel filter（避免 .in 报错）
+      try {
+        const { data: allData } = await sb.from('messages').select('*')
+        if (allData) processChannelData(allData)
+      } catch (e2: any) {
+        logger.warn('chat', `获取聊天统计 fallback 失败: ${e2?.message}`)
       }
     } else if (data) {
       processChannelData(data)
