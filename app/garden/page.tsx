@@ -88,7 +88,7 @@ export default function GardenPage() {
       { id: 3, unlocked: true, unlockPrice: 0, flower: null },
     ]
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-[100px]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
         {/* 游客横幅 */}
         <div className="mb-4 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
           <Sparkles size={14} className="flex-shrink-0" />
@@ -156,7 +156,7 @@ export default function GardenPage() {
   const bgIsDark = gardenBg === 'night'
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8 md:max-w-4xl md:pt-6">
+    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       {/* 顶部状态栏 */}
       <div className="card p-3 mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
