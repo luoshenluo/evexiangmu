@@ -1301,6 +1301,197 @@ export async function incrementTaskProgress(userId: string, action: string, amou
   await updateUser(userId, { taskProgress: progress, taskLastReset: lastReset })
 }
 
+// ==================== 任务模板管理（管理员可配置） ====================
+
+// 默认任务模板（首次启动时自动种子到数据库）
+const DEFAULT_TASK_TEMPLATES = [
+  { id: 't_daily_1', type: 'daily', title: '登录游戏', description: '今日首次登录游戏', target: 1, action: 'login', rewards: { coins: 10 }, enabled: true, sortOrder: 1 },
+  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵3次', target: 3, action: 'plant', rewards: { coins: 15 }, enabled: true, sortOrder: 2 },
+  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获任意 2 朵花', target: 2, action: 'harvest', rewards: { coins: 25, items: [{ referenceId: 'seed_rose', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 3 },
+  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, action: 'trade', rewards: { coins: 20 }, enabled: true, sortOrder: 4 },
+  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, action: 'chat', rewards: { coins: 10 }, enabled: true, sortOrder: 5 },
+  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, action: 'unlock', rewards: { coins: 80, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 10 },
+  { id: 't_weekly_2', type: 'weekly', title: '周常·富豪', description: '累计获得 500 金币', target: 500, action: 'earn_coin', rewards: { coins: 50 }, enabled: true, sortOrder: 11 },
+  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, action: 'harvest', rewards: { coins: 300, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 3 }] }, enabled: true, sortOrder: 20 },
+]
+
+// 可选的行为类型（供前端下拉选择）
+export const TASK_ACTION_OPTIONS = [
+  { value: 'login', label: '登录游戏', desc: '每日首次登录自动完成' },
+  { value: 'plant', label: '种植花朵', desc: '种下任意一朵花' },
+  { value: 'water', label: '浇水', desc: '给花朵浇水' },
+  { value: 'fertilize', label: '施肥', desc: '给花朵施肥' },
+  { value: 'pesticide', label: '除虫', desc: '给花朵除虫' },
+  { value: 'speedup', label: '加速卡', desc: '使用加速卡' },
+  { value: 'harvest', label: '收获花朵', desc: '收获成熟的花朵' },
+  { value: 'chat', label: '聊天发言', desc: '在任意频道发言' },
+  { value: 'trade', label: '市场交易', desc: '买入或卖出物品' },
+  { value: 'unlock', label: '解锁地块', desc: '花费金币解锁新地块' },
+  { value: 'earn_coin', label: '获得金币', desc: '通过任意途径获得金币（签到/出售/任务奖励等）' },
+]
+
+let _taskTemplatesCache: any[] | null = null
+
+// 确保表存在并种子默认数据
+async function ensureTaskTemplatesTable(): Promise<void> {
+  const sb = getSupabase()
+  // 尝试查询，如果表不存在则通过 RPC 创建
+  const { data, error } = await sb.from('task_templates').select('id').limit(1)
+  if (error) {
+    // 表不存在，尝试创建
+    try {
+      await sb.rpc('_garden_ensure_task_templates' as any)
+    } catch {}
+    // 创建后再试一次
+    const { data: retry } = await sb.from('task_templates').select('id').limit(1)
+    if (!retry) {
+      // 仍然失败，使用内存缓存
+      if (!_taskTemplatesCache) _taskTemplatesCache = DEFAULT_TASK_TEMPLATES.map(t => ({ ...t, createdAt: Date.now(), updatedAt: Date.now() }))
+      return
+    }
+  }
+  // 如果表为空，种子默认数据
+  const { count } = await sb.from('task_templates').select('*', { count: 'exact', head: true })
+  if (count === 0) {
+    const now = Date.now()
+    const rows = DEFAULT_TASK_TEMPLATES.map(t => ({
+      ...t,
+      rewards: JSON.stringify(t.rewards),
+      created_at: now,
+      updated_at: now,
+    }))
+    await sb.from('task_templates').insert(rows)
+    logger.info('system', '已种子默认任务模板', { count: rows.length })
+  }
+}
+
+// 获取所有任务模板（enabledOnly=true 时只返回启用的）
+export async function getAllTaskTemplates(enabledOnly = false): Promise<any[]> {
+  await ensureTaskTemplatesTable()
+
+  // 优先从数据库读
+  const sb = getSupabase()
+  const { data, error } = await sb.from('task_templates')
+    .select('*')
+    .order('sort_order', { ascending: true })
+
+  if (!error && data) {
+    const templates = data.map(row => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      description: row.description,
+      target: row.target,
+      action: row.action,
+      rewards: typeof row.rewards === 'string' ? JSON.parse(row.rewards) : (row.rewards || {}),
+      enabled: row.enabled ?? true,
+      sortOrder: row.sort_order ?? 0,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+    _taskTemplatesCache = templates
+    return enabledOnly ? templates.filter(t => t.enabled) : templates
+  }
+
+  // 降级到缓存
+  if (_taskTemplatesCache) return enabledOnly ? _taskTemplatesCache.filter(t => t.enabled) : _taskTemplatesCache
+  return enabledOnly ? DEFAULT_TASK_TEMPLATES.filter(t => t.enabled) : DEFAULT_TASK_TEMPLATES
+}
+
+// 创建任务模板
+export async function createTaskTemplate(data: {
+  id?: string
+  type: string
+  title: string
+  description: string
+  target: number
+  action: string
+  rewards: any
+  enabled?: boolean
+  sortOrder?: number
+}): Promise<any> {
+  const sb = getSupabase()
+  const id = data.id || `t_${data.type}_${Date.now().toString(36)}`
+  const now = Date.now()
+  const row = {
+    id,
+    type: data.type,
+    title: data.title,
+    description: data.description,
+    target: Math.max(1, data.target),
+    action: data.action,
+    rewards: JSON.stringify(data.rewards || {}),
+    enabled: data.enabled ?? true,
+    sort_order: data.sortOrder ?? 99,
+    created_at: now,
+    updated_at: now,
+  }
+  const { data: inserted, error } = await sb.from('task_templates').insert(row).select().single()
+  if (error) {
+    // 表可能不存在，降级到缓存
+    if (_taskTemplatesCache === null) _taskTemplatesCache = []
+    const tmpl = { ...row, rewards: data.rewards || {}, enabled: row.enabled, sortOrder: row.sort_order, createdAt: now, updatedAt: now }
+    _taskTemplatesCache.push(tmpl)
+    return tmpl
+  }
+  _taskTemplatesCache = null // 清缓存
+  return { id: inserted.id, type: inserted.type, title: inserted.title, description: inserted.description, target: inserted.target, action: inserted.action, rewards: typeof inserted.rewards === 'string' ? JSON.parse(inserted.rewards) : inserted.rewards, enabled: inserted.enabled, sortOrder: inserted.sort_order, createdAt: inserted.created_at, updatedAt: inserted.updated_at }
+}
+
+// 更新任务模板
+export async function updateTaskTemplate(id: string, data: {
+  type?: string
+  title?: string
+  description?: string
+  target?: number
+  action?: string
+  rewards?: any
+  enabled?: boolean
+  sortOrder?: number
+}): Promise<any> {
+  const sb = getSupabase()
+  const update: any = { updated_at: Date.now() }
+  if (data.type !== undefined) update.type = data.type
+  if (data.title !== undefined) update.title = data.title
+  if (data.description !== undefined) update.description = data.description
+  if (data.target !== undefined) update.target = Math.max(1, data.target)
+  if (data.action !== undefined) update.action = data.action
+  if (data.rewards !== undefined) update.rewards = JSON.stringify(data.rewards)
+  if (data.enabled !== undefined) update.enabled = data.enabled
+  if (data.sortOrder !== undefined) update.sort_order = data.sortOrder
+
+  const { data: updated, error } = await sb.from('task_templates').update(update).eq('id', id).select().single()
+  if (error) {
+    // 降级：更新缓存
+    if (_taskTemplatesCache) {
+      const idx = _taskTemplatesCache.findIndex(t => t.id === id)
+      if (idx >= 0) {
+        _taskTemplatesCache[idx] = { ..._taskTemplatesCache[idx], ...data, updatedAt: Date.now() }
+        return _taskTemplatesCache[idx]
+      }
+    }
+    throw new Error(error.message)
+  }
+  _taskTemplatesCache = null
+  return { id: updated.id, type: updated.type, title: updated.title, description: updated.description, target: updated.target, action: updated.action, rewards: typeof updated.rewards === 'string' ? JSON.parse(updated.rewards) : updated.rewards, enabled: updated.enabled, sortOrder: updated.sort_order, createdAt: updated.created_at, updatedAt: updated.updated_at }
+}
+
+// 删除任务模板
+export async function deleteTaskTemplate(id: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { error } = await sb.from('task_templates').delete().eq('id', id)
+  if (error) {
+    // 降级：从缓存删除
+    if (_taskTemplatesCache) {
+      _taskTemplatesCache = _taskTemplatesCache.filter(t => t.id !== id)
+      return true
+    }
+    throw new Error(error.message)
+  }
+  _taskTemplatesCache = null
+  return true
+}
+
 // ==================== 官方收购价调整 ====================
 
 export async function setOfficialBuyPrice(referenceId: string, rank: number, newPrice: number): Promise<void> {
