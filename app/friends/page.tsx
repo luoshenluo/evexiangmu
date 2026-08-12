@@ -6,7 +6,7 @@ import { apiFetch, classNames, formatDateTime } from '@/lib/utils'
 import {
   Users, Search, Plus, X, Check,
   MessageCircle, UserPlus, Eye, Trash2, RefreshCw, AlertCircle,
-  Handshake,
+  ShoppingBag, Handshake,
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
@@ -135,7 +135,7 @@ export default function FriendsPage() {
     setActionForFriend(null)
     showToast(`正在准备与 ${nickname} 的交易...`, 'info')
     // 跳到花园 / 市场页（带好友参数，交易 Tab 可以过滤对方）
-    window.location.href = `/market?tradeWith=${encodeURIComponent(friendId)}&name=${encodeURIComponent(nickname)}`
+    window.location.href = `/shop?tradeWith=${encodeURIComponent(friendId)}&name=${encodeURIComponent(nickname)}`
   }
 
   if (!user) {
