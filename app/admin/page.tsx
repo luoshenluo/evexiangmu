@@ -491,7 +491,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto p-4 flex gap-4 flex-col md:flex-row">
+      <div className="max-w-6xl mx-auto p-4 flex gap-4 flex-col md:flex-row" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 120px)' }}>
         <aside className="md:w-56 flex-shrink-0">
           <div className="card p-2 space-y-1 sticky top-4">
             {visibleTabs.map(t => {
