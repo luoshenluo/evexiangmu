@@ -30,7 +30,7 @@ export interface FlowerType {
   emoji: string
   season: Season[]
   maxRank: RankLevel
-  growthTime: number // 毫秒
+  growthTime: number
   baseBuyPrice: number
   baseSellPrice: number
   description: string
@@ -54,12 +54,12 @@ export interface PlantedFlower {
   fertilizeCount: number
   pestCount: number
   hasPest: boolean
-  pestAt: number | null // 虫灾发生时间
-  growthProgress: number // 0-100
+  pestAt: number | null
+  growthProgress: number
   isReady: boolean
-  lastWaterAt: number | null // 最后浇水时间
-  lastFertilizeAt: number | null // 最后施肥时间
-  lastSettledAt?: number | null // 离线结算锚点（缺省取 plantedAt）
+  lastWaterAt: number | null
+  lastFertilizeAt: number | null
+  lastSettledAt?: number | null
 }
 
 export interface Plot {
@@ -74,7 +74,7 @@ export type ItemType = 'flower' | 'seed' | 'tool' | 'bouquet'
 export interface InventoryItem {
   id: string
   type: ItemType
-  referenceId: string // flowerTypeId, seedId, or toolId
+  referenceId: string
   name: string
   emoji: string
   rank?: RankLevel
@@ -93,8 +93,6 @@ export interface Tool {
   effect: 'water' | 'fertilize' | 'pesticide' | 'speedup'
   power: number
 }
-
-// ==================== 好友系统 ====================
 
 export interface FriendRequest {
   id: string
@@ -139,35 +137,49 @@ export interface User {
   familyId: string | null
   friends: string[]
   deleted?: boolean
-  // 偷花系统
   stealCountToday: number
   stealResetAt: number
-  // 花园保护（防止被偷）
   gardenProtectedUntil: number
-  // 任务系统（持久化到数据库）
   taskProgress: Record<string, number>
   taskClaimed: Record<string, boolean>
-  taskLastReset: Record<string, number>  // 各类型任务上次重置时间戳
-  // 好友系统：待处理申请
-  incomingFriendRequests?: FriendRequest[]  // 收到的申请
-  outgoingFriendRequests?: FriendRequest[]  // 发出的申请
-  // 子管理员权限位（超级管理员 admin 永远全开）
+  taskLastReset: Record<string, number>
+  incomingFriendRequests?: FriendRequest[]
+  outgoingFriendRequests?: FriendRequest[]
   adminPermissions?: number
-  // 皮肤/主题
   theme?: 'light' | 'dark' | 'garden' | 'sunset' | 'ocean'
   gardenBg?: string
-  // 签到
   lastCheckInAt?: number
   checkInStreak?: number
-  totalCheckinDays?: number         // 当前周期累计（可能重置）
-  totalCheckinDaysAccum?: number    // 历史累计（永不重置）
-  // 成就: { [key]: { unlockedAt: ms } }
+  totalCheckinDays?: number
+  totalCheckinDaysAccum?: number
   achievements?: Record<string, { unlockedAt: number }>
   title?: string
-  // 花瓣代币（小游戏用）
   petalCoins?: number
-  // 成就额外奖励：称号列表
   titles?: string[]
+  lastActiveAt?: number
+}
+
+export interface PrivateMessage {
+  id: string
+  fromUserId: string
+  toUserId: string
+  content: string
+  fromName?: string
+  fromAvatar?: string
+  toName?: string
+  toAvatar?: string
+  createdAt: number
+  readAt?: number | null
+}
+
+export interface PrivateConversation {
+  peerId: string
+  peerName: string
+  peerAvatar: string
+  lastMessage: string
+  lastMessageAt: number
+  unreadCount: number
+  isOnline?: boolean
 }
 
 export interface MarketListing {
@@ -221,24 +233,17 @@ export interface Task {
   progress: number
   completed: boolean
   claimed: boolean
-  rewards: {
-    coins?: number
-    items?: { referenceId: string; quantity: number; type: ItemType }[]
-  }
+  rewards: { coins?: number; items?: { referenceId: string; quantity: number; type: ItemType }[] }
 }
 
-// 管理员可配置的任务模板（存储在 task_templates 表中）
 export interface TaskTemplate {
   id: string
   type: 'daily' | 'weekly' | 'monthly'
   title: string
   description: string
   target: number
-  action: string // 触发行为：login/plant/water/fertilize/pesticide/harvest/chat/trade/unlock/earn_coin
-  rewards: {
-    coins?: number
-    items?: { referenceId: string; quantity: number; type: ItemType }[]
-  }
+  action: string
+  rewards: { coins?: number; items?: { referenceId: string; quantity: number; type: ItemType; name?: string; emoji?: string }[] }
   enabled: boolean
   sortOrder: number
   createdAt: number
@@ -268,12 +273,7 @@ export interface Announcement {
 
 export interface CDK {
   code: string
-  rewards: {
-    coins?: number
-    petalCoins?: number
-    titles?: string[] // 称号key：newbie/checkin_dragon/expert 等
-    items?: { referenceId: string; quantity: number; type: ItemType; name?: string; emoji?: string }[]
-  }
+  rewards: { coins?: number; petalCoins?: number; titles?: string[]; items?: { referenceId: string; quantity: number; type: ItemType; name?: string; emoji?: string }[] }
   maxUses: number
   usedCount: number
   expiresAt: number | null
@@ -293,10 +293,8 @@ export interface Notification {
 export interface GameState {
   currentSeason: Season
   seasonStartAt: number
-  seasonDuration: number // 毫秒
+  seasonDuration: number
 }
-
-// ==================== 虫灾系统 ====================
 
 export type PestSeverity = 'minor' | 'major' | 'catastrophic'
 
@@ -307,8 +305,6 @@ export interface PestDisasterEvent {
   affectedPlots: number[]
   occurredAt: number
 }
-
-// ==================== 偷花系统 ====================
 
 export interface StealLog {
   id: string
@@ -327,15 +323,8 @@ export interface StealLog {
 export interface StealResult {
   success: boolean
   message: string
-  flower?: {
-    flowerTypeId: string
-    name: string
-    emoji: string
-    rank: RankLevel
-  }
+  flower?: { flowerTypeId: string; name: string; emoji: string; rank: RankLevel }
 }
-
-// ==================== 聊天管理 / 敏感词 / 频率限制 ====================
 
 export interface SensitiveWord {
   id: string
@@ -352,9 +341,7 @@ export interface ChatSettings {
   updatedAt: number
 }
 
-export interface AdminChatMessage extends ChatMessage {
-  // 后台管理用的扩展字段
-}
+export interface AdminChatMessage extends ChatMessage {}
 
 export interface ChatStats {
   worldCount: number
