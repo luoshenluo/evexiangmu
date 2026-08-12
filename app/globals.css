@@ -180,13 +180,15 @@ body {
 /* 弹窗卡片：手机端避开底部导航栏，PC端居中无偏移 */
 @media (max-width: 639px) {
   .seed-selector-card,
-  .plot-action-card {
+  .plot-action-card,
+  .inventory-item-card {
     margin-bottom: calc(env(safe-area-inset-bottom) + 90px);
   }
 }
 @media (min-width: 640px) {
   .seed-selector-card,
-  .plot-action-card {
+  .plot-action-card,
+  .inventory-item-card {
     margin-bottom: 0;
   }
 }
