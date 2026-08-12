@@ -53,7 +53,7 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-lg h-[85vh] sm:h-auto sm:max-h-[80vh] overflow-hidden flex flex-col slide-up rounded-t-3xl sm:rounded-xl seed-selector-card"
+        className="card w-full max-w-lg h-[72vh] sm:h-auto sm:max-h-[80vh] overflow-hidden flex flex-col slide-up rounded-t-3xl sm:rounded-xl seed-selector-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
