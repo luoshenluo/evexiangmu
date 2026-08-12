@@ -41,12 +41,14 @@ export function formatDateTime(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/** 仅显示 年-月-日 */
 export function formatDateOnly(ts: number): string {
   const d = new Date(ts)
   const pad = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/** 智能日期格式：今天→只显示时间；昨天及以前→显示完整 YYYY-MM-DD HH:mm */
 export function formatChatTime(ts: number, now: number = Date.now()): string {
   const d = new Date(ts)
   const today = new Date(now)
