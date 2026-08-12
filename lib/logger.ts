@@ -68,6 +68,7 @@ export function log(
       console.warn(formatted)
       break
     case 'debug':
+      // debug 仅在开发环境输出
       if (process.env.NODE_ENV !== 'production') {
         console.log(formatted)
       }
@@ -77,6 +78,7 @@ export function log(
   }
 }
 
+// 便捷方法
 export const logger = {
   debug: (cat: LogCategory, msg: string, data?: Record<string, any>, userId?: string) =>
     log('debug', cat, msg, data, userId),
