@@ -1,4 +1,5 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatDateTime } from '@/lib/utils'
@@ -22,7 +23,12 @@ export default function FriendsPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [actionForFriend, setActionForFriend] = useState<{ id: string; nickname: string; avatar: string } | null>(null)
+  // 好友快捷弹窗：私聊 / 交易入口
+  const [actionForFriend, setActionForFriend] = useState<{
+    id: string
+    nickname: string
+    avatar: string
+  } | null>(null)
 
   const refresh = async () => {
     if (!user) return
@@ -37,7 +43,9 @@ export default function FriendsPage() {
         setIncoming(rRes.data?.incoming || [])
         setOutgoing(rRes.data?.outgoing || [])
       }
-    } finally { setLoading(null) }
+    } finally {
+      setLoading(null)
+    }
   }
 
   useEffect(() => { refresh() }, [user, refreshKey])
@@ -73,7 +81,10 @@ export default function FriendsPage() {
     try {
       const res = await apiFetch('/api/friends', {
         method: 'POST',
-        body: JSON.stringify({ mode: accept ? 'accept-request' : 'reject-request', requestId }),
+        body: JSON.stringify({
+          mode: accept ? 'accept-request' : 'reject-request',
+          requestId,
+        }),
       })
       if (res.success) {
         showToast(accept ? '已添加好友！' : '已拒绝', 'success')
@@ -101,12 +112,15 @@ export default function FriendsPage() {
     } finally { setLoading(null) }
   }
 
+  // ======== 跳转好友私聊：利用 URL hash 或页面内锚点通知 ChatWidget ========
   const openPrivateChat = (friendId: string, nickname: string) => {
     setActionForFriend(null)
     try {
+      // 1) 优先：通过 CustomEvent 将 peerId 抛给 ChatWidget
       window.dispatchEvent(new CustomEvent('garden:open-private-chat', {
         detail: { peerId: friendId, peerName: nickname },
       }))
+      // 2) 兜底：滚动到聊天入口按钮（用户手动点击右下角展开也能看到）
       setTimeout(() => {
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
         showToast(`已打开与 ${nickname} 的私聊窗口`, 'success')
@@ -116,10 +130,12 @@ export default function FriendsPage() {
     }
   }
 
+  // 交易跳转：好友发起 / 访问对方花园看交易
   const openTrade = (friendId: string, nickname: string) => {
     setActionForFriend(null)
     showToast(`正在准备与 ${nickname} 的交易...`, 'info')
-    window.location.href = `/shop?tradeWith=${encodeURIComponent(friendId)}&name=${encodeURIComponent(nickname)}`
+    // 跳到花园 / 市场页（带好友参数，交易 Tab 可以过滤对方）
+    window.location.href = `/market?tradeWith=${encodeURIComponent(friendId)}&name=${encodeURIComponent(nickname)}`
   }
 
   if (!user) {
@@ -142,6 +158,7 @@ export default function FriendsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+      {/* 顶部 */}
       <div className="card p-4 mb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-md shadow-green-200">
@@ -154,12 +171,16 @@ export default function FriendsPage() {
               {pendingCount > 0 && <span className="ml-2 text-red-500 font-medium">· {pendingCount} 条申请</span>}
             </p>
           </div>
-          <button onClick={() => { setTab('search'); setSearchKw(''); setSearchResults([]) }} className="btn-primary py-2 px-3 text-xs flex items-center gap-1">
+          <button
+            onClick={() => { setTab('search'); setSearchKw(''); setSearchResults([]) }}
+            className="btn-primary py-2 px-3 text-xs flex items-center gap-1"
+          >
             <UserPlus size={14} /> 加好友
           </button>
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
         {([
           { k: 'friends', label: '好友列表', count: friends.length },
@@ -168,16 +189,29 @@ export default function FriendsPage() {
         ] as const).map((t) => {
           const active = tab === t.k
           return (
-            <button key={t.k} onClick={() => setTab(t.k)} className={classNames('py-2 rounded-lg text-xs font-medium transition-all relative', active ? 'bg-white text-garden-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k)}
+              className={classNames(
+                'py-2 rounded-lg text-xs font-medium transition-all relative',
+                active ? 'bg-white text-garden-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
               {t.label}
               {'count' in t && t.count > 0 ? (
-                <span className={classNames('ml-1 inline-flex items-center justify-center text-[10px] rounded-full min-w-[16px] px-1 h-4', t.k === 'requests' ? 'bg-red-100 text-red-600' : 'bg-garden-100 text-garden-700')}>{t.count}</span>
+                <span className={classNames(
+                  'ml-1 inline-flex items-center justify-center text-[10px] rounded-full min-w-[16px] px-1 h-4',
+                  t.k === 'requests' ? 'bg-red-100 text-red-600' : 'bg-garden-100 text-garden-700'
+                )}>
+                  {t.count}
+                </span>
               ) : null}
             </button>
           )
         })}
       </div>
 
+      {/* 好友列表 */}
       {tab === 'friends' && (
         <div className="space-y-2">
           {loading === 'refresh' && friends.length === 0 && (
@@ -188,16 +222,30 @@ export default function FriendsPage() {
               <Users size={36} className="mx-auto mb-2 text-slate-300" />
               <p className="text-slate-500 text-sm">还没有好友</p>
               <p className="text-slate-400 text-xs mt-1 mb-4">去添加一些花友一起玩吧</p>
-              <button onClick={() => setTab('search')} className="btn-primary py-2 text-sm"><UserPlus size={14} /> 立即添加</button>
+              <button onClick={() => setTab('search')} className="btn-primary py-2 text-sm">
+                <UserPlus size={14} /> 立即添加
+              </button>
             </div>
           ) : (
             friends.map((f) => (
               <div key={f.id} className="card p-3 flex items-center gap-3">
-                <button onClick={() => setActionForFriend({ id: f.id, nickname: f.nickname, avatar: f.avatar })} className="relative hover:ring-2 hover:ring-garden-300 rounded-xl transition-all" title="点击打开快捷操作：私聊 / 交易">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-2xl">{f.avatar}</div>
-                  <span className={classNames('absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white', f.online ? 'bg-green-500' : 'bg-slate-300')} />
+                {/* 头像：可点击弹出快捷菜单 */}
+                <button
+                  onClick={() => setActionForFriend({ id: f.id, nickname: f.nickname, avatar: f.avatar })}
+                  className="relative hover:ring-2 hover:ring-garden-300 rounded-xl transition-all"
+                  title="点击打开快捷操作：私聊 / 交易"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-2xl">
+                    {f.avatar}
+                  </div>
+                  <span className={classNames(
+                    'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white',
+                    f.online ? 'bg-green-500' : 'bg-slate-300'
+                  )} />
                 </button>
-                <div className="flex-1 min-w-0" onClick={() => setActionForFriend({ id: f.id, nickname: f.nickname, avatar: f.avatar })} style={{ cursor: 'pointer' }}>
+                <div className="flex-1 min-w-0"
+                     onClick={() => setActionForFriend({ id: f.id, nickname: f.nickname, avatar: f.avatar })}
+                     style={{ cursor: 'pointer' }}>
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-slate-800 truncate">{f.nickname}</span>
                     {f.title && <span className="chip text-[9px] bg-amber-100 text-amber-700">{f.title}</span>}
@@ -208,16 +256,33 @@ export default function FriendsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-wrap justify-end">
-                  <button onClick={() => openPrivateChat(f.id, f.nickname)} className="px-2.5 py-1 rounded-lg text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center gap-1" title="私聊">
+                  <button
+                    onClick={() => openPrivateChat(f.id, f.nickname)}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center gap-1"
+                    title="私聊"
+                  >
                     <MessageCircle size={12} /> 私聊
                   </button>
-                  <button onClick={() => openTrade(f.id, f.nickname)} className="px-2.5 py-1 rounded-lg text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 flex items-center gap-1" title="与TA交易">
+                  <button
+                    onClick={() => openTrade(f.id, f.nickname)}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 flex items-center gap-1"
+                    title="与TA交易"
+                  >
                     <Handshake size={12} /> 交易
                   </button>
-                  <button onClick={() => window.open(`/visit?u=${f.id}`, '_blank')} className="px-2.5 py-1 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1" title="拜访花园">
+                  <button
+                    onClick={() => window.open(`/visit?u=${f.id}`, '_blank')}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1"
+                    title="拜访花园"
+                  >
                     <Eye size={12} /> 拜访
                   </button>
-                  <button onClick={() => removeFriend(f.id)} disabled={loading === `rm_${f.id}`} className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1" title="删除好友">
+                  <button
+                    onClick={() => removeFriend(f.id)}
+                    disabled={loading === `rm_${f.id}`}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1"
+                    title="删除好友"
+                  >
                     <Trash2 size={12} /> 删除
                   </button>
                 </div>
@@ -227,17 +292,22 @@ export default function FriendsPage() {
         </div>
       )}
 
+      {/* 好友申请 */}
       {tab === 'requests' && (
         <div className="space-y-4">
           <div>
-            <h3 className="text-xs font-medium text-slate-500 mb-2 px-1">收到的申请 {incoming.length > 0 && <span className="text-red-500">（{incoming.length}）</span>}</h3>
+            <h3 className="text-xs font-medium text-slate-500 mb-2 px-1">
+              收到的申请 {incoming.length > 0 && <span className="text-red-500">（{incoming.length}）</span>}
+            </h3>
             {incoming.length === 0 ? (
               <div className="card p-6 text-center text-sm text-slate-400">暂无新的好友申请</div>
             ) : (
               <div className="space-y-2">
                 {incoming.map((r) => (
                   <div key={r.id} className="card p-3 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-pink-50 to-rose-100 flex items-center justify-center text-2xl">{r.fromUserAvatar}</div>
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-pink-50 to-rose-100 flex items-center justify-center text-2xl">
+                      {r.fromUserAvatar}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-slate-800">{r.fromUserName}</div>
                       {r.message ? (
@@ -247,10 +317,18 @@ export default function FriendsPage() {
                       )}
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => handleRequest(r.id, false)} disabled={!!loading?.startsWith(`req_${r.id}`)} className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1">
+                      <button
+                        onClick={() => handleRequest(r.id, false)}
+                        disabled={!!loading?.startsWith(`req_${r.id}`)}
+                        className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1"
+                      >
                         <X size={12} /> 拒绝
                       </button>
-                      <button onClick={() => handleRequest(r.id, true)} disabled={!!loading?.startsWith(`req_${r.id}`)} className="px-2.5 py-1 rounded-lg text-xs bg-garden-500 text-white hover:bg-garden-600 flex items-center gap-1">
+                      <button
+                        onClick={() => handleRequest(r.id, true)}
+                        disabled={!!loading?.startsWith(`req_${r.id}`)}
+                        className="px-2.5 py-1 rounded-lg text-xs bg-garden-500 text-white hover:bg-garden-600 flex items-center gap-1"
+                      >
                         <Check size={12} /> 接受
                       </button>
                     </div>
@@ -259,6 +337,7 @@ export default function FriendsPage() {
               </div>
             )}
           </div>
+
           <div>
             <h3 className="text-xs font-medium text-slate-500 mb-2 px-1">我发出的申请（{outgoing.length}）</h3>
             {outgoing.length === 0 ? (
@@ -267,10 +346,14 @@ export default function FriendsPage() {
               <div className="space-y-2">
                 {outgoing.map((r) => (
                   <div key={r.id} className="card p-3 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center text-2xl">{r.toUserAvatar}</div>
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center text-2xl">
+                      {r.toUserAvatar}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-slate-800">{r.toUserName}</div>
-                      <div className="text-[11px] text-amber-600 mt-0.5 flex items-center gap-1"><RefreshCw size={10} className="animate-spin" /> 等待处理中...</div>
+                      <div className="text-[11px] text-amber-600 mt-0.5 flex items-center gap-1">
+                        <RefreshCw size={10} className="animate-spin" /> 等待处理中...
+                      </div>
                     </div>
                     <span className="chip text-[10px] bg-amber-100 text-amber-700">待处理</span>
                   </div>
@@ -281,26 +364,47 @@ export default function FriendsPage() {
         </div>
       )}
 
+      {/* 搜索/添加 */}
       {tab === 'search' && (
         <div className="space-y-3">
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={searchKw} onChange={(e) => setSearchKw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()} placeholder="搜索昵称、用户名或ID..." className="input pl-10 py-2.5" />
+            <input
+              value={searchKw}
+              onChange={(e) => setSearchKw(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+              placeholder="搜索昵称、用户名或ID..."
+              className="input pl-10 py-2.5"
+            />
           </div>
-          <button onClick={doSearch} disabled={loading === 'search' || !searchKw.trim()} className="btn-primary w-full py-2.5 disabled:opacity-50">
+          <button
+            onClick={doSearch}
+            disabled={loading === 'search' || !searchKw.trim()}
+            className="btn-primary w-full py-2.5 disabled:opacity-50"
+          >
             {loading === 'search' ? '搜索中...' : <><Search size={14} /> 搜索用户</>}
           </button>
+
           {searchResults.length > 0 && (
             <div className="space-y-2 mt-2">
               {searchResults.map((u) => (
                 <div key={u.id} className="card p-3 flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 flex items-center justify-center text-2xl">{u.avatar}</div>
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 flex items-center justify-center text-2xl">
+                    {u.avatar}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-slate-800 truncate">{u.nickname}</div>
                     <div className="text-[11px] text-slate-500 mt-0.5 truncate">@{u.username}</div>
-                    <div className="text-[11px] text-slate-400">花园 {u.plots?.filter?.((p: any) => p.unlocked).length || 0} 块{' · '}注册于 {formatDateTime(u.createdAt).slice(0, 10)}</div>
+                    <div className="text-[11px] text-slate-400">
+                      花园 {u.plots?.filter?.((p: any) => p.unlocked).length || 0} 块
+                      {' · '}注册于 {formatDateTime(u.createdAt).slice(0, 10)}
+                    </div>
                   </div>
-                  <button onClick={() => sendRequest(u.id)} disabled={loading === `send_${u.id}`} className="px-3 py-1.5 rounded-lg text-xs bg-garden-500 text-white hover:bg-garden-600 flex items-center gap-1 disabled:opacity-60">
+                  <button
+                    onClick={() => sendRequest(u.id)}
+                    disabled={loading === `send_${u.id}`}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-garden-500 text-white hover:bg-garden-600 flex items-center gap-1 disabled:opacity-60"
+                  >
                     {loading === `send_${u.id}` ? '已发送' : <><Plus size={12} /> 加好友</>}
                   </button>
                 </div>
@@ -314,41 +418,85 @@ export default function FriendsPage() {
               <p className="text-xs text-slate-400 mt-1">试试其他关键词</p>
             </div>
           )}
-          {!searchKw && <div className="card p-6 text-center text-sm text-slate-400">输入关键词搜索其他玩家~</div>}
+          {!searchKw && (
+            <div className="card p-6 text-center text-sm text-slate-400">
+              输入关键词搜索其他玩家~
+            </div>
+          )}
         </div>
       )}
 
+      {/* ===== 快捷操作 Sheet（点击好友头像弹出：私聊 / 交易） ===== */}
       {actionForFriend && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setActionForFriend(null)} />
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setActionForFriend(null)}
+          />
           <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:bottom-6 md:w-[420px] md:pb-0 slide-up">
             <div className="card rounded-t-3xl md:rounded-3xl p-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-3xl">{actionForFriend.avatar}</div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-3xl">
+                  {actionForFriend.avatar}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-lg font-bold text-slate-800 truncate">{actionForFriend.nickname}</div>
                   <div className="text-xs text-slate-500">好友快捷操作</div>
                 </div>
-                <button onClick={() => setActionForFriend(null)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"><X size={18} /></button>
+                <button
+                  onClick={() => setActionForFriend(null)}
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"
+                >
+                  <X size={18} />
+                </button>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => openPrivateChat(actionForFriend.id, actionForFriend.nickname)} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><MessageCircle size={20} /></div>
+                <button
+                  onClick={() => openPrivateChat(actionForFriend.id, actionForFriend.nickname)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <MessageCircle size={20} />
+                  </div>
                   <div className="text-sm font-semibold">私聊</div>
                   <div className="text-[11px] text-indigo-500/80">一对一聊天</div>
                 </button>
-                <button onClick={() => openTrade(actionForFriend.id, actionForFriend.nickname)} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Handshake size={20} /></div>
+
+                <button
+                  onClick={() => openTrade(actionForFriend.id, actionForFriend.nickname)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <Handshake size={20} />
+                  </div>
                   <div className="text-sm font-semibold">好友交易</div>
                   <div className="text-[11px] text-amber-600/80">种子 · 金币交易</div>
                 </button>
-                <button onClick={() => { window.open(`/visit?u=${actionForFriend.id}`, '_blank'); setActionForFriend(null) }} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Eye size={20} /></div>
+
+                <button
+                  onClick={() => { window.open(`/visit?u=${actionForFriend.id}`, '_blank'); setActionForFriend(null) }}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <Eye size={20} />
+                  </div>
                   <div className="text-sm font-semibold">拜访花园</div>
                   <div className="text-[11px] text-blue-500/80">看TA种花</div>
                 </button>
-                <button onClick={() => { const ok = confirm('确定删除该好友吗？'); if (!ok) return; setActionForFriend(null); removeFriend(actionForFriend.id) }} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm"><Trash2 size={20} /></div>
+
+                <button
+                  onClick={() => {
+                    const ok = confirm('确定删除该好友吗？')
+                    if (!ok) return
+                    setActionForFriend(null)
+                    removeFriend(actionForFriend.id)
+                  }}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <Trash2 size={20} />
+                  </div>
                   <div className="text-sm font-semibold">删除好友</div>
                   <div className="text-[11px] text-red-500/80">谨慎操作</div>
                 </button>
