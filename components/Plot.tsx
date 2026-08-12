@@ -239,13 +239,15 @@ export default function Plot({ plot, onUpdate }: Props) {
       {/* 操作弹窗 */}
       {showActions && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setShowActions(false)}
         >
           <div
-            className="card w-full max-w-md p-5 slide-up"
+            className="card w-full max-w-md h-[80vh] sm:h-auto sm:max-h-[85vh] overflow-hidden flex flex-col slide-up rounded-t-3xl sm:rounded-xl plot-action-card"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 可滚动内容区 */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-thin">
             {/* 花信息 */}
             <div className="flex items-center gap-4 mb-4 pb-4 border-b border-slate-100">
               <div className={classNames(
@@ -385,6 +387,15 @@ export default function Plot({ plot, onUpdate }: Props) {
                     <ShoppingCart size={12} /> 前往市场
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* 关闭滚动内容区 */}
+            </div>
+
+            {/* Footer 底部按钮区 - 固定不滚动 */}
+            <div className="p-5 border-t border-slate-100 flex-shrink-0 space-y-2">
+              {flower.isReady && (
                 <button
                   onClick={() => performAction('harvest')}
                   disabled={loading}
@@ -392,15 +403,14 @@ export default function Plot({ plot, onUpdate }: Props) {
                 >
                   🎁 收获并存入背包
                 </button>
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowActions(false)}
-              className="w-full btn-secondary mt-2"
-            >
-              关闭
-            </button>
+              )}
+              <button
+                onClick={() => setShowActions(false)}
+                className="w-full btn-secondary"
+              >
+                关闭
+              </button>
+            </div>
           </div>
         </div>
       )}
