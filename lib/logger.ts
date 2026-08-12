@@ -2,7 +2,7 @@
 // 在 Cloudflare Edge 环境下使用 console.log（Workers 日志会自动收集）
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type LogCategory = 'garden' | 'auth' | 'market' | 'chat' | 'season' | 'pest' | 'steal' | 'system' | 'tasks' | 'admin' | 'family'
+export type LogCategory = 'garden' | 'auth' | 'market' | 'chat' | 'season' | 'pest' | 'steal' | 'system' | 'tasks' | 'admin' | 'family' | 'pm'
 
 interface LogEntry {
   level: LogLevel
@@ -32,6 +32,7 @@ const CATEGORY_TAG: Record<LogCategory, string> = {
   tasks: '[TASKS]',
   admin: '[ADMIN]',
   family: '[FAMILY]',
+  pm: '[PM]',
 }
 
 function formatLog(entry: LogEntry): string {
@@ -67,7 +68,6 @@ export function log(
       console.warn(formatted)
       break
     case 'debug':
-      // debug 仅在开发环境输出
       if (process.env.NODE_ENV !== 'production') {
         console.log(formatted)
       }
@@ -77,7 +77,6 @@ export function log(
   }
 }
 
-// 便捷方法
 export const logger = {
   debug: (cat: LogCategory, msg: string, data?: Record<string, any>, userId?: string) =>
     log('debug', cat, msg, data, userId),
