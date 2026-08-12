@@ -118,7 +118,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
+    <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       {/* 顶部 */}
       <div className="card p-3 mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export default function InventoryPage() {
           onClick={expandInventory}
           disabled={loading === 'expand' || user.coins < expandPrice}
           className={classNames(
-            'px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1 transition-all',
+            'px-3 py-2.5 rounded-xl text-xs font-medium flex items-center gap-1 transition-all',
             user.coins >= expandPrice
               ? 'bg-garden-500 text-white hover:bg-garden-600 active:scale-95'
               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -161,7 +161,7 @@ export default function InventoryPage() {
       </div>
 
       {/* 背包网格 */}
-      <div className="grid grid-cols-5 gap-2 mb-6">
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-6">
         {Array.from({ length: user.inventorySize }).map((_, idx) => {
           const item = user.inventory.filter(i => i.quantity > 0)[idx]
           const typeInfo = item ? getTypeLabel(item.type) : null
@@ -182,7 +182,7 @@ export default function InventoryPage() {
                   {/* 等级标签：仅鲜花显示，工具/种子不显示 */}
                   {item.type === 'flower' && item.rank && (
                     <span
-                      className="absolute top-1 left-1 text-[8px] px-1 rounded font-bold"
+                      className="absolute top-1 left-1 text-[9px] px-1 rounded font-bold"
                       style={{ backgroundColor: RankColors[item.rank], color: 'white' }}
                     >
                       {RankNames[item.rank]}
@@ -191,7 +191,7 @@ export default function InventoryPage() {
                   {/* 数量标签：工具用蓝底、鲜花/种子用 typeInfo 颜色 */}
                   <span
                     className={classNames(
-                      'absolute top-1 right-1 text-[9px] px-1.5 rounded-full font-bold',
+                      'absolute top-1 right-1 text-[10px] px-1.5 rounded-full font-bold',
                       item.type === 'tool' ? 'bg-blue-100 text-blue-700' : (typeInfo?.color || 'bg-slate-100 text-slate-700')
                     )}
                   >
@@ -199,7 +199,7 @@ export default function InventoryPage() {
                   </span>
                   {/* 工具名称小字 */}
                   {item.type === 'tool' && (
-                    <span className="absolute bottom-1 text-[8px] text-slate-500 font-medium truncate px-1">
+                    <span className="absolute bottom-1 text-[9px] text-slate-500 font-medium truncate px-1">
                       {item.name}
                     </span>
                   )}
@@ -215,13 +215,15 @@ export default function InventoryPage() {
       {/* 物品详情弹窗 */}
       {selectedItem && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setSelectedItem(null)}
         >
           <div
-            className="card w-full max-w-md p-5 slide-up"
+            className="card w-full max-w-md h-[70vh] sm:h-auto sm:max-h-[80vh] overflow-hidden flex flex-col slide-up rounded-t-3xl sm:rounded-2xl inventory-item-card"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 内容滚动区 */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-thin">
             <div className="flex items-start gap-4 mb-4">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 flex items-center justify-center text-5xl relative">
                 {selectedItem.emoji}
@@ -249,7 +251,7 @@ export default function InventoryPage() {
               </div>
               <button
                 onClick={() => setSelectedItem(null)}
-                className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 flex-shrink-0"
               >
                 <X size={20} />
               </button>
@@ -265,7 +267,12 @@ export default function InventoryPage() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2 mt-4">
+            {/* 关闭滚动内容区 */}
+            </div>
+
+            {/* 固定底部按钮区 */}
+            <div className="p-5 border-t border-slate-100 flex-shrink-0">
+            <div className="grid grid-cols-2 gap-2">
               {selectedItem.sellable && (
                 <button
                   onClick={sellItem}
@@ -289,9 +296,9 @@ export default function InventoryPage() {
                 disabled={loading === 'discard'}
                 className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 font-medium hover:bg-red-100 active:scale-95 transition-all"
               >
-                <Trash2 size={18} />
-                丢弃 1 个
+                <Trash2 size={18} /> 丢弃 1 个
               </button>
+            </div>
             </div>
           </div>
         </div>
