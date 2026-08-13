@@ -15,6 +15,9 @@ export async function GET(
   { params }: { params: { channel: string } }
 ) {
   try {
+    const user = await authRequest(req)
+    if (!user) return jsonResponse(false, null, '请先登录', 401)
+
     await ensureSeasonTick()
     const channel = params.channel as any
     const msgs = await getMessages(channel, 200)
