@@ -1289,19 +1289,8 @@ export async function createNotification(data: Omit<Notification, 'id' | 'create
 
 // ==================== 任务进度 ====================
 
-const TASK_INCREMENT_MAP: Record<string, string> = {
-  'login': 't_daily_1',
-  'daily_checkin': 't_daily_1',
-  'plant': 't_daily_2',
-  'water': 't_daily_2',
-  'fertilize': 't_daily_2',
-  'pesticide': 't_daily_2',
-  'harvest': 't_daily_3',
-  'chat': 't_daily_5',
-  'trade': 't_daily_4',
-  'unlock': 't_weekly_1', // 解锁地块：同时计入周常花园扩张
-  'earn_coin': 't_weekly_2', // 赚金币：计入周常富豪
-}
+// 花园打理类行为集合（解锁/种植/浇水/施肥/除虫/加速卡）：周常花园扩张任务按此推进
+const GARDEN_CARE_ACTIONS = ['unlock', 'plant', 'water', 'fertilize', 'pesticide', 'speedup']
 
 export async function incrementTaskProgress(userId: string, action: string, amount = 1): Promise<void> {
   const user = await findUserById(userId)
@@ -1309,29 +1298,54 @@ export async function incrementTaskProgress(userId: string, action: string, amou
 
   const progress = { ...(user.taskProgress || {}) }
 
-  // 主任务推进（按映射）
-  const dailyTaskId = TASK_INCREMENT_MAP[action]
-  if (dailyTaskId) {
-    progress[dailyTaskId] = (progress[dailyTaskId] || 0) + amount
+  // 从数据库读取当前启用的任务模板（按 action 匹配，避免硬编码 ID 与模板 ID 不一致）
+  const templates = await getAllTaskTemplates(true).catch(() => [])
+
+  // 主任务推进：匹配 action 相同的模板
+  for (const tpl of templates) {
+    if (tpl.action === action) {
+      progress[tpl.id] = (progress[tpl.id] || 0) + amount
+    }
   }
 
-  // 同步推进对应的周任务 / 月任务
-  // 周常·花园扩张：解锁 / 种植 / 浇水 / 施肥 / 除虫 / 加速卡 都算（打理类行为 + 解锁）
-  if (action === 'unlock' || action === 'plant' || action === 'water' ||
-      action === 'fertilize' || action === 'pesticide' || action === 'speedup') {
-    progress['t_weekly_1'] = (progress['t_weekly_1'] || 0) + amount
+  // 花园打理类行为额外推进所有打理类模板
+  if (GARDEN_CARE_ACTIONS.includes(action)) {
+    for (const tpl of templates) {
+      if (GARDEN_CARE_ACTIONS.includes(tpl.action)) {
+        progress[tpl.id] = (progress[tpl.id] || 0) + amount
+      }
+    }
   }
-  // 周常·富豪（累计获得金币）：amount = 本次获得的金币数
-  if (action === 'earn_coin' && amount > 0) {
-    progress['t_weekly_2'] = (progress['t_weekly_2'] || 0) + amount
+
+  // 兼容旧版硬编码 ID（历史数据或模板 ID 恰好为 t_xxx_N 时）
+  const legacyMap: Record<string, string> = {
+    'login': 't_daily_1',
+    'daily_checkin': 't_daily_1',
+    'plant': 't_daily_2',
+    'water': 't_daily_2',
+    'fertilize': 't_daily_2',
+    'pesticide': 't_daily_2',
+    'harvest': 't_daily_3',
+    'chat': 't_daily_5',
+    'trade': 't_daily_4',
+    'unlock': 't_weekly_1',
+    'earn_coin': 't_weekly_2',
   }
-  // 日常收获同时推进月常·大收藏家（收获 20 朵花）
+  const legacyId = legacyMap[action]
+  if (legacyId) {
+    progress[legacyId] = (progress[legacyId] || 0) + amount
+  }
   if (action === 'harvest') {
     progress['t_monthly_1'] = (progress['t_monthly_1'] || 0) + amount
   }
 
   // 登录任务特殊处理：幂等，最多到 1（避免重复累加）
   if (action === 'login' || action === 'daily_checkin') {
+    for (const tpl of templates) {
+      if (tpl.action === 'login' || tpl.action === 'daily_checkin') {
+        progress[tpl.id] = Math.max(1, progress[tpl.id] || 1)
+      }
+    }
     progress['t_daily_1'] = Math.max(1, progress['t_daily_1'] || 1)
   }
 
@@ -1348,11 +1362,11 @@ export async function incrementTaskProgress(userId: string, action: string, amou
     return 0
   }
 
-  // 重置过期任务
-  const typeMap: Record<string, string> = {
+  // 重置过期任务（按模板类型前缀 + 模板自身 type，兼容任意 ID 前缀如 t_daily_msrqflvp）
+  const typePrefixes: Record<string, string> = {
     't_daily_': 'daily', 't_weekly_': 'weekly', 't_monthly_': 'monthly',
   }
-  for (const [prefix, type] of Object.entries(typeMap)) {
+  for (const [prefix, type] of Object.entries(typePrefixes)) {
     if (!lastReset[type] || lastReset[type] < periodStart(type)) {
       for (const key of Object.keys(progress)) {
         if (key.startsWith(prefix)) {
@@ -1360,6 +1374,18 @@ export async function incrementTaskProgress(userId: string, action: string, amou
         }
       }
       lastReset[type] = now
+    }
+  }
+  const resetKeys = new Set<string>()
+  for (const tpl of templates) {
+    if (!resetKeys.has(tpl.type)) {
+      resetKeys.add(tpl.type)
+      if (!lastReset[tpl.type] || lastReset[tpl.type] < periodStart(tpl.type)) {
+        for (const t of templates) {
+          if (t.type === tpl.type) progress[t.id] = 0
+        }
+        lastReset[tpl.type] = now
+      }
     }
   }
 
