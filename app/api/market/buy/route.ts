@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findListing, removeListing, updateListingQuantity, updateUser, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
+import { findListing, removeListing, updateListingQuantity, atomicDecreaseListing, updateUser, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOLS } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const { listingId, quantity } = await req.json()
     if (!listingId || !quantity) return jsonResponse(false, null, '参数错误', 400)
-    if (quantity < 1) return jsonResponse(false, null, '数量无效', 400)
+    if (!Number.isInteger(quantity) || quantity < 1) return jsonResponse(false, null, '数量无效', 400)
 
     const listing = await findListing(listingId)
     if (!listing) return jsonResponse(false, null, '商品不存在', 404)
@@ -63,6 +63,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 更新 listing 库存（原子扣减，防并发超卖）——必须在任何发奖/扣款之前
+    if (listing.isOfficial && listing.sellerId === 'system') {
+      // 官方商品不减库存（无限供应）
+    } else {
+      const decreased = await atomicDecreaseListing(listingId, quantity)
+      if (!decreased) {
+        return jsonResponse(false, null, '商品已被抢购，请重试', 409)
+      }
+      const refreshed = await findListing(listingId)
+      if (refreshed && refreshed.quantity <= 0) {
+        await removeListing(listingId).catch(() => {})
+      }
+    }
+
     // 如果是玩家挂售，给卖家金币
     if (!listing.isOfficial && listing.sellerId !== 'system') {
       const seller = await findUserById(listing.sellerId)
@@ -73,17 +87,6 @@ export async function POST(req: NextRequest) {
         // 卖家任务：贸易达人（日） + 周常富豪（累计获得金币）
         try { await incrementTaskProgress(seller.id, 'trade', 1) } catch {}
         try { if (sellerCoins > 0) await incrementTaskProgress(seller.id, 'earn_coin', sellerCoins) } catch {}
-      }
-    }
-
-    // 更新 listing 库存
-    if (listing.isOfficial && listing.sellerId === 'system') {
-      // 官方商品不减库存（无限供应）
-    } else {
-      if (listing.quantity - quantity <= 0) {
-        await removeListing(listingId)
-      } else {
-        await updateListingQuantity(listingId, listing.quantity - quantity)
       }
     }
 

@@ -1018,6 +1018,39 @@ export async function updateListingQuantity(id: string, quantity: number): Promi
   await sb.from('listings').update({ quantity }).eq('id', id)
 }
 
+// 原子扣减 listing 库存（防并发超卖）——由数据库 RPC 保证原子性
+export async function atomicDecreaseListing(id: string, amount: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_decrease_listing', { p_id: id, p_amount: amount })
+  if (error) {
+    logger.warn('market', 'atomicDecreaseListing 失败', { id, amount, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子扣减收购单剩余数量（防并发超卖）——由数据库 RPC 保证原子性
+export async function atomicDecreaseBuyOrder(id: string, amount: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_decrease_buy_order', { p_id: id, p_amount: amount })
+  if (error) {
+    logger.warn('market', 'atomicDecreaseBuyOrder 失败', { id, amount, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子自增 CDK 已用次数（防并发超发）——由数据库 RPC 保证原子性
+export async function atomicIncrementCdk(code: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_increment_cdk', { p_code: code })
+  if (error) {
+    logger.warn('system', 'atomicIncrementCdk 失败', { code, error: error.message })
+    return false
+  }
+  return data === true
+}
+
 export async function findListing(id: string): Promise<MarketListing | null> {
   const sb = getSupabase()
   const { data, error } = await sb.from('listings').select('*').eq('id', id).single()
@@ -1166,10 +1199,9 @@ export async function redeemCDK(code: string, userId: string): Promise<CDK | nul
   if (cdk.expiresAt && cdk.expiresAt < Date.now()) return null
   if (cdk.usedCount >= cdk.maxUses) return null
 
-  const sb = getSupabase()
-  await sb.from('cdks')
-    .update({ used_count: cdk.usedCount + 1 })
-    .eq('code', code.toUpperCase())
+  // 原子自增已用次数（防并发超发）：仅在 used_count < max_uses 时成功
+  const ok = await atomicIncrementCdk(code)
+  if (!ok) return null
 
   return { ...cdk, usedCount: cdk.usedCount + 1 }
 }

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import {
   updateUser, findUserById, ensureSeasonTick, getBuyOrders,
-  updateBuyOrderQuantity, addInventoryItem, createNotification, incrementTaskProgress,
+  updateBuyOrderQuantity, atomicDecreaseBuyOrder, addInventoryItem, createNotification, incrementTaskProgress,
 } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
 
     const { orderId, quantity, inventoryItemId } = await req.json()
     if (!orderId || !quantity || !inventoryItemId) return jsonResponse(false, null, '参数错误', 400)
+    if (!Number.isInteger(quantity) || quantity < 1) return jsonResponse(false, null, '数量无效', 400)
 
     const orders = await getBuyOrders()
     const order = orders.find(o => o.id === orderId)
@@ -25,8 +26,16 @@ export async function POST(req: NextRequest) {
     if (!invItem) return jsonResponse(false, null, '背包中没有该物品', 400)
 
     if (invItem.type !== order.itemType) return jsonResponse(false, null, '物品类型不匹配', 400)
+    if (invItem.referenceId !== order.referenceId) return jsonResponse(false, null, '物品与收购单不匹配', 400)
+    if (order.itemType === 'flower' && invItem.rank !== order.rank) return jsonResponse(false, null, '物品品质与收购单不匹配', 400)
 
     const coinsEarned = order.price * quantity
+
+    // 原子扣减收购单剩余数量（防并发超卖）——必须在任何发奖/扣背包之前
+    const decreased = await atomicDecreaseBuyOrder(order.id, quantity)
+    if (!decreased) {
+      return jsonResponse(false, null, '收购单数量不足，请重试', 409)
+    }
 
     // 扣除背包物品
     const newInventory = user.inventory.map(i =>
@@ -71,8 +80,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 更新收购单剩余数量
-    await updateBuyOrderQuantity(order.id, order.quantity - quantity)
+    // 更新收购单剩余数量（已在前面通过 atomicDecreaseBuyOrder 原子扣减）
 
     const updated = await updateUser(user.id, {
       coins: user.coins + coinsEarned,
