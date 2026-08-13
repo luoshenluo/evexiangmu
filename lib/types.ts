@@ -168,36 +168,6 @@ export interface User {
   petalCoins?: number
   // 成就额外奖励：称号列表
   titles?: string[]
-  // 最近活跃时间（ms）：用于统计"最近5分钟在线用户"，由 heartbeat API 更新
-  lastActiveAt?: number
-}
-
-// ============================================================
-// 私聊系统（好友一对一）
-// ============================================================
-
-export interface PrivateMessage {
-  id: string
-  fromUserId: string
-  toUserId: string
-  content: string
-  fromName?: string
-  fromAvatar?: string
-  toName?: string
-  toAvatar?: string
-  createdAt: number
-  readAt?: number | null
-}
-
-// 会话：一对好友的最后一条消息摘要 + 未读数
-export interface PrivateConversation {
-  peerId: string
-  peerName: string
-  peerAvatar: string
-  lastMessage: string
-  lastMessageAt: number
-  unreadCount: number
-  isOnline?: boolean
 }
 
 export interface MarketListing {
