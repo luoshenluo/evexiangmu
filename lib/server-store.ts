@@ -12,7 +12,9 @@ import { logger } from './logger'
 // ============================================================================
 // Supabase 客户端
 // ============================================================================
-const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!let _sb: SupabaseClient | null = null
+const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let _sb: SupabaseClient | null = null;
 function getSupabase(): SupabaseClient {
   if (!_sb) {
     _sb = createClient(SB_URL, SB_KEY, {
