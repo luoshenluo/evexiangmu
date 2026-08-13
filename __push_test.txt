@@ -1,1 +1,0 @@
-connectivity ok - if this file appears in repo, then single file push works
