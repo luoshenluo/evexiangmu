@@ -79,6 +79,7 @@ export default function FriendsPage() {
       if (res.success) {
         showToast(accept ? '已添加好友！' : '已拒绝', 'success')
         setRefreshKey((k) => k + 1)
+        // 刷新用户（好友数更新）
         const uRes = await apiFetch('/api/user/me')
         if (uRes.success && uRes.data) updateUser(uRes.data)
       } else showToast(res.error || '操作失败', 'error')
@@ -236,6 +237,7 @@ export default function FriendsPage() {
       {/* 好友申请 */}
       {tab === 'requests' && (
         <div className="space-y-4">
+          {/* 收到的申请 */}
           <div>
             <h3 className="text-xs font-medium text-slate-500 mb-2 px-1">
               收到的申请 {incoming.length > 0 && <span className="text-red-500">（{incoming.length}）</span>}
@@ -281,6 +283,7 @@ export default function FriendsPage() {
             )}
           </div>
 
+          {/* 发出的申请 */}
           <div>
             <h3 className="text-xs font-medium text-slate-500 mb-2 px-1">我发出的申请（{outgoing.length}）</h3>
             {outgoing.length === 0 ? (
