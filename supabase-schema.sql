@@ -184,13 +184,12 @@ insert into public.game_state (id, current_season, season_start_at, season_durat
 values (1, 'spring', (EXTRACT(EPOCH FROM now()) * 1000)::bigint, 90 * 24 * 3600 * 1000)
 on conflict (id) do nothing;
 
--- 初始化管理员账号 (admin / admin123)
--- 密码 hash: 预先计算的 bcrypt hash (admin123)
+-- 初始化管理员账号（安全口令，仅首次部署时种子，部署后请立即修改）
 insert into public.users (id, username, password, nickname, avatar, coins, is_admin, plots, inventory)
 values (
+  'adm_4ce9c3a14203',
   'admin',
-  'admin',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+  '$2a$10$LjLnVn53hATKYWmnzP/rleBOrrUkxGUcaBMc7GDmg2wIVI6/UB1Lm',
   '超级管理员',
   '👑',
   999999,
@@ -200,12 +199,12 @@ values (
 )
 on conflict (id) do nothing;
 
--- 初始化演示账号 (demo / 123456)
+-- 初始化演示账号（仅首次部署时种子）
 insert into public.users (id, username, password, nickname, avatar, coins, is_admin, plots, inventory)
 values (
   'demo',
   'demo',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+  '$2a$10$c6r4PvEkrh3DW1ZcBVF6DufX6v6YGH2OJ0/FGcCtvZEV/WWQZWs9G',
   '演示玩家',
   '🌻',
   500,

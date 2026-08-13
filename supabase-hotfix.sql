@@ -50,15 +50,10 @@ create table if not exists public.official_buy_prices (
   primary key (reference_id, rank)
 );
 
--- 7. 修正 admin 密码为 admin123（只更新这一行，不影响其他用户）
-update public.users
-set password = '$2a$10$1jgwGVXuQ30V0wjQkUGQae60AZrf9xWlurRo8y.WnNMU9pw.Kfsk6'
-where username = 'admin';
+-- 7. 【已移除】原脚本在此重置 admin 密码为公开默认值，属于严重安全隐患，故删除。
+--    如需修改管理员密码，请使用管理后台「系统设置」或直接更新数据库。
 
--- 8. 修正 demo 密码为 123456
-update public.users
-set password = '$2a$10$BhGV51VjlOxTopEh/Zb5Vep0w51L/5.6DKoidCNXW3BH4ntF9FuIm'
-where username = 'demo';
+-- 8. 【已移除】原脚本在此重置 demo 密码为公开默认值，属于严重安全隐患，故删除。
 
 -- 9. 确保 admin 有管理员权限和足够的背包空间
 update public.users

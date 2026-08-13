@@ -1,7 +1,11 @@
 -- ============================================================
 --  花园游戏 · Supabase 最终合并版 v1.4
 --  ============================================================
---  ⚠️  重 要  提  醒  ⚠️
+--  ⚠️  重  要  提  醒  ⚠️
+--
+--  ⚠️⚠️ 危险脚本 · 勿在生产环境执行！本脚本开头会 DROP 全部业务表，
+--  ⚠️⚠️ 执行将清空所有用户/交易/聊天数据，仅用于全新初始化。
+--  ⚠️⚠️ 生产环境请使用 supabase/schema.sql 或单独迁移脚本。
 --
 --  1) 不要点绿色的 "Run selected"！！
 --     请用鼠标滚到这一行最顶上，按 Ctrl+A 全选，
@@ -241,15 +245,15 @@ values (
 )
 on conflict (id) do nothing;
 
--- 管理员：admin / admin123 （bcrypt hash）
+-- 管理员（安全口令，仅首次部署时种子，部署后请立即修改）
 insert into public.users (
   id, username, password, nickname, avatar, coins,
   created_at, last_login, plots, inventory, inventory_size,
   is_admin, muted_until, family_id, friends, deleted,
   steal_count_today, steal_reset_at, garden_protected_until
 ) values (
-  'admin', 'admin',
-  '$2a$10$1jgwGVXuQ30V0wjQkUGQae60AZrf9xWlurRo8y.WnNMU9pw.Kfsk6',
+  'adm_4ce9c3a14203', 'admin',
+  '$2a$10$LjLnVn53hATKYWmnzP/rleBOrrUkxGUcaBMc7GDmg2wIVI6/UB1Lm',
   '花园管理员', '👑', 99999::bigint,
   (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint - 86400000::bigint,  -- 1 天前创建
   (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint,                      -- 刚刚登录
@@ -258,7 +262,7 @@ insert into public.users (
   0, 0, 0
 ) on conflict (id) do nothing;
 
--- 普通玩家：demo / 123456 （bcrypt hash）
+-- 普通玩家（仅首次部署时种子）
 insert into public.users (
   id, username, password, nickname, avatar, coins,
   created_at, last_login, plots, inventory, inventory_size,
@@ -266,7 +270,7 @@ insert into public.users (
   steal_count_today, steal_reset_at, garden_protected_until
 ) values (
   'demo', 'demo',
-  '$2a$10$BhGV51VjlOxTopEh/Zb5Vep0w51L/5.6DKoidCNXW3BH4ntF9FuIm',
+  '$2a$10$c6r4PvEkrh3DW1ZcBVF6DufX6v6YGH2OJ0/FGcCtvZEV/WWQZWs9G',
   '小花农', '🌱', 200::bigint,
   (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint - 3600000::bigint,   -- 1 小时前创建
   (EXTRACT(EPOCH FROM now())::numeric * 1000)::bigint,

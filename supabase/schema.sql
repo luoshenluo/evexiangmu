@@ -186,12 +186,12 @@ INSERT INTO game_state (id, current_season, season_start_at, season_duration)
 VALUES (1, 'spring', EXTRACT(EPOCH FROM NOW()) * 1000, 28800000)
 ON CONFLICT (id) DO NOTHING;
 
--- 管理员账号（密码: admin123，bcrypt hash）
+-- 管理员账号（安全口令，仅首次部署时种子，请部署后立即修改）
 INSERT INTO users (id, username, password, nickname, avatar, coins, created_at, last_login, plots, inventory, inventory_size, is_admin, muted_until, family_id, friends, deleted, steal_count_today, steal_reset_at, garden_protected_until)
 VALUES (
+  'adm_4ce9c3a14203',
   'admin',
-  'admin',
-  '$2a$10$mRz5m5qvtwP0JMb6wuGB/OfbRYuUSdVnpvfOZjW3djv9EBF5ze7Su',
+  '$2a$10$LjLnVn53hATKYWmnzP/rleBOrrUkxGUcaBMc7GDmg2wIVI6/UB1Lm',
   '花园管理员',
   '👑',
   99999,
@@ -211,12 +211,12 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- 演示账号（密码: 123456，bcrypt hash）
+-- 演示账号（仅首次部署时种子）
 INSERT INTO users (id, username, password, nickname, avatar, coins, created_at, last_login, plots, inventory, inventory_size, is_admin, muted_until, family_id, friends, deleted, steal_count_today, steal_reset_at, garden_protected_until)
 VALUES (
   'user1',
   'demo',
-  '$2a$10$QywGDAdXCAgKZzVzV1kxhOAYXg2.a4Yeme9OJS.vpCF/0l6556jae',
+  '$2a$10$c6r4PvEkrh3DW1ZcBVF6DufX6v6YGH2OJ0/FGcCtvZEV/WWQZWs9G',
   '小花农',
   '🌱',
   200,

@@ -1,4 +1,10 @@
 -- =============================================
+-- ⚠️⚠️⚠️ 危险脚本 · 勿在生产环境执行 ⚠️⚠️⚠️
+-- =============================================
+-- 本脚本会 DROP 全部业务表并重建，执行将清空所有用户/交易/聊天数据！
+-- 仅用于本地开发或全新初始化数据库。生产环境请勿运行。
+-- 若需在线修改数据库，请使用 supabase/schema.sql 或单独迁移脚本。
+-- =============================================
 -- 花园游戏 Supabase Schema · 彻底重置版 v1.3
 -- 修复: integer out of range (所有时间列显式 bigint + seasonDuration 匹配游戏实际值)
 -- =============================================
@@ -187,21 +193,21 @@ insert into public.game_state (id, current_season, season_start_at, season_durat
 values (1, 'spring', (EXTRACT(EPOCH FROM now()) * 1000)::bigint, 28800000::bigint)
 on conflict (id) do nothing;
 
--- 管理员 admin / admin123
+-- 管理员（安全口令，仅首次部署时种子，部署后请立即修改）
 insert into public.users (id, username, password, nickname, avatar, coins, is_admin, plots, inventory)
 values (
-  'admin', 'admin',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+  'adm_4ce9c3a14203', 'admin',
+  '$2a$10$LjLnVn53hATKYWmnzP/rleBOrrUkxGUcaBMc7GDmg2wIVI6/UB1Lm',
   '超级管理员', '👑', 999999::bigint, true,
   '[{"id":1,"unlocked":true,"flower":null},{"id":2,"unlocked":true,"flower":null},{"id":3,"unlocked":true,"flower":null},{"id":4,"unlocked":true,"flower":null},{"id":5,"unlocked":true,"flower":null},{"id":6,"unlocked":true,"flower":null},{"id":7,"unlocked":true,"flower":null},{"id":8,"unlocked":true,"flower":null},{"id":9,"unlocked":true,"flower":null},{"id":10,"unlocked":true,"flower":null}]'::jsonb,
   '[]'::jsonb
 ) on conflict (id) do nothing;
 
--- 演示 demo / 123456
+-- 演示（仅首次部署时种子）
 insert into public.users (id, username, password, nickname, avatar, coins, is_admin, plots, inventory)
 values (
   'demo', 'demo',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+  '$2a$10$c6r4PvEkrh3DW1ZcBVF6DufX6v6YGH2OJ0/FGcCtvZEV/WWQZWs9G',
   '演示玩家', '🌻', 500::bigint, false,
   '[{"id":1,"unlocked":true,"flower":null},{"id":2,"unlocked":true,"flower":null},{"id":3,"unlocked":true,"flower":null},{"id":4,"unlocked":false,"flower":null},{"id":5,"unlocked":false,"flower":null}]'::jsonb,
   '[{"id":"inv_s1","type":"seed","referenceId":"seed_daisy","name":"雏菊种子","emoji":"🌱","quantity":3,"maxStack":99,"sellable":false,"tradeable":true},{"id":"inv_s2","type":"seed","referenceId":"seed_tulip","name":"郁金香种子","emoji":"🌱","quantity":2,"maxStack":99,"sellable":false,"tradeable":true},{"id":"inv_t1","type":"tool","referenceId":"watering_can","name":"水壶","emoji":"💧","quantity":5,"maxStack":99,"sellable":true,"tradeable":true}]'::jsonb
