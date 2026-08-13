@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, findUserById, incrementTaskProgress, getAllTaskTemplates } from '@/lib/server-store'
+import { updateUser, findUserById, incrementTaskProgress, getAllTaskTemplates, atomicClaimTask } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -123,10 +123,12 @@ export async function POST(req: NextRequest) {
     const currentProgress = progress[taskId] || 0
     if (currentProgress < task.target) return jsonResponse(false, null, '任务未完成', 400)
 
-    // 检查是否已领取
+    // 检查是否已领取（前置检查，快速失败）
     if (claimed[taskId]) return jsonResponse(false, null, '奖励已领取', 400)
 
-    // 标记为已领取
+    // 原子标记为已领取（防并发重复领取）：仅当未被领取时成功
+    const claimedOk = await atomicClaimTask(freshUser.id, taskId)
+    if (!claimedOk) return jsonResponse(false, null, '奖励已领取', 400)
     claimed[taskId] = true
 
     // 发放奖励

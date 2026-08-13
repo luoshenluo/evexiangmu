@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, findUserById, createNotification } from '@/lib/server-store'
+import { updateUser, findUserById, createNotification, atomicSpendPetals } from '@/lib/server-store'
 import { authRequest, jsonResponse, sanitizeUser } from '@/lib/auth'
 import { WHEEL_REWARDS, pickWheelIndex } from '@/lib/game-data'
 
@@ -29,8 +29,15 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const times = Math.max(1, Math.min(10, Number(body?.times || 1)))
+    if (!Number.isFinite(times) || !Number.isInteger(times) || times < 1) {
+      return jsonResponse(false, null, '次数无效', 400)
+    }
     const cost = times // 1 花瓣/次
     if ((u.petalCoins || 0) < cost) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${cost} 花瓣`, 400)
+
+    // 原子扣减花瓣（防并发超扣）：仅当余额足够时成功
+    const spent = await atomicSpendPetals(u.id, cost)
+    if (!spent) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${cost} 花瓣`, 400)
 
     const results: number[] = []
     let totalCoins = 0, totalPetals = 0
@@ -40,8 +47,13 @@ export async function POST(req: NextRequest) {
       totalCoins += WHEEL_REWARDS[idx].coins
       totalPetals += WHEEL_REWARDS[idx].petals || 0
     }
+
+    // 原子扣减后重新读取最新花瓣数，避免用旧值覆盖并发扣减结果
+    const fresh = await findUserById(u.id)
+    const basePetals = fresh?.petalCoins ?? (u.petalCoins || 0)
+
     const patch: any = {
-      petalCoins: (u.petalCoins || 0) - cost + totalPetals,
+      petalCoins: basePetals + totalPetals,
       coins: (u.coins || 0) + totalCoins,
     }
     const updated = await updateUser(u.id, patch)

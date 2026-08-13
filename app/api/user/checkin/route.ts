@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, findUserById, createNotification, incrementTaskProgress } from '@/lib/server-store'
+import { updateUser, findUserById, createNotification, incrementTaskProgress, atomicCheckinMark } from '@/lib/server-store'
 import { authRequest, jsonResponse, sanitizeUser, isSameDay } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -88,34 +88,44 @@ export async function POST(req: NextRequest) {
     const today = new Date(now)
     if (isSameDay(last, today)) return jsonResponse(false, null, '今天已经签到过了~', 400)
 
+    // 原子标记签到（防并发重复签到）：仅当今天未签到时成功
+    const marked = await atomicCheckinMark(u.id, now)
+    if (!marked) return jsonResponse(false, null, '今天已经签到过了~', 400)
+
+    // 原子标记成功后重新读取用户，基于最新数据计算奖励
+    const fresh = await findUserById(u.id)
+    if (!fresh) return jsonResponse(false, null, '用户不存在', 404)
+    const freshStreak = fresh.checkInStreak || 0
+
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-    const broken = lastCheckInAt > 0 && !isSameDay(last, yesterday)
-    const nextStreak = broken ? 1 : (checkInStreak + 1)
-    const todayIndex = broken ? 0 : (checkInStreak % 7)
+    const freshLastCheckIn = (fresh as any).lastCheckInAt || 0
+    const broken = freshLastCheckIn > 0 && !isSameDay(new Date(freshLastCheckIn), yesterday)
+    const nextStreak = broken ? 1 : (freshStreak + 1)
+    const todayIndex = broken ? 0 : (freshStreak % 7)
     const reward = getDailyReward(todayIndex)
 
     // 发奖
     const patch: any = {
       lastCheckInAt: now,
       checkInStreak: nextStreak,
-      coins: (u.coins || 0) + reward.coins,
-      petalCoins: (u.petalCoins || 0) + reward.petals,
+      coins: (fresh.coins || 0) + reward.coins,
+      petalCoins: (fresh.petalCoins || 0) + reward.petals,
     }
 
     // 成就判定（签到成就）
-    const achieves = (u.achievements || {}) as Record<string, { unlockedAt: number }>
+    const achieves = (fresh.achievements || {}) as Record<string, { unlockedAt: number }>
     const ACHIEVEMENTS = [
       { k: 'checkin_1day',   need: 1,   name: '初次签到',   desc: '完成第一次每日签到' },
       { k: 'checkin_7day',   need: 7,   name: '周常达人',   desc: '累计签到7天' },
       { k: 'checkin_30day',  need: 30,  name: '勤奋园丁',   desc: '累计签到30天' },
       { k: 'checkin_100day', need: 100, name: '百日守护',   desc: '累计签到100天' },
     ]
-    let totalCheckinDays = (u.totalCheckinDays || 0) + 1
+    let totalCheckinDays = (fresh.totalCheckinDays || 0) + 1
     patch.totalCheckinDays = totalCheckinDays
     const newlyUnlocked: string[] = []
-    const totalAll = (u.totalCheckinDaysAccum || 0) + 1  // 总签到天数
+    const totalAll = (fresh.totalCheckinDaysAccum || 0) + 1  // 总签到天数
     patch.totalCheckinDaysAccum = totalAll
-    const newTitles = Array.isArray((u as any).titles) ? [...(u as any).titles] : []
+    const newTitles = Array.isArray(fresh.titles) ? [...fresh.titles] : []
     for (const a of ACHIEVEMENTS) {
       if (!achieves[a.k] && totalAll >= a.need) {
         achieves[a.k] = { unlockedAt: now }
@@ -129,11 +139,11 @@ export async function POST(req: NextRequest) {
     if (newlyUnlocked.length > 0) patch.achievements = achieves
     if (newTitles.length > 0) patch.titles = newTitles
 
-    const updated = await updateUser(u.id, patch)
+    const updated = await updateUser(fresh.id, patch)
 
     // 推送消息
     await createNotification({
-      userId: u.id,
+      userId: fresh.id,
       type: 'reward',
       title: `每日签到 - ${reward.label}`,
       content: `签到成功，获得 ${reward.coins} 金币${reward.petals ? ` + ${reward.petals} 花瓣` : ''}！`,
@@ -141,7 +151,7 @@ export async function POST(req: NextRequest) {
     for (const k of newlyUnlocked) {
       const def = ACHIEVEMENTS.find(a => a.k === k)!
       await createNotification({
-        userId: u.id,
+        userId: fresh.id,
         type: 'achievement',
         title: `🏆 成就解锁：${def.name}`,
         content: def.desc,
@@ -149,10 +159,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 任务进度
-    await incrementTaskProgress(u.id, 'login', 1)
-    await incrementTaskProgress(u.id, 'daily_checkin', 1)
+    await incrementTaskProgress(fresh.id, 'login', 1)
+    await incrementTaskProgress(fresh.id, 'daily_checkin', 1)
     // 周常·富豪：签到获得金币计入累计获得
-    try { if (reward.coins > 0) await incrementTaskProgress(u.id, 'earn_coin', reward.coins) } catch {}
+    try { if (reward.coins > 0) await incrementTaskProgress(fresh.id, 'earn_coin', reward.coins) } catch {}
 
     return jsonResponse(true, {
       user: updated ? sanitizeUser(updated) : null,

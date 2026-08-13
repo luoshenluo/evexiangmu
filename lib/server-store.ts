@@ -1051,6 +1051,39 @@ export async function atomicIncrementCdk(code: string): Promise<boolean> {
   return data === true
 }
 
+// 原子签到标记：仅当今天未签到成功，防止并发重复签到（防并发刷奖励）
+export async function atomicCheckinMark(userId: string, now: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_checkin_mark', { p_user_id: userId, p_now: now })
+  if (error) {
+    logger.warn('system', 'atomicCheckinMark 失败', { userId, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子扣减花瓣：仅当余额足够时扣减，防止并发超扣（防并发刷转盘）
+export async function atomicSpendPetals(userId: string, cost: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_spend_petals', { p_user_id: userId, p_cost: cost })
+  if (error) {
+    logger.warn('system', 'atomicSpendPetals 失败', { userId, cost, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子领取任务：仅当该任务未被领取时标记，防止并发重复领取（防并发刷任务奖励）
+export async function atomicClaimTask(userId: string, taskId: string): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_claim_task', { p_user_id: userId, p_task_id: taskId })
+  if (error) {
+    logger.warn('system', 'atomicClaimTask 失败', { userId, taskId, error: error.message })
+    return false
+  }
+  return data === true
+}
+
 export async function findListing(id: string): Promise<MarketListing | null> {
   const sb = getSupabase()
   const { data, error } = await sb.from('listings').select('*').eq('id', id).single()
