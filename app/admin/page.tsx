@@ -77,6 +77,7 @@ export default function AdminPage() {
   const [annTitle, setAnnTitle] = useState('')
   const [annContent, setAnnContent] = useState('')
   const [annPriority, setAnnPriority] = useState<'normal' | 'important' | 'urgent'>('normal')
+  const [editingAnn, setEditingAnn] = useState<any>(null)
 
   const [showCDKForm, setShowCDKForm] = useState(false)
   const [cdkCoins, setCdkCoins] = useState(0)
@@ -202,18 +203,34 @@ export default function AdminPage() {
     else showToast(res.error || '删除失败', 'error')
   }
 
-  const postAnn = async () => {
+  const openAnnForm = (a: any | null) => {
+    setEditingAnn(a)
+    setAnnTitle(a ? a.title : '')
+    setAnnContent(a ? a.content : '')
+    setAnnPriority(a ? (a.priority || 'normal') : 'normal')
+    setShowAnnForm(true)
+  }
+
+  const closeAnnForm = () => {
+    setShowAnnForm(false)
+    setEditingAnn(null)
+    setAnnTitle('')
+    setAnnContent('')
+    setAnnPriority('normal')
+  }
+
+  const submitAnn = async () => {
     if (!annTitle.trim() || !annContent.trim()) return showToast('请填写完整', 'error')
     setLoading('ann')
-    const res = await apiFetch('/api/admin/announcements', {
-      method: 'POST',
-      body: JSON.stringify({ title: annTitle, content: annContent, priority: annPriority })
-    })
+    const body = JSON.stringify({ title: annTitle.trim(), content: annContent.trim(), priority: annPriority })
+    const res = editingAnn
+      ? await apiFetch('/api/admin/announcements/' + editingAnn.id, { method: 'PUT', body })
+      : await apiFetch('/api/admin/announcements', { method: 'POST', body })
     if (res.success) {
-      showToast('发布成功', 'success')
-      setShowAnnForm(false); setAnnTitle(''); setAnnContent(''); setAnnPriority('normal')
+      showToast(editingAnn ? '已保存修改' : '发布成功', 'success')
+      closeAnnForm()
       loadAll()
-    } else showToast(res.error || '发布失败', 'error')
+    } else showToast(res.error || (editingAnn ? '保存失败' : '发布失败'), 'error')
     setLoading(null)
   }
 
@@ -799,7 +816,7 @@ export default function AdminPage() {
             <div className="space-y-4">
               <div className="card p-4 flex items-center justify-between">
                 <h3 className="font-bold text-slate-800">公告列表</h3>
-                <button onClick={() => setShowAnnForm(true)} className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1">
+                <button onClick={() => openAnnForm(null)} className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1">
                   <Plus size={16} /> 发布公告
                 </button>
               </div>
@@ -819,9 +836,14 @@ export default function AdminPage() {
                       </div>
                       <p className="text-sm text-slate-600 whitespace-pre-wrap">{a.content}</p>
                     </div>
-                    <button onClick={() => deleteAnn(a.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openAnnForm(a)} className="p-1.5 text-slate-400 hover:text-garden-500 hover:bg-garden-50 rounded-lg" title="编辑公告">
+                        <Edit size={16} />
+                      </button>
+                      <button onClick={() => deleteAnn(a.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="删除公告">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1113,11 +1135,11 @@ export default function AdminPage() {
       </div>
 
       {showAnnForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAnnForm(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeAnnForm}>
           <div className="card w-full max-w-md p-5 slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg text-slate-800">发布公告</h2>
-              <button onClick={() => setShowAnnForm(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <h2 className="font-bold text-lg text-slate-800">{editingAnn ? '编辑公告' : '发布公告'}</h2>
+              <button onClick={closeAnnForm} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="space-y-3">
               <div>
@@ -1136,8 +1158,8 @@ export default function AdminPage() {
                 <label className="block text-sm font-medium mb-1 text-slate-700">内容</label>
                 <textarea className="input min-h-[120px] resize-none" value={annContent} onChange={e => setAnnContent(e.target.value)} maxLength={500} />
               </div>
-              <button onClick={postAnn} disabled={loading === 'ann'} className="btn-primary w-full py-2.5">
-                {loading === 'ann' ? '发布中...' : '立即发布'}
+              <button onClick={submitAnn} disabled={loading === 'ann'} className="btn-primary w-full py-2.5">
+                {loading === 'ann' ? '保存中...' : editingAnn ? '保存修改' : '立即发布'}
               </button>
             </div>
           </div>
