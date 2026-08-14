@@ -5,6 +5,14 @@ export interface ValidationResult {
   message?: string
 }
 
+// 账号规则：仅允许字母和数字，3-18 位
+export function validateUsername(username: string): ValidationResult {
+  if (!/^[a-zA-Z0-9]{3,18}$/.test(username)) {
+    return { ok: false, message: '账号需为3-18位字母和数字' }
+  }
+  return { ok: true }
+}
+
 // 密码规则：8-16 位，仅允许 ASCII 可见字符（不含中文/空格），
 // 数字、大写字母、小写字母、特殊符号四类中至少包含两类。
 

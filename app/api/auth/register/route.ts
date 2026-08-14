@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { findUserByUsername, findUserByNickname, createUser } from '@/lib/server-store'
 import { signToken, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
-import { validatePassword, validateNickname } from '@/lib/password'
+import { validatePassword, validateNickname, validateUsername } from '@/lib/password'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -10,9 +10,6 @@ export const runtime = 'edge'
 // 注册限次：同一 IP 每小时最多注册 3 个账号（防脚本批量刷号）
 const REGISTER_MAX_PER_IP = 3
 const REGISTER_WINDOW_MS = 60 * 60 * 1000
-
-// 用户名：3-24 位，字母/数字/下划线/中划线/中文
-const USERNAME_RE = /^[\w\u4e00-\u9fa5-]{3,24}$/
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,8 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 输入校验
-    if (!USERNAME_RE.test(name)) {
-      return jsonResponse(false, null, '账号需为3-24位字母/数字/下划线/中划线/中文', 400)
+    const nameCheck = validateUsername(name)
+    if (!nameCheck.ok) {
+      return jsonResponse(false, null, nameCheck.message, 400)
     }
     const pwdCheck = validatePassword(pwd)
     if (!pwdCheck.ok) {
