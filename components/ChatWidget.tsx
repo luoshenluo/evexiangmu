@@ -225,6 +225,12 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
     }
   }
 
+  // ===== 当前公共频道消息（必须在任何条件 return 之前调用，遵守 Hooks 规则）=====
+  const currentPublicMessages = useMemo(
+    () => (currentChatChannel === 'friend' ? [] : (messages[currentChatChannel] || []) as ChatMessage[]),
+    [currentChatChannel, messages],
+  )
+
   // ===== 折叠状态：只显示右下角聊天按钮 =====
   if (!chatExpanded) {
     const hasUnread = pmUnreadTotal > 0
@@ -244,10 +250,6 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
   }
 
   // ===== 渲染内容 =====
-  const currentPublicMessages = useMemo(
-    () => (currentChatChannel === 'friend' ? [] : (messages[currentChatChannel] || []) as ChatMessage[]),
-    [currentChatChannel, messages],
-  )
   const headerTime = formatDateTime(Date.now()).slice(0, 16)
   const activeConv = conversations.find(c => c.peerId === activePeerId)
 
