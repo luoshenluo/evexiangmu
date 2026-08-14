@@ -237,7 +237,7 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
     return (
       <button
         onClick={() => setChatExpanded(true)}
-        className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-gradient-to-br from-garden-500 to-garden-600 text-white shadow-xl shadow-garden-300/50 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 md:bottom-6"
+        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-garden-500 to-garden-600 text-white shadow-xl shadow-garden-300/50 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 md:bottom-20"
       >
         <MessageCircle size={24} />
         {hasUnread && (
@@ -254,7 +254,7 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
   const activeConv = conversations.find(c => c.peerId === activePeerId)
 
   return (
-    <div className="fixed bottom-24 right-4 z-30 w-[92vw] max-w-sm h-[480px] max-h-[75vh] card slide-up overflow-hidden flex flex-col shadow-2xl md:bottom-6 md:w-96 md:h-[560px] md:max-h-[80vh]">
+    <div className="fixed bottom-24 right-4 z-50 w-[92vw] max-w-sm h-[480px] max-h-[75vh] card slide-up overflow-hidden flex flex-col shadow-2xl md:bottom-20 md:right-4 md:w-96 md:h-[560px] md:max-h-[80vh]">
       {/* Header */}
       <div className="bg-gradient-to-r from-garden-500 to-garden-600 px-3 py-2.5 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">

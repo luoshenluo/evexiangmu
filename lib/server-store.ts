@@ -2562,7 +2562,7 @@ export async function getFriendProfiles(currentUserId: string): Promise<any[]> {
         id: u.id,
         nickname: u.nickname,
         avatar: u.avatar,
-        online: Date.now() - u.lastLogin < 5 * 60 * 1000,
+        online: Date.now() - (u.lastActiveAt || u.lastLogin || 0) < 5 * 60 * 1000,
         lastLogin: u.lastLogin,
         plotsUnlocked: u.plots.filter((p) => p.unlocked).length,
         coins: u.coins,
