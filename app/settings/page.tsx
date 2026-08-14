@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames } from '@/lib/utils'
-import { Palette, Moon, Sun, Leaf, Sunset, Waves, Sparkles, Flower2, Trees, MapPin, Check, ChevronLeft, Paintbrush } from 'lucide-react'
+import { Palette, Moon, Sun, Leaf, Sunset, Waves, Sparkles, Flower2, Trees, MapPin, Check, ChevronLeft, Paintbrush, Type } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
 type Theme = 'light' | 'dark' | 'garden' | 'sunset' | 'ocean'
@@ -28,11 +28,28 @@ const GARDEN_BGS: { k: string; name: string; preview: string; emoji: string; pri
   { k: 'ocean', name: '海底世界', preview: 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600', emoji: '🐚' },
 ]
 
+const FONTS: { k: string; name: string; sample: string; desc: string }[] = [
+  { k: 'system', name: '系统默认', sample: '平安如春水，花开满园', desc: '跟随设备系统字体' },
+  { k: 'kaiti', name: '楷体', sample: '平安如春水，花开满园', desc: '手账质感，温柔雅致' },
+  { k: 'hei', name: '黑体', sample: '平安如春水，花开满园', desc: '清晰醒目' },
+  { k: 'song', name: '宋体', sample: '平安如春水，花开满园', desc: '书卷气息' },
+  { k: 'yuan', name: '圆体', sample: '平安如春水，花开满园', desc: '圆润可爱' },
+]
+
+// 与 globals.css 中 html[data-font] 的字体栈保持一致
+const FONT_CSS: Record<string, string> = {
+  kaiti: '"Kaiti SC", "KaiTi", "STKaiti", "PingFang SC", "Microsoft YaHei", serif',
+  hei: '"Heiti SC", "SimHei", "Microsoft YaHei", system-ui, sans-serif',
+  yuan: '"Yuanti SC", "YouYuan", "Microsoft YaHei", system-ui, sans-serif',
+  song: '"Songti SC", "SimSun", "NSimSun", "PingFang SC", serif',
+}
+
 export default function SettingsPage() {
-  const { user, updateUser, showToast, setTheme: storeSetTheme, setGardenBg: storeSetGardenBg } = useAppStore()
+  const { user, updateUser, showToast, setTheme: storeSetTheme, setGardenBg: storeSetGardenBg, setFont: storeSetFont } = useAppStore()
   const [showLogin, setShowLogin] = useState(false)
   const [theme, setTheme] = useState<Theme>((user?.theme as Theme) || 'light')
   const [gardenBg, setGardenBg] = useState(user?.gardenBg || 'default')
+  const [font, setFont] = useState((user?.font as string) || 'system')
   const [title, setTitle] = useState(user?.title || '')
   const [saveLoading, setSaveLoading] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -45,6 +62,7 @@ export default function SettingsPage() {
       if (r.success && r.data) {
         setTheme(r.data.theme || 'light')
         setGardenBg(r.data.gardenBg || 'default')
+        setFont(r.data.font || 'system')
         setTitle(r.data.title || '')
       }
     })()
@@ -62,7 +80,10 @@ export default function SettingsPage() {
     }
     storeSetTheme(theme)
     storeSetGardenBg(gardenBg)
-  }, [theme, gardenBg])
+    // 字体即时预览
+    html.dataset.font = font
+    storeSetFont(font)
+  }, [theme, gardenBg, font])
 
   if (!user) {
     return (
@@ -85,7 +106,7 @@ export default function SettingsPage() {
     try {
       const res = await apiFetch('/api/user/settings', {
         method: 'POST',
-        body: JSON.stringify({ theme, gardenBg, title }),
+        body: JSON.stringify({ theme, gardenBg, font, title }),
       })
       if (res.success) {
         showToast('已保存设置', 'success')
@@ -189,6 +210,48 @@ export default function SettingsPage() {
           <Sparkles size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
           <div>
             预览：你的花园在游玩界面会使用所选背景样式。皮肤永久免费开放给所有玩家～
+          </div>
+        </div>
+      </div>
+
+      {/* 字体 */}
+      <div className="card p-5 mb-4">
+        <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
+          <Type size={16} className="text-garden-500" /> 界面字体
+        </h3>
+        <p className="text-xs text-slate-500 mb-3">选择你喜欢的中文字体风格，全站即时生效</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {FONTS.map(f => {
+            const active = font === f.k
+            return (
+              <button key={f.k}
+                onClick={() => setFont(f.k)}
+                className={classNames(
+                  'p-3 rounded-2xl border transition-all text-left',
+                  active ? 'border-garden-500 ring-2 ring-garden-200' : 'border-slate-200 hover:border-slate-300'
+                )}
+              >
+                <div className={classNames(
+                  'w-full py-3 rounded-xl flex items-center justify-center mb-2',
+                  active ? 'bg-garden-50' : 'bg-slate-50'
+                )} style={{ fontFamily: f.k === 'system' ? undefined : FONT_CSS[f.k] }}>
+                  <span className="text-sm text-slate-800">{f.sample}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">{f.name}</div>
+                    <div className="text-[11px] text-slate-500">{f.desc}</div>
+                  </div>
+                  {active && <div className="w-5 h-5 rounded-full bg-garden-500 text-white flex items-center justify-center"><Check size={12} /></div>}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-3 p-3 rounded-xl bg-slate-50 text-[11px] text-slate-500 flex items-start gap-2">
+          <Sparkles size={12} className="text-garden-500 flex-shrink-0 mt-0.5" />
+          <div>
+            字体样式依赖设备已安装字体：楷体（KaiTi/STKaiti）、黑体（SimHei/Heiti SC）、宋体（SimSun/Songti SC）、圆体（YouYuan/Yuanti SC）。若设备未安装对应字体，会自动回退到系统字体。
           </div>
         </div>
       </div>

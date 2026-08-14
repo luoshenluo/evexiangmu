@@ -14,7 +14,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     isAuthenticated, isGuest, isOffline,
     setGameState, setAnnouncements,
     enterGuest, setLastActiveAt, setOffline,
-    theme, gardenBg, setTheme, setGardenBg,
+    theme, gardenBg, font, setTheme, setGardenBg, setFont,
     announcements,
   } = useAppStore()
   const hasHydrated = useAppStore(s => s._hasHydrated)
@@ -69,10 +69,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           const s = settingsRes.data
           setTheme(s.theme || 'light')
           setGardenBg(s.gardenBg || 'default')
+          setFont(s.font || 'system')
         }
       }
     } catch {}
-  }, [setGameState, setAnnouncements, isAuthenticated, setTheme, setGardenBg])
+  }, [setGameState, setAnnouncements, isAuthenticated, setTheme, setGardenBg, setFont])
 
   // 应用主题到 DOM：dataset.theme + dark class（全局 CSS 监听 html[data-theme]）
   useEffect(() => {
@@ -83,6 +84,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     else html.classList.remove('dark')
   }, [theme])
 
+  // 应用字体到 DOM：data-font（全局 CSS 监听 html[data-font]）
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.dataset.font = font || 'system'
+  }, [font])
+
   // 启动时立即从 Zustand 持久化中应用一次主题（避免 SSR 后默认绿）
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -91,12 +98,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const state = useAppStore.getState()
     const initialTheme = state.theme || (state.user?.theme as any) || 'garden'
     const initialBg = state.gardenBg || (state.user?.gardenBg as any) || 'default'
+    const initialFont = state.font || (state.user?.font as any) || 'system'
     html.dataset.theme = initialTheme
     if (initialTheme === 'dark') html.classList.add('dark')
     else html.classList.remove('dark')
+    html.dataset.font = initialFont
     if (!state.theme) setTheme(initialTheme)
     if (!state.gardenBg) setGardenBg(initialBg)
-  }, [setTheme, setGardenBg])
+    if (!state.font) setFont(initialFont)
+  }, [setTheme, setGardenBg, setFont])
 
   // 初始化游戏状态 + 定时轮询（离线时暂停，节省资源）
   useEffect(() => {

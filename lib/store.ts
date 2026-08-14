@@ -30,6 +30,7 @@ interface AppState {
   toast: { message: string; type: 'success' | 'error' | 'info' } | null
   theme: string
   gardenBg: string
+  font: string
 
   // Actions
   login: (user: User, token: string) => void
@@ -53,6 +54,7 @@ interface AppState {
   hideToast: () => void
   setTheme: (t: string) => void
   setGardenBg: (b: string) => void
+  setFont: (f: string) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -75,9 +77,10 @@ export const useAppStore = create<AppState>()(
       toast: null,
       theme: 'light',
       gardenBg: 'default',
+      font: 'system',
 
-      login: (user, token) => set({ user, token, isAuthenticated: true, isGuest: false, _hasHydrated: true, theme: (user as any).theme || 'light', gardenBg: (user as any).gardenBg || 'default' }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false, isGuest: false, messages: {}, lastMessageTimes: {}, theme: 'light', gardenBg: 'default' }),
+      login: (user, token) => set({ user, token, isAuthenticated: true, isGuest: false, _hasHydrated: true, theme: (user as any).theme || 'light', gardenBg: (user as any).gardenBg || 'default', font: (user as any).font || 'system' }),
+      logout: () => set({ user: null, token: null, isAuthenticated: false, isGuest: false, messages: {}, lastMessageTimes: {}, theme: 'light', gardenBg: 'default', font: 'system' }),
       setHasHydrated: (v) => set({ _hasHydrated: v }),
       // 进入游客模式：不调 API，直接以游客身份浏览
       enterGuest: () => set({ isGuest: true, isAuthenticated: false, user: null, token: null }),
@@ -125,6 +128,7 @@ export const useAppStore = create<AppState>()(
       hideToast: () => set({ toast: null }),
       setTheme: (t) => set({ theme: t }),
       setGardenBg: (b) => set({ gardenBg: b }),
+      setFont: (f) => set({ font: f }),
     }),
     {
       name: 'garden-app-storage',

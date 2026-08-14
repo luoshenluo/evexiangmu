@@ -50,6 +50,7 @@ function dbRowToUser(row: any): User {
     adminPermissions: row.admin_permissions ?? 0,
     theme: row.theme || 'light',
     gardenBg: row.garden_bg || '',
+    font: row.font || 'system',
     lastCheckInAt: row.last_check_in_at || 0,
     checkInStreak: row.check_in_streak || 0,
     totalCheckinDays: row.total_checkin_days || 0,
@@ -92,6 +93,7 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.adminPermissions !== undefined) row.admin_permissions = user.adminPermissions
   if (user.theme !== undefined) row.theme = user.theme
   if (user.gardenBg !== undefined) row.garden_bg = user.gardenBg
+  if (user.font !== undefined) row.font = user.font
   if (user.lastCheckInAt !== undefined) row.last_check_in_at = user.lastCheckInAt
   if (user.checkInStreak !== undefined) row.check_in_streak = user.checkInStreak
   if ((user as any).totalCheckinDays !== undefined) row.total_checkin_days = (user as any).totalCheckinDays
@@ -652,7 +654,7 @@ export async function createUser(data: { username: string; password: string; nic
 // 本轮新增的列（签到/设置/小游戏/成就）——用于热更新降级：
 // 当 users 表尚未 ALTER 添加这些列时，update 会整条失败，这里在失败后自动剥离重试
 const NEW_USER_COLUMNS = new Set([
-  'theme', 'garden_bg', 'title',
+  'theme', 'garden_bg', 'title', 'font',
   'last_check_in_at', 'check_in_streak',
   'total_checkin_days', 'total_checkin_days_accum',
   'petal_coins', 'achievements', 'titles',

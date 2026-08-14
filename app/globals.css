@@ -2,9 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   设计令牌：植物手账 Botanical Journal
+   所有主题共享同一套语义变量，主题只负责覆写颜色值。
+   --font-ui 支持后续外观设置切换字体（data-font 钩子）。
+   ============================================================ */
 :root {
-  --foreground: 20 40 20;
-  --background: 240 253 244;
+  /* 字体：默认系统字体；外观设置可切换（html[data-font] 钩子见下） */
+  --font-ui: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+
+  /* 语义色：由各主题覆写 */
+  --bg-top: #f0fdf4;
+  --bg-mid: #ecfdf5;
+  --bg-bottom: #dcfce7;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: #d9e7d3;
+  --input-bg: #ffffff;
+  --btn-primary: #5c8658;
+  --btn-primary-hover: #4a7047;
+  --text-primary: #052e16;
+  --text-secondary: #4a624d;
+  --accent: #5c8658;
+  --accent-soft: #e7efe2;
+  --shadow-card: 0 1px 3px rgba(46, 68, 48, 0.08), 0 2px 8px rgba(46, 68, 48, 0.05);
 }
 
 * {
@@ -15,7 +35,7 @@ html, body {
   padding: 0;
   margin: 0;
   min-height: 100vh;
-  font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui);
   /* 防止移动端双击缩放和点击高亮 */
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -29,78 +49,104 @@ html, body {
 .safe-right { padding-right: env(safe-area-inset-right); }
 
 /* ======= 主题：light（日间清新）默认 ======= */
-html[data-theme="light"] body {
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 30%, #f1f5f9 100%);
-  background-attachment: fixed;
+html[data-theme="light"] {
+  --bg-top: #f8fafc;
+  --bg-mid: #ffffff;
+  --bg-bottom: #f1f5f9;
   --card-bg: rgba(255, 255, 255, 0.9);
-  --card-border: rgb(226 232 240);
-  --btn-primary: #475569;
-  --btn-primary-hover: #334155;
+  --card-border: #e2e8f0;
+  --btn-primary: #5c8658;
+  --btn-primary-hover: #4a7047;
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  color: #0f172a;
+  --accent: #5c8658;
+  --accent-soft: #e7efe2;
 }
 
 /* ======= 主题：garden（花园翠绿） ======= */
-html[data-theme="garden"] body,
-html:not([data-theme]) body {
-  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 30%, #dcfce7 100%);
-  background-attachment: fixed;
-  color: #052e16;
+html[data-theme="garden"],
+html:not([data-theme]) {
+  --bg-top: #f0fdf4;
+  --bg-mid: #ecfdf5;
+  --bg-bottom: #dcfce7;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: #d9e7d3;
+  --btn-primary: #5c8658;
+  --btn-primary-hover: #4a7047;
+  --text-primary: #052e16;
+  --text-secondary: #4a624d;
+  --accent: #5c8658;
+  --accent-soft: #e7efe2;
 }
 
 /* ======= 主题：sunset（暮光橙霞） ======= */
-html[data-theme="sunset"] body {
-  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 30%, #ffe4e6 100%);
-  background-attachment: fixed;
-  color: #7c2d12;
+html[data-theme="sunset"] {
+  --bg-top: #fff7ed;
+  --bg-mid: #ffedd5;
+  --bg-bottom: #ffe4e6;
+  --card-bg: rgba(255, 250, 244, 0.92);
+  --card-border: #f5d8c4;
+  --btn-primary: #c2703d;
+  --btn-primary-hover: #a75e31;
+  --text-primary: #7c2d12;
+  --text-secondary: #96614a;
+  --accent: #c2703d;
+  --accent-soft: #fbe8d9;
 }
 
 /* ======= 主题：ocean（海洋深蓝） ======= */
-html[data-theme="ocean"] body {
-  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 30%, #dbeafe 100%);
-  background-attachment: fixed;
-  color: #0c4a6e;
+html[data-theme="ocean"] {
+  --bg-top: #f0f9ff;
+  --bg-mid: #e0f2fe;
+  --bg-bottom: #dbeafe;
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-border: #c3ddf0;
+  --btn-primary: #3b6d94;
+  --btn-primary-hover: #315c7d;
+  --text-primary: #0c4a6e;
+  --text-secondary: #3b6d94;
+  --accent: #3b6d94;
+  --accent-soft: #e0eefa;
 }
 
 /* ======= 主题：dark（夜间模式） ======= */
-html.dark body,
-html[data-theme="dark"] body {
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 30%, #020617 100%);
-  background-attachment: fixed;
-  color: #e2e8f0;
-}
-html.dark .card,
-html[data-theme="dark"] .card {
-  background: rgba(30, 41, 59, 0.9);
-  border-color: #334155;
-  color: #f1f5f9;
-}
-html.dark .card h1, html.dark .card h2, html.dark .card h3, html.dark .card h4,
-html[data-theme="dark"] .card h1, html[data-theme="dark"] .card h2, html[data-theme="dark"] .card h3, html[data-theme="dark"] .card h4 {
-  color: #f1f5f9;
-}
-html.dark .input,
-html[data-theme="dark"] .input {
-  background: rgba(15, 23, 42, 0.6);
-  border-color: #475569;
-  color: #f8fafc;
-}
-html.dark .input::placeholder,
-html[data-theme="dark"] .input::placeholder { color: #64748b; }
-html.dark .btn-secondary,
-html[data-theme="dark"] .btn-secondary {
-  background: rgba(30, 41, 59, 0.9);
-  color: #f1f5f9;
-  border-color: #475569;
-}
-html.dark .text-slate-500, html.dark .text-slate-600, html.dark .text-slate-700, html.dark .text-slate-800,
-html[data-theme="dark"] .text-slate-500, html[data-theme="dark"] .text-slate-600, html[data-theme="dark"] .text-slate-700, html[data-theme="dark"] .text-slate-800 {
-  color: #cbd5e1 !important;
+html.dark,
+html[data-theme="dark"] {
+  --bg-top: #0f172a;
+  --bg-mid: #1e293b;
+  --bg-bottom: #020617;
+  --card-bg: rgba(30, 41, 59, 0.92);
+  --card-border: #334155;
+  --input-bg: rgba(15, 23, 42, 0.6);
+  --btn-primary: #5c8658;
+  --btn-primary-hover: #6ea068;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --accent: #7fa97a;
+  --accent-soft: rgba(127, 169, 122, 0.16);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* ======= 主题背景与文字（变量驱动） ======= */
 body {
   min-height: 100vh;
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 30%, var(--bg-bottom) 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+}
+
+/* ======= 字体切换（外观设置）：html[data-font] 覆写 --font-ui ======= */
+html[data-font="kaiti"] {
+  --font-ui: "Kaiti SC", "KaiTi", "STKaiti", "PingFang SC", "Microsoft YaHei", serif;
+}
+html[data-font="hei"] {
+  --font-ui: "Heiti SC", "SimHei", "Microsoft YaHei", system-ui, sans-serif;
+}
+html[data-font="yuan"] {
+  --font-ui: "Yuanti SC", "YouYuan", "Microsoft YaHei", system-ui, sans-serif;
+}
+html[data-font="song"] {
+  --font-ui: "Songti SC", "SimSun", "NSimSun", "PingFang SC", serif;
 }
 
 @layer utilities {
@@ -129,23 +175,63 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-garden-500 hover:bg-garden-600 text-white font-medium rounded-lg px-4 py-2 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply text-white font-medium rounded-lg px-4 py-2 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    background: var(--btn-primary);
+  }
+  .btn-primary:hover {
+    background: var(--btn-primary-hover);
   }
   .btn-secondary {
-    @apply bg-white hover:bg-garden-50 text-garden-700 border border-garden-200 font-medium rounded-lg px-4 py-2 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply font-medium rounded-lg px-4 py-2 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    background: var(--card-bg);
+    color: var(--accent);
+    border: 1px solid var(--card-border);
   }
   .btn-danger {
     @apply bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg px-4 py-2 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .card {
-    @apply bg-white/90 backdrop-blur rounded-xl shadow-sm border border-garden-100;
+    @apply rounded-xl backdrop-blur;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-card);
+    color: var(--text-primary);
   }
   .input {
-    @apply w-full px-4 py-2 rounded-lg border border-garden-200 focus:border-garden-400 focus:ring-2 focus:ring-garden-200 outline-none transition-all bg-white;
+    @apply w-full px-4 py-2 rounded-lg outline-none transition-all;
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  .input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
   }
   .chip {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
+}
+
+/* ======= 深色主题下纯 Tailwind slate 文字的适配层 =======
+   现有页面大量直接使用 text-slate-*，dark 主题下需映射为浅色。
+   后续逐步收敛到语义变量后可移除。 */
+html.dark .card h1, html.dark .card h2, html.dark .card h3, html.dark .card h4,
+html[data-theme="dark"] .card h1, html[data-theme="dark"] .card h2, html[data-theme="dark"] .card h3, html[data-theme="dark"] .card h4 {
+  color: #f1f5f9;
+}
+html.dark .btn-secondary,
+html[data-theme="dark"] .btn-secondary {
+  background: rgba(30, 41, 59, 0.9);
+  color: #f1f5f9;
+  border-color: #475569;
+}
+html.dark .text-slate-500, html.dark .text-slate-600, html.dark .text-slate-700, html.dark .text-slate-800,
+html[data-theme="dark"] .text-slate-500, html[data-theme="dark"] .text-slate-600, html[data-theme="dark"] .text-slate-700, html[data-theme="dark"] .text-slate-800 {
+  color: #cbd5e1 !important;
 }
 
 /* 花园地块动画 */

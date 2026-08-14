@@ -156,6 +156,7 @@ export interface User {
   // 皮肤/主题
   theme?: 'light' | 'dark' | 'garden' | 'sunset' | 'ocean'
   gardenBg?: string
+  font?: 'system' | 'kaiti' | 'hei' | 'yuan' | 'song'
   // 签到
   lastCheckInAt?: number
   checkInStreak?: number

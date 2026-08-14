@@ -11,6 +11,9 @@ const VALID_GARDEN_BGS = [
   'default', 'green', 'purple', 'blue', 'sunset', 'sakura', 'autumn', 'night', 'ocean',
 ]
 
+const VALID_FONTS = ['system', 'kaiti', 'hei', 'yuan', 'song'] as const
+type Font = (typeof VALID_FONTS)[number]
+
 // 获取用户设置
 export async function GET(req: NextRequest) {
   try {
@@ -19,6 +22,7 @@ export async function GET(req: NextRequest) {
     return jsonResponse(true, {
       theme: (user as any).theme || 'light',
       gardenBg: (user as any).gardenBg || 'default',
+      font: (user as any).font || 'system',
       lastCheckInAt: (user as any).lastCheckInAt || 0,
       checkInStreak: (user as any).checkInStreak || 0,
       petalCoins: (user as any).petalCoins || 0,
@@ -45,6 +49,11 @@ export async function POST(req: NextRequest) {
       const bg = body.gardenBg
       if (bg && !VALID_GARDEN_BGS.includes(bg)) return jsonResponse(false, null, '背景参数不合法', 400)
       mode.gardenBg = bg
+    }
+    if (body.font !== undefined) {
+      const f = body.font as Font
+      if (!VALID_FONTS.includes(f)) return jsonResponse(false, null, '字体参数不合法', 400)
+      mode.font = f
     }
     if (body.title !== undefined) {
       if (typeof body.title !== 'string' || body.title.length > 12) return jsonResponse(false, null, '称号长度最多12字', 400)
