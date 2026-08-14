@@ -245,16 +245,16 @@ export function getFlowerSellPrice(flower: FlowerType, rank: number): number {
 // 工具价格调控兼容别名
 export const TOOL_TYPES = TOOLS
 
-// 幸运转盘奖励配置（花瓣代币玩法）- 调低金币奖励和概率
+// 幸运转盘奖励配置（花瓣代币玩法）- 期望值约 18 金币/抽（原 37.2，避免转盘成为印钞机跳过种花）
 export const WHEEL_REWARDS: { key: string; label: string; weight: number; coins: number; petals?: number }[] = [
-  { key: 'coins_10',    label: '10 金币',  weight: 32, coins: 10 },
-  { key: 'coins_20',    label: '20 金币',  weight: 25, coins: 20 },
-  { key: 'coins_50',    label: '50 金币',  weight: 12, coins: 50 },
-  { key: 'coins_100',   label: '100 金币', weight: 7,  coins: 100 },
-  { key: 'coins_200',   label: '200 金币', weight: 3,  coins: 200 },
+  { key: 'coins_10',    label: '10 金币',  weight: 35, coins: 10 },
+  { key: 'coins_20',    label: '20 金币',  weight: 20, coins: 20 },
+  { key: 'coins_50',    label: '50 金币',  weight: 6,  coins: 50 },
+  { key: 'coins_100',   label: '100 金币', weight: 3,  coins: 100 },
+  { key: 'coins_200',   label: '200 金币', weight: 1,  coins: 200 },
   { key: 'petal_1',     label: '+1 花瓣',  weight: 8,  coins: 0, petals: 1 },
-  { key: 'jackpot',     label: '🎉 1000💰', weight: 1,  coins: 1000 },
-  { key: 'nothing',     label: '谢谢参与',  weight: 12, coins: 0 },
+  { key: 'jackpot',     label: '🎉 500💰', weight: 1,  coins: 500 },
+  { key: 'nothing',     label: '谢谢参与',  weight: 40, coins: 0 },
 ]
 
 export function pickWheelIndex(): number {

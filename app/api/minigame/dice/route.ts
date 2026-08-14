@@ -37,11 +37,11 @@ export async function POST(req: NextRequest) {
         break
       case 'middle':
         win = sum === 7
-        multiplier = win ? 5 : 0
+        multiplier = win ? 4 : 0
         break
       case 'exact':
         win = target !== undefined && sum === target
-        multiplier = win ? 20 : 0
+        multiplier = win ? 18 : 0
         break
     }
 

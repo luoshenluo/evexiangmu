@@ -50,9 +50,6 @@ export async function GET(req: NextRequest) {
     const user = await authRequest(req)
     if (!user) return jsonResponse(false, null, '请先登录', 401)
 
-    // 进入任务页时先推进一次登录任务
-    try { await incrementTaskProgress(user.id, 'login', 1) } catch {}
-
     // 从数据库获取最新用户数据
     const freshUser = await findUserById(user.id)
     if (!freshUser) return jsonResponse(false, null, '用户不存在', 404)
