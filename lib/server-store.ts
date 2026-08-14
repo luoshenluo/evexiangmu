@@ -550,6 +550,18 @@ export async function findUserByUsername(username: string): Promise<User | null>
   return dbRowToUser(data)
 }
 
+export async function findUserByNickname(nickname: string): Promise<User | null> {
+  await seedDatabase()
+  const sb = getSupabase()
+  // 昵称无唯一约束（历史数据可能重复），取第一条即可判断是否存在
+  const { data, error } = await sb.from('users')
+    .select('*')
+    .eq('nickname', nickname)
+    .limit(1)
+  if (error || !data || data.length === 0) return null
+  return dbRowToUser(data[0])
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   await seedDatabase()
   const sb = getSupabase()

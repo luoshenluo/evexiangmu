@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
-import { findUserByUsername, createUser } from '@/lib/server-store'
+import { findUserByUsername, findUserByNickname, createUser } from '@/lib/server-store'
 import { signToken, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import { validatePassword, validateNickname } from '@/lib/password'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const name = String(username).trim()
     const pwd = String(password)
-    const nick = String(nickname || name).trim()
+    const nick = String(nickname || '').trim()
 
     // IP 限速
     const ipLimit = checkRateLimit(`register:${getClientIp(req)}`, REGISTER_MAX_PER_IP, REGISTER_WINDOW_MS)
@@ -33,15 +34,20 @@ export async function POST(req: NextRequest) {
     if (!USERNAME_RE.test(name)) {
       return jsonResponse(false, null, '账号需为3-24位字母/数字/下划线/中划线/中文', 400)
     }
-    if (pwd.length < 6 || pwd.length > 64) {
-      return jsonResponse(false, null, '密码需为6-64位', 400)
+    const pwdCheck = validatePassword(pwd)
+    if (!pwdCheck.ok) {
+      return jsonResponse(false, null, pwdCheck.message, 400)
     }
-    if (nick.length < 1 || nick.length > 24) {
-      return jsonResponse(false, null, '昵称需为1-24个字符', 400)
+    const nickCheck = validateNickname(nick)
+    if (!nickCheck.ok) {
+      return jsonResponse(false, null, nickCheck.message, 400)
     }
 
     if (await findUserByUsername(name)) {
       return jsonResponse(false, null, '账号已存在', 400)
+    }
+    if (await findUserByNickname(nick)) {
+      return jsonResponse(false, null, '昵称已被使用，请换一个', 400)
     }
 
     const user = await createUser({
