@@ -6,12 +6,14 @@ import type {
   Task, CDK, Notification, GameState, Announcement,
   StealLog, PestSeverity, PlantedFlower, Plot, RankLevel,
   SensitiveWord, ChatSettings, ChatStats, InventoryItem,
+  PrivateMessage, PrivateConversation,
 } from './types'
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
   getPlotUnlockPrice, PEST_CONFIG, STEAL_CONFIG, rollPestSeverity,
   getFlowerSellPrice, getSeasonByMonth,
   FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
+  filterSensitiveWords,
 } from './game-data'
 import bcrypt from 'bcryptjs'
 
@@ -56,6 +58,7 @@ function dbRowToUser(row: any): User {
     title: row.title || '',
     petalCoins: row.petal_coins || 0,
     titles: row.titles || [],
+    lastActiveAt: row.last_active_at || row.last_login || row.created_at || 0,
   }
 }
 
@@ -97,6 +100,7 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.title !== undefined) row.title = user.title
   if (user.petalCoins !== undefined) row.petal_coins = user.petalCoins
   if ((user as any).titles !== undefined) row.titles = (user as any).titles
+  if ((user as any).lastActiveAt !== undefined) row.last_active_at = (user as any).lastActiveAt
   return row
 }
 
@@ -727,6 +731,7 @@ const NEW_USER_COLUMNS = new Set([
   'last_check_in_at', 'check_in_streak',
   'total_checkin_days', 'total_checkin_days_accum',
   'petal_coins', 'achievements', 'titles',
+  'last_active_at',
 ])
 
 function isMissingColumnError(err: any): boolean {
@@ -769,7 +774,27 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
 }
 
 export async function updateUserLogin(userId: string): Promise<void> {
-  await updateUser(userId, { lastLogin: Date.now() })
+  const now = Date.now()
+  await updateUser(userId, { lastLogin: now, lastActiveAt: now } as any)
+}
+
+// ============================================================
+// 在线用户心跳：轻量更新 last_active_at（不写日志，不触发完整 updateUser 回退链）
+// ============================================================
+export async function touchUserActive(userId: string, ts: number): Promise<void> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { error } = await sb.from('users').update({ last_active_at: ts }).eq('id', userId)
+    if (error) {
+      // 若列不存在（热更新前），静默忽略，不影响其他功能
+      if (!isMissingColumnError(error)) {
+        logger.warn('system', `touchUserActive 更新失败: ${error.message}`, { userId })
+      }
+    }
+  } catch (e: any) {
+    logger.warn('system', `touchUserActive 异常: ${e?.message}`, { userId })
+  }
 }
 
 export async function deleteUser(userId: string): Promise<boolean> {
@@ -1289,9 +1314,11 @@ export async function createNotification(data: Omit<Notification, 'id' | 'create
 
 // ==================== 任务进度 ====================
 
-// 花园打理类行为集合（解锁/种植/浇水/施肥/除虫/加速卡）：周常花园扩张任务按此推进
+// 兼容旧版：按 action 同步推进的"花园打理类"行为集合（周常花园扩张）
 const GARDEN_CARE_ACTIONS = ['unlock', 'plant', 'water', 'fertilize', 'pesticide', 'speedup']
 
+// 将 action 归类为需要推进的主任务 action（模板按此字段匹配）
+// 兼容：同一行为映射到模板的 action 字段。模板 action 值即模板创建时选择的触发行为。
 export async function incrementTaskProgress(userId: string, action: string, amount = 1): Promise<void> {
   const user = await findUserById(userId)
   if (!user) return
@@ -1308,7 +1335,7 @@ export async function incrementTaskProgress(userId: string, action: string, amou
     }
   }
 
-  // 花园打理类行为额外推进所有打理类模板
+  // 花园打理类行为（unlock/plant/water/fertilize/pesticide/speedup）额外推进所有 action 属于打理类的模板
   if (GARDEN_CARE_ACTIONS.includes(action)) {
     for (const tpl of templates) {
       if (GARDEN_CARE_ACTIONS.includes(tpl.action)) {
@@ -1362,7 +1389,7 @@ export async function incrementTaskProgress(userId: string, action: string, amou
     return 0
   }
 
-  // 重置过期任务（按模板类型前缀 + 模板自身 type，兼容任意 ID 前缀如 t_daily_msrqflvp）
+  // 重置过期任务（按模板类型前缀 + 模板自身 type）
   const typePrefixes: Record<string, string> = {
     't_daily_': 'daily', 't_weekly_': 'weekly', 't_monthly_': 'monthly',
   }
@@ -1376,6 +1403,7 @@ export async function incrementTaskProgress(userId: string, action: string, amou
       lastReset[type] = now
     }
   }
+  // 模板可能用任意 ID 前缀（如 t_daily_msrqflvp），按模板 type 重置
   const resetKeys = new Set<string>()
   for (const tpl of templates) {
     if (!resetKeys.has(tpl.type)) {
@@ -2939,6 +2967,279 @@ export async function getAllUserBaseCount(): Promise<number> {
 
 export async function getAllFamilies(): Promise<Family[]> {
   return getFamilies(undefined, 500)
+}
+
+export async function findAdminByUserId(userId: string): Promise<User | null> {
+  const user = await findUserById(userId)
+  if (!user || !user.isAdmin) return null
+  return user
+}
+
+export async function updateAdminPassword(userId: string, newPasswordHash: string): Promise<void> {
+  await updateUser(userId, { password: newPasswordHash })
+}
+
+export async function updateUserPassword(userId: string, newPasswordHash: string): Promise<void> {
+  await updateUser(userId, { password: newPasswordHash })
+}
+
+// ============================================================
+// 私聊系统：Private Messages
+// ============================================================
+
+function dbRowToPrivateMessage(row: any): PrivateMessage {
+  return {
+    id: row.id,
+    fromUserId: row.from_user_id,
+    toUserId: row.to_user_id,
+    content: row.content,
+    fromName: row.from_name,
+    fromAvatar: row.from_avatar,
+    toName: row.to_name,
+    toAvatar: row.to_avatar,
+    createdAt: (typeof row.created_at === 'number' ? row.created_at : Number(row.created_at)) ?? Date.now(),
+    readAt: row.read_at ? (typeof row.read_at === 'number' ? row.read_at : Number(row.read_at)) : null,
+  }
+}
+
+/** 校验私聊权限：必须是好友关系或双向允许 */
+function canPrivateMessage(fromId: string, toId: string, fromUser: User | null): boolean {
+  if (!fromId || !toId || fromId === toId) return false
+  const user = fromUser
+  if (!user) return false
+  return Array.isArray(user.friends) && user.friends.includes(toId)
+}
+
+/** 发送私聊消息 */
+export async function sendPrivateMessage(
+  fromUser: User,
+  toUserId: string,
+  content: string,
+): Promise<{ success: boolean; message?: PrivateMessage; error?: string }> {
+  if (!content || !content.trim()) return { success: false, error: '消息内容不能为空' }
+  if (!canPrivateMessage(fromUser.id, toUserId, fromUser)) {
+    return { success: false, error: '只能与好友私聊' }
+  }
+  if (fromUser.mutedUntil && fromUser.mutedUntil > Date.now()) {
+    return { success: false, error: '您已被禁言，无法发送消息' }
+  }
+
+  await seedDatabase()
+  const sb = getSupabase()
+
+  const target = await findUserById(toUserId)
+  if (!target) return { success: false, error: '对方用户不存在' }
+
+  const now = Date.now()
+  const filteredContent = filterSensitiveWords(content.trim().slice(0, 500))
+  const msg: PrivateMessage = {
+    id: `pm_${now}_${Math.random().toString(36).slice(2, 8)}`,
+    fromUserId: fromUser.id,
+    toUserId: target.id,
+    content: filteredContent,
+    fromName: fromUser.nickname,
+    fromAvatar: fromUser.avatar,
+    toName: target.nickname,
+    toAvatar: target.avatar,
+    createdAt: now,
+  }
+
+  const row = {
+    id: msg.id,
+    from_user_id: msg.fromUserId,
+    to_user_id: msg.toUserId,
+    content: msg.content,
+    from_name: msg.fromName,
+    from_avatar: msg.fromAvatar,
+    to_name: msg.toName,
+    to_avatar: msg.toAvatar,
+    created_at: msg.createdAt,
+    read_at: null,
+  }
+
+  try {
+    const { error } = await sb.from('private_messages').insert(row)
+    if (error) {
+      // 表不存在的热更新情况
+      if (isMissingColumnError(error) || /relation .* does not exist/i.test(error.message)) {
+        logger.warn('pm', `私聊表未就绪: ${error.message}`)
+        return { success: false, error: '私聊系统暂时不可用，请稍后再试' }
+      }
+      return { success: false, error: error.message }
+    }
+    return { success: true, message: msg }
+  } catch (e: any) {
+    return { success: false, error: e?.message || '发送失败' }
+  }
+}
+
+/** 获取与某一好友的私聊消息列表（时间正序） */
+export async function getPrivateMessages(
+  currentUserId: string,
+  peerId: string,
+  limit = 100,
+): Promise<PrivateMessage[]> {
+  if (!currentUserId || !peerId || currentUserId === peerId) return []
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb
+      .from('private_messages')
+      .select('*')
+      .or(`and(from_user_id.eq.${currentUserId},to_user_id.eq.${peerId}),and(from_user_id.eq.${peerId},to_user_id.eq.${currentUserId})`)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) {
+      if (isMissingColumnError(error) || /relation .* does not exist/i.test(error.message)) return []
+      logger.warn('pm', `getPrivateMessages 查询错误: ${error.message}`)
+      return []
+    }
+    const msgs = (data || []).map(dbRowToPrivateMessage)
+    msgs.reverse() // 正序
+    return msgs
+  } catch (e: any) {
+    logger.warn('pm', `getPrivateMessages 异常: ${e?.message}`)
+    return []
+  }
+}
+
+/** 标阅读：把对方发给我的消息全部设为已读 */
+export async function markPrivateConversationRead(currentUserId: string, peerId: string): Promise<void> {
+  if (!currentUserId || !peerId) return
+  await seedDatabase()
+  const sb = getSupabase()
+  const now = Date.now()
+  try {
+    const { error } = await sb
+      .from('private_messages')
+      .update({ read_at: now })
+      .eq('to_user_id', currentUserId)
+      .eq('from_user_id', peerId)
+      .is('read_at', null)
+    if (error) {
+      if (isMissingColumnError(error) || /relation .* does not exist/i.test(error.message)) return
+      logger.warn('pm', `markPrivateConversationRead 错误: ${error.message}`)
+    }
+  } catch (e: any) {
+    logger.warn('pm', `markPrivateConversationRead 异常: ${e?.message}`)
+  }
+}
+
+/** 获取私聊会话列表：每对好友的最后一条消息 + 未读数 */
+export async function getPrivateConversations(currentUserId: string): Promise<PrivateConversation[]> {
+  if (!currentUserId) return []
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    // 拉取当前用户的所有私聊
+    const { data, error } = await sb
+      .from('private_messages')
+      .select('*')
+      .or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    if (error) {
+      if (isMissingColumnError(error) || /relation .* does not exist/i.test(error.message)) return []
+      logger.warn('pm', `getPrivateConversations 查询错误: ${error.message}`)
+      return []
+    }
+
+    const user = await findUserById(currentUserId)
+    const friendIds = user?.friends || []
+
+    const map = new Map<string, {
+      lastMsg: PrivateMessage
+      unreadCount: number
+    }>()
+
+    for (const row of (data || [])) {
+      const m = dbRowToPrivateMessage(row)
+      const peerId = m.fromUserId === currentUserId ? m.toUserId : m.fromUserId
+      // 只保留好友关系的会话（非好友不展示，消息仍可读以兼容）
+      if (!friendIds.includes(peerId)) continue
+      if (!map.has(peerId)) {
+        map.set(peerId, { lastMsg: m, unreadCount: 0 })
+      }
+      if (m.toUserId === currentUserId && !m.readAt) {
+        map.get(peerId)!.unreadCount++
+      }
+    }
+
+    // 补充没有历史消息的好友，显示为空会话（避免好友列表有好友但私聊空）
+    for (const fid of friendIds) {
+      if (!map.has(fid)) {
+        const friendUser = await findUserById(fid)
+        if (friendUser) {
+          map.set(fid, {
+            lastMsg: {
+              id: 'placeholder_' + fid,
+              fromUserId: fid,
+              toUserId: currentUserId,
+              content: '',
+              createdAt: friendUser.lastActiveAt || 0,
+            },
+            unreadCount: 0,
+          })
+        }
+      }
+    }
+
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+    const result: PrivateConversation[] = []
+    for (const [peerId, info] of map.entries()) {
+      const m = info.lastMsg
+      const peer = (peerId === m.fromUserId)
+        ? { name: m.fromName || peerId, avatar: m.fromAvatar || '🌱' }
+        : { name: m.toName || peerId, avatar: m.toAvatar || '🌱' }
+      // 兜底：如果好友有ID，查一下在线状态
+      let isOnline = false
+      try {
+        const friend = await findUserById(peerId)
+        if (friend) {
+          peer.name = friend.nickname || peer.name
+          peer.avatar = friend.avatar || peer.avatar
+          isOnline = (friend.lastActiveAt || 0) >= fiveMinutesAgo
+        }
+      } catch {}
+      result.push({
+        peerId,
+        peerName: peer.name,
+        peerAvatar: peer.avatar,
+        lastMessage: m.content || '暂未开始聊天，发送第一句问候吧~',
+        lastMessageAt: m.createdAt || 0,
+        unreadCount: info.unreadCount,
+        isOnline,
+      })
+    }
+
+    // 最新在前
+    result.sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+    return result
+  } catch (e: any) {
+    logger.warn('pm', `getPrivateConversations 异常: ${e?.message}`)
+    return []
+  }
+}
+
+/** 获取当前用户所有未读私聊总条数 */
+export async function getPrivateMessageUnreadCount(currentUserId: string): Promise<number> {
+  if (!currentUserId) return 0
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { count, error } = await sb
+      .from('private_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('to_user_id', currentUserId)
+      .is('read_at', null)
+    if (error) {
+      if (isMissingColumnError(error) || /relation .* does not exist/i.test(error.message)) return 0
+      return 0
+    }
+    return count ?? 0
+  } catch {
+    return 0
+  }
 }
 
 

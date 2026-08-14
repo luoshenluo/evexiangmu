@@ -20,6 +20,37 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [showLogin, setShowLogin] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const lastActivityLogRef = useRef(0)
+  const lastHeartbeatRef = useRef(0)
+
+  // ====== 心跳上报：每 30 秒上报一次用户活跃到 DB，供管理员后台统计"最近 5 分钟在线用户"
+  const sendHeartbeat = useCallback(async () => {
+    try {
+      if (!useAppStore.getState().isAuthenticated) return
+      if (useAppStore.getState().isOffline) return
+      await apiFetch('/api/user/heartbeat', { method: 'POST' })
+    } catch {}
+  }, [])
+
+  // 初始化 + 定时：30s 一次心跳
+  useEffect(() => {
+    if (isAuthenticated) {
+      // 登录后立即发一次
+      sendHeartbeat()
+      lastHeartbeatRef.current = Date.now()
+    }
+    const t = setInterval(() => {
+      const now = Date.now()
+      if (!isAuthenticated) return
+      // 前台 5 分钟无操作视作离线，就不心跳了
+      const { lastActiveAt, isOffline } = useAppStore.getState()
+      if (isOffline || now - lastActiveAt > 5 * 60 * 1000) return
+      if (now - lastHeartbeatRef.current >= 25 * 1000) {
+        lastHeartbeatRef.current = now
+        sendHeartbeat()
+      }
+    }, 30000)
+    return () => clearInterval(t)
+  }, [isAuthenticated, sendHeartbeat])
 
   // 刷新公开数据（游戏状态 / 公告），供初始化与恢复在线时复用
   const refreshData = useCallback(async () => {
