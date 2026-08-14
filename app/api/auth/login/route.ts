@@ -7,7 +7,8 @@ import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
 
-// 登录失败限次：同一账号或同一 IP 15 分钟内最多失败 5 次
+// 登录失败限次：同一账号 15 分钟内最多失败 5 次（跨 IP 累计，只锁该账号，不连坐同 IP 其他账号）
+// IP 维度仅防枚举：同一 IP 15 分钟内对"不存在的账号"最多失败 5 次
 const LOGIN_FAIL_MAX = 5
 const LOGIN_FAIL_WINDOW_MS = 15 * 60 * 1000
 
@@ -23,21 +24,20 @@ export async function POST(req: NextRequest) {
     const name = String(username).trim()
     const ip = getClientIp(req)
 
-    // 限速前置检查：IP 维度
-    const ipLimit = checkRateLimit(failKey('ip', ip), LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS)
-    if (!ipLimit.allowed) {
-      const mins = Math.ceil(ipLimit.retryAfterMs / 60000)
-      return jsonResponse(false, null, `尝试次数过多，请 ${mins} 分钟后再试`, 429)
-    }
-
     const user = await findUserByUsername(name)
     if (!user) {
-      // 统一文案，避免账号枚举
+      // 账号不存在：IP 桶防枚举 + 账号桶防同一账号反复试探
+      const ipLimit = checkRateLimit(failKey('ip', ip), LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS)
+      if (!ipLimit.allowed) {
+        const mins = Math.ceil(ipLimit.retryAfterMs / 60000)
+        return jsonResponse(false, null, `尝试次数过多，请 ${mins} 分钟后再试`, 429)
+      }
       const nameLimit = checkRateLimit(failKey('name', name), LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS)
       if (!nameLimit.allowed) {
         const mins = Math.ceil(nameLimit.retryAfterMs / 60000)
         return jsonResponse(false, null, `尝试次数过多，请 ${mins} 分钟后再试`, 429)
       }
+      // 统一文案，避免账号枚举
       return jsonResponse(false, null, '账号或密码错误', 400)
     }
 
@@ -56,8 +56,13 @@ export async function POST(req: NextRequest) {
 
     const valid = bcrypt.compareSync(password, user.password)
     if (!valid) {
+      // 密码错误：只锁该账号，不扣 IP 桶，不连坐同 IP 其他账号
       logger.warn('auth', '登录失败: 密码错误', { username: name })
-      checkRateLimit(failKey('name', name), LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS)
+      const nameLimit = checkRateLimit(failKey('name', name), LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS)
+      if (!nameLimit.allowed) {
+        const mins = Math.ceil(nameLimit.retryAfterMs / 60000)
+        return jsonResponse(false, null, `尝试次数过多，请 ${mins} 分钟后再试`, 429)
+      }
       return jsonResponse(false, null, '账号或密码错误', 400)
     }
 
