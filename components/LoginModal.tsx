@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X, Sprout, Leaf } from 'lucide-react'
 import { apiFetch, classNames } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { useRouter } from 'next/navigation'
+import { validateUsername, validatePassword, validateNickname, countPasswordCategories } from '@/lib/password'
 
 interface Props {
   onClose?: () => void
@@ -22,6 +23,18 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
   const { login, showToast } = useAppStore()
   const router = useRouter()
 
+  // 密码强度（注册模式显示）：长度不足为不合格，按命中的字符类别数分级
+  const passwordStrength = useMemo(() => {
+    if (!password) return { level: 0, label: '', color: '', width: 0, ok: false }
+    if (password.length < 8 || password.length > 16) {
+      return { level: 0, label: '密码需为8-16位字母/数字/符号（不含中文）', color: 'bg-red-400', width: 100, ok: false }
+    }
+    const c = countPasswordCategories(password)
+    const labels = ['', '弱', '中', '强', '极强']
+    const colors = ['', 'bg-red-500', 'bg-amber-500', 'bg-green-500', 'bg-emerald-500']
+    return { level: c, label: labels[c], color: colors[c], width: (c / 4) * 100, ok: c >= 2 }
+  }, [password])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setServerMsg(null)
@@ -32,6 +45,15 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
     if (mode === 'register' && !nickname.trim()) {
       setServerMsg({ type: 'error', text: '请填写昵称' })
       return
+    }
+    // 客户端同步校验（与后端 lib/password.ts 一致）
+    if (mode === 'register') {
+      const nCheck = validateUsername(username.trim())
+      if (!nCheck.ok) { setServerMsg({ type: 'error', text: nCheck.message || '' }); return }
+      const pCheck = validatePassword(password)
+      if (!pCheck.ok) { setServerMsg({ type: 'error', text: pCheck.message || '' }); return }
+      const nickCheck = validateNickname(nickname.trim())
+      if (!nickCheck.ok) { setServerMsg({ type: 'error', text: nickCheck.message || '' }); return }
     }
     setLoading(true)
     try {
@@ -109,6 +131,11 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
               className="input"
               autoFocus
             />
+            {mode === 'register' && (
+              <p className={classNames('text-xs mt-1', username && !validateUsername(username.trim()).ok ? 'text-red-500' : 'text-slate-400')}>
+                3-18位字母和数字
+              </p>
+            )}
           </div>
           {mode === 'register' && (
             <div>
@@ -120,6 +147,9 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
                 placeholder="给自己起个好听的昵称吧"
                 className="input"
               />
+              <p className={classNames('text-xs mt-1', nickname && !validateNickname(nickname.trim()).ok ? 'text-red-500' : 'text-slate-400')}>
+                最多12个字符或8个汉字（当前 {nickname.length}/12）
+              </p>
             </div>
           )}
           <div>
@@ -131,6 +161,21 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
               placeholder="请输入密码"
               className="input"
             />
+            {mode === 'register' && password && (
+              <div className="mt-1.5">
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className={classNames('h-full rounded-full transition-all duration-300', passwordStrength.color)}
+                    style={{ width: `${passwordStrength.width}%` }}
+                  />
+                </div>
+                <p className={classNames('text-xs mt-1', passwordStrength.level > 0 ? (passwordStrength.ok ? 'text-emerald-600' : 'text-red-500') : 'text-red-500')}>
+                  {passwordStrength.level > 0
+                    ? `密码强度：${passwordStrength.label}${passwordStrength.ok ? '' : '（需至少两类字符）'}`
+                    : passwordStrength.label}
+                </p>
+              </div>
+            )}
           </div>
           <button
             type="submit"
