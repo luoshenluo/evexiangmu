@@ -1072,6 +1072,17 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
   return !error
 }
 
+export async function updateAnnouncement(
+  id: string,
+  data: { title: string; content: string; priority: Announcement['priority'] },
+): Promise<boolean> {
+  const sb = getSupabase()
+  const { error } = await sb.from('announcements')
+    .update({ title: data.title, content: data.content, priority: data.priority })
+    .eq('id', id)
+  return !error
+}
+
 // ==================== 背包工具函数（共享） ====================
 
 export function addInventoryItem(
