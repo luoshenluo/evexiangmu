@@ -5,9 +5,9 @@ import BottomNav from '@/components/BottomNav'
 import ChatWidget from '@/components/ChatWidget'
 import Toast from '@/components/Toast'
 import { useAppStore } from '@/lib/store'
-import { apiFetch } from '@/lib/utils'
+import { apiFetch, formatDateTime } from '@/lib/utils'
 import LoginModal from '@/components/LoginModal'
-import { Sprout, Leaf, User, LogIn } from 'lucide-react'
+import { Sprout, Leaf, User, LogIn, X, Bell } from 'lucide-react'
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -15,10 +15,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     setGameState, setAnnouncements,
     enterGuest, setLastActiveAt, setOffline,
     theme, gardenBg, setTheme, setGardenBg,
+    announcements,
   } = useAppStore()
   const hasHydrated = useAppStore(s => s._hasHydrated)
   const [showLogin, setShowLogin] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [showAnnModal, setShowAnnModal] = useState(false)
+  const [showAllAnn, setShowAllAnn] = useState(false)
   const lastActivityLogRef = useRef(0)
   const lastHeartbeatRef = useRef(0)
 
@@ -112,6 +115,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     setShowWelcome(!isAuthenticated && !isGuest && !showLogin)
   }, [isAuthenticated, isGuest, showLogin, hasHydrated])
 
+  // 公告弹窗：登录后若存在紧急/重要公告，自动弹出一次（当次会话只弹一次）
+  const triggerAnn = announcements.find(a => a.priority === 'urgent' || a.priority === 'important') || null
+  useEffect(() => {
+    if (!isAuthenticated || !triggerAnn) return
+    try {
+      if (sessionStorage.getItem('garden-ann-shown')) return
+      sessionStorage.setItem('garden-ann-shown', '1')
+      setShowAllAnn(false)
+      setShowAnnModal(true)
+    } catch {}
+  }, [isAuthenticated, triggerAnn])
+
   // 全局活跃监听（mousemove/click/keydown/touchstart），节流 5 秒更新一次 lastActiveAt
   useEffect(() => {
     const handleActivity = () => {
@@ -202,6 +217,72 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <div className="text-6xl mb-4">🌙</div>
             <div className="text-lg font-bold">你已离线</div>
             <div className="text-sm opacity-80 mt-1">点击屏幕恢复</div>
+          </div>
+        </div>
+      )}
+
+      {/* 公告弹窗：登录后自动弹出（展示最新紧急/重要公告，可展开全部） */}
+      {showAnnModal && triggerAnn && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => { setShowAnnModal(false); setShowAllAnn(false) }}
+        >
+          <div className="card w-full max-w-md p-5 slide-up max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+              <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <Bell size={18} className="text-garden-500" /> 公告
+              </h2>
+              <button onClick={() => { setShowAnnModal(false); setShowAllAnn(false) }} className="p-2 hover:bg-slate-100 rounded-xl" aria-label="关闭公告">
+                <X size={18} />
+              </button>
+            </div>
+
+            {!showAllAnn ? (
+              <div>
+                <div className={`p-4 rounded-xl ${
+                  triggerAnn.priority === 'urgent' ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="font-bold text-slate-800">{triggerAnn.title}</span>
+                    <span className={`chip text-[10px] ${triggerAnn.priority === 'urgent' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {triggerAnn.priority === 'urgent' ? '紧急' : '重要'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{triggerAnn.content}</p>
+                  <div className="text-[11px] text-slate-400 mt-2">{formatDateTime(triggerAnn.createdAt)}</div>
+                </div>
+                {announcements.length > 1 && (
+                  <button onClick={() => setShowAllAnn(true)} className="btn-secondary w-full py-2 mt-3 text-sm">
+                    查看全部公告（{announcements.length}）
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                {announcements.map(a => (
+                  <div key={a.id} className={`p-4 rounded-xl ${
+                    a.priority === 'urgent' ? 'bg-amber-50 border border-amber-200' :
+                      a.priority === 'important' ? 'bg-blue-50 border border-blue-200' :
+                        'bg-slate-50 border border-slate-100'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="font-bold text-slate-800">{a.title}</span>
+                      <span className={`chip text-[10px] ${
+                        a.priority === 'urgent' ? 'bg-amber-100 text-amber-700' :
+                          a.priority === 'important' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {a.priority === 'urgent' ? '紧急' : a.priority === 'important' ? '重要' : '普通'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{a.content}</p>
+                    <div className="text-[11px] text-slate-400 mt-2">{formatDateTime(a.createdAt)}</div>
+                  </div>
+                ))}
+                {announcements.length === 0 && (
+                  <div className="text-center py-12 text-slate-400 text-sm">暂无公告</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
