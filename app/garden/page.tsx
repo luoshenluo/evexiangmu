@@ -31,7 +31,10 @@ export default function GardenPage() {
       try {
         const res = await apiFetch(`/api/user/${user.id}`)
         if (res.success && res.data) {
-          updateUser(res.data)
+          // 轮询刷新时不覆盖 inventory：背包数量只能由用户主动操作改变，
+          // 若用轮询数据整体覆盖，会与工具消耗产生竞态（旧快照覆盖新库存导致数量"回满"）
+          const { inventory: _ignored, ...rest } = res.data
+          updateUser(rest)
         }
       } catch {}
     }
