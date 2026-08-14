@@ -133,7 +133,7 @@ export default function LoginModal({ onClose, onSuccess, onGuestEnter }: Props) 
             />
             {mode === 'register' && (
               <p className={classNames('text-xs mt-1', username && !validateUsername(username.trim()).ok ? 'text-red-500' : 'text-slate-400')}>
-                3-18位字母和数字
+                8-18位字母和数字
               </p>
             )}
           </div>
