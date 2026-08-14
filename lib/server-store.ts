@@ -527,102 +527,17 @@ async function doSeed(): Promise<void> {
   }
 
   // ============================================================
-  //  自修复 4：给所有已有用户补齐 4 种基础工具
-  // （老用户/用老版本 seed 创建的用户 inventory 里没有 pesticide 和 speedup_card，
-  //   导致背包和地块操作弹窗看不到数量。这里在每次 seed 时做一次补齐。）
+  //  注意：原有的"给所有已有用户补齐 4 种基础工具"自修复逻辑已移除。
+  //  原因：该逻辑会在用户把工具用完（数量减为 0 后从背包移除）时，
+  //  误判为"缺少工具"并自动补回默认数量，导致"用完自动补齐"的严重 bug。
+  //  新用户注册时 createUser 已提供初始工具，无需重复补齐。
+  //  老用户若确需补工具，请单独手动处理。
   // ============================================================
-  try {
-    const { data: allUsers, error: usersErr } = await sb
-      .from('users')
-      .select('id, inventory, deleted')
-    if (!usersErr && allUsers) {
-      const DEFAULT_TOOLS = [
-        { ref: 'watering_can', name: '水壶', emoji: '💧', quantity: 5 },
-        { ref: 'fertilizer',   name: '化肥', emoji: '🧪', quantity: 3 },
-        { ref: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2 },
-        { ref: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1 },
-      ]
-      for (const u of allUsers) {
-        if (u.deleted) continue
-        const inv = Array.isArray(u.inventory) ? [...u.inventory] : []
-        const toolIdPrefix = `t_${u.id.replace(/[^a-zA-Z0-9_]/g, '')}`
-        let changed = false
-        DEFAULT_TOOLS.forEach((tool, idx) => {
-          const exists = inv.find(i => i && i.type === 'tool' && i.referenceId === tool.ref)
-          if (!exists) {
-            inv.push({
-              id: `inv_${toolIdPrefix}_${idx}`,
-              type: 'tool',
-              referenceId: tool.ref,
-              name: tool.name,
-              emoji: tool.emoji,
-              quantity: tool.quantity,
-              maxStack: 99,
-              sellable: true,
-              tradeable: true,
-            })
-            changed = true
-          }
-        })
-        if (changed) {
-          const { error: updErr } = await sb.from('users').update({ inventory: inv }).eq('id', u.id)
-          if (updErr) logger.warn('system', `补全用户 ${u.id} 工具失败: ${updErr.message}`)
-          else logger.info('system', `已为用户 ${u.id} 补全背包基础工具`)
-        }
-      }
-    }
-  } catch (e: any) {
-    logger.warn('system', `补全所有用户基础工具失败: ${e?.message || 'unknown'}`)
-  }
 
   logger.info('system', '数据库种子数据初始化完成')
 }
 
 // ==================== 用户 ====================
-
-/**
- * 确保用户背包拥有 4 种基础工具（水壶/化肥/除虫剂/加速卡）。
- * 每次 findUserById / findUserByUsername 返回前调用，
- * 缺失的工具自动补齐并写回 DB。这样无论 seed 是否跑过，
- * 老用户登录时都会被兜底。
- */
-const DEFAULT_TOOLS = [
-  { ref: 'watering_can', name: '水壶',   emoji: '💧', quantity: 5 },
-  { ref: 'fertilizer',   name: '化肥',   emoji: '🧪', quantity: 3 },
-  { ref: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2 },
-  { ref: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1 },
-]
-
-async function ensureUserTools(row: any): Promise<any> {
-  if (!row || row.deleted) return row
-  const inv = Array.isArray(row.inventory) ? [...row.inventory] : []
-  let changed = false
-  const uid = String(row.id || '').replace(/[^a-zA-Z0-9_]/g, '')
-  DEFAULT_TOOLS.forEach((tool, idx) => {
-    const exists = inv.find((i: any) => i && i.type === 'tool' && i.referenceId === tool.ref)
-    if (!exists) {
-      inv.push({
-        id: `inv_t_${uid}_${idx}`,
-        type: 'tool',
-        referenceId: tool.ref,
-        name: tool.name,
-        emoji: tool.emoji,
-        quantity: tool.quantity,
-        maxStack: 99,
-        sellable: true,
-        tradeable: true,
-      })
-      changed = true
-    }
-  })
-  if (changed) {
-    const sb = getSupabase()
-    const { error } = await sb.from('users').update({ inventory: inv }).eq('id', row.id)
-    if (error) logger.warn('system', `补全用户 ${row.id} 工具失败: ${error.message}`)
-    else { logger.info('system', `已为用户 ${row.id} 补全背包基础工具`); row.inventory = inv }
-  }
-  return row
-}
 
 export async function findUserByUsername(username: string): Promise<User | null> {
   await seedDatabase()
@@ -632,7 +547,6 @@ export async function findUserByUsername(username: string): Promise<User | null>
     .eq('username', username)
     .single()
   if (error || !data) return null
-  await ensureUserTools(data)
   return dbRowToUser(data)
 }
 
@@ -644,7 +558,6 @@ export async function findUserById(id: string): Promise<User | null> {
     .eq('id', id)
     .single()
   if (error || !data) return null
-  await ensureUserTools(data)
   return dbRowToUser(data)
 }
 
