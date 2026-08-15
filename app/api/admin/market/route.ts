@@ -3,7 +3,7 @@ import { authRequest, jsonResponse, isSuperAdminUser, userHasPermission } from '
 import {
   getPriceOverrides, setPriceOverrides,
   getListingItems, removeListingExt, createAdminListing,
-  getAllFamilies, logAdminAction, getEconomyStats,
+  getAllFamilies, logAdminAction, getEconomyStats, listAdminLogs,
 } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES } from '@/lib/game-data'
 
@@ -49,6 +49,11 @@ export async function GET(req: NextRequest) {
       const stats = await getEconomyStats()
       const families = await getAllFamilies()
       return jsonResponse(true, { ...stats, familyCount: families.length })
+    }
+
+    if (action === 'override-history') {
+      const logs = await listAdminLogs({ action: 'market_price', limit: 50 })
+      return jsonResponse(true, { items: logs.items })
     }
 
     return jsonResponse(false, null, 'action 错误', 400)

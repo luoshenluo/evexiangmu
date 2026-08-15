@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch, classNames, formatDateTime, formatNumber } from '@/lib/utils'
-import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart, BarChart3 } from 'lucide-react'
+import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart, BarChart3, History } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
 type SubTab = 'overview' | 'prices' | 'official' | 'player'
@@ -27,6 +27,7 @@ export default function AdminMarketPanel() {
   const [player, setPlayer] = useState<any[]>([])
   const [totalListings, setTotalListings] = useState(0)
   const [econStats, setEconStats] = useState<any>(null)
+  const [overrideHistory, setOverrideHistory] = useState<any[]>([])
 
   const [showCreate, setShowCreate] = useState(false)
   const [newItemType, setNewItemType] = useState<'seed' | 'flower' | 'tool'>('seed')
@@ -41,10 +42,11 @@ export default function AdminMarketPanel() {
   const refresh = async () => {
     setLoading(true)
     try {
-      const [p, m, e] = await Promise.all([
+      const [p, m, e, h] = await Promise.all([
         apiFetch('/api/admin/market?action=price-overrides'),
         apiFetch('/api/admin/market?action=market-items'),
         apiFetch('/api/admin/market?action=econ-stats'),
+        apiFetch('/api/admin/market?action=override-history'),
       ])
       if (p.success) {
         setFlowerTypes(p.data?.flowerTypes || [])
@@ -81,6 +83,7 @@ export default function AdminMarketPanel() {
         setTotalListings(m.data?.totalListings || 0)
       }
       if (e.success) setEconStats(e.data)
+      if (h.success) setOverrideHistory(h.data?.items || [])
     } finally { setLoading(false) }
   }
 
@@ -335,7 +338,7 @@ export default function AdminMarketPanel() {
                               value={edit.baseSellPrice ?? ''}
                               onChange={(e) => setFlowerEdits((p) => ({ ...p, [f.id]: { ...(p[f.id] || {}), baseSellPrice: Number(e.target.value) } }))} />
                             <Coins size={12} className="text-amber-500" />
-                            {(changedSell) && <span className="text-[10px] text-emerald-600 font-medium">已改</span>}
+                            {(changedSell) && <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 rounded px-1.5 py-0.5">默认 {f.baseSellPrice} → 现 {edit.baseSellPrice}</span>}
                           </div>
                           <div className="text-[10px] text-slate-400 mt-1">默认：{f.baseSellPrice}</div>
                         </td>
@@ -345,7 +348,7 @@ export default function AdminMarketPanel() {
                               value={edit.seedPrice ?? ''}
                               onChange={(e) => setFlowerEdits((p) => ({ ...p, [f.id]: { ...(p[f.id] || {}), seedPrice: Number(e.target.value) } }))} />
                             <Coins size={12} className="text-amber-500" />
-                            {(changedSeed) && <span className="text-[10px] text-emerald-600 font-medium">已改</span>}
+                            {(changedSeed) && <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 rounded px-1.5 py-0.5">默认 {f.seedPrice} → 现 {edit.seedPrice}</span>}
                           </div>
                           <div className="text-[10px] text-slate-400 mt-1">默认：{f.seedPrice}</div>
                         </td>
@@ -391,7 +394,7 @@ export default function AdminMarketPanel() {
                                 value={e.price ?? ''}
                                 onChange={(ev) => setSeedEdits((p) => ({ ...p, [s.id]: { price: Number(ev.target.value) } }))} />
                               <Coins size={12} className="text-amber-500" />
-                              {changed && <span className="text-[10px] text-emerald-600 font-medium">已改</span>}
+                              {changed && <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 rounded px-1.5 py-0.5">默认 {s.price} → 现 {e.price}</span>}
                             </div>
                             <div className="text-[10px] text-slate-400 mt-1">默认：{s.price}</div>
                           </td>
@@ -432,7 +435,7 @@ export default function AdminMarketPanel() {
                       </div>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-[10px] text-slate-400">默认：{t.price}</span>
-                        {changed && <span className="text-[10px] text-emerald-600 font-medium">已改</span>}
+                        {changed && <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 rounded px-1.5 py-0.5">默认 {t.price} → 现 {e.price}</span>}
                       </div>
                       <button onClick={() => toolPreset(t.id)} className="mt-2 w-full text-[10px] py-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-600">
                         上架官方
@@ -448,6 +451,32 @@ export default function AdminMarketPanel() {
             <button onClick={savePrices} disabled={loading} className="btn-primary py-2.5 px-5">
               {loading ? '保存中...' : '保存价格调控'}
             </button>
+          </div>
+
+          {/* 调节历史 */}
+          <div className="card p-5">
+            <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-1"><History size={14} /> 调节历史</h4>
+            {overrideHistory.length === 0 ? (
+              <div className="text-xs text-slate-400">暂无调节记录</div>
+            ) : (
+              <div className="space-y-2">
+                {overrideHistory.map((h) => (
+                  <div key={h.id} className="flex items-start justify-between gap-3 p-2 rounded-lg bg-slate-50 text-xs">
+                    <div className="flex-1 text-slate-600">
+                      <span className="font-medium text-slate-800">{h.adminName}</span>
+                      <span className="mx-1 text-slate-400">·</span>
+                      <span>{h.detail?.desc || '修改市场价格调控'}</span>
+                      {h.detail?.overrides && (
+                        <div className="text-[10px] text-slate-400 mt-1 font-mono break-all">
+                          {JSON.stringify(h.detail.overrides).slice(0, 200)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 whitespace-nowrap">{formatDateTime(h.createdAt).slice(5, 16)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
