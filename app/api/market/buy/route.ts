@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 更新 listing 库存（原子扣减，防并发超卖）——必须在任何发奖/扣款之前
-    if (listing.isOfficial && listing.sellerId === 'system') {
-      // 官方商品不减库存（无限供应）
+    if (listing.isOfficial) {
+      // 官方商品不减库存（无限供应，sellerId 统一为 system/official 均不消耗）
     } else {
       const decreased = await atomicDecreaseListing(listingId, quantity)
       if (!decreased) {
