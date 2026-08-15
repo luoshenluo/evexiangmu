@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
 import { FLOWER_TYPES, RankNames, RankColors } from '@/lib/game-data'
-import { ChevronLeft, Users, Coins, Shield, Bug, Sparkles, Search, Heart, Droplets } from 'lucide-react'
+import { ChevronLeft, Users, Coins, Shield, Bug, Sparkles, Search, Heart, Droplets, MessageCircle, UserPlus } from 'lucide-react'
 
 interface RankedUser {
   id: string
@@ -146,6 +146,34 @@ export default function VisitPage() {
     }
   }
 
+  // 唤起全局聊天面板的私聊会话
+  const openPrivateChat = (peerId: string, peerName: string, peerAvatar: string) => {
+    if (!user) return
+    window.dispatchEvent(new CustomEvent('garden:open-private-chat', {
+      detail: { peerId, peerName, peerAvatar },
+    }))
+    showToast(`开始和 ${peerName} 聊天~`, 'info')
+  }
+
+  // 直接向对方发送好友申请
+  const sendFriendRequestTo = async (peerId: string, peerName: string) => {
+    if (!user) return
+    setLiking(true)
+    try {
+      const res = await apiFetch<any>('/api/friends', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'send-request', toUserId: peerId }),
+      })
+      if (res.success) {
+        showToast(`好友申请已发送给 ${peerName}`, 'success')
+      } else {
+        showToast(res.error || '发送失败', 'error')
+      }
+    } finally {
+      setLiking(false)
+    }
+  }
+
   const filteredUsers = rankedUsers.filter(u =>
     !search || u.nickname.toLowerCase().includes(search.toLowerCase())
   )
@@ -245,19 +273,37 @@ export default function VisitPage() {
               </div>
             )}
             {!garden.isSelf && (
-              <button
-                onClick={handleLike}
-                disabled={liking}
-                className={classNames(
-                  'flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                  garden.liked
-                    ? 'bg-pink-100 text-pink-600 border border-pink-200'
-                    : 'bg-white text-slate-500 border border-slate-200 hover:border-pink-200 hover:text-pink-500'
+              <>
+                <button
+                  onClick={handleLike}
+                  disabled={liking}
+                  className={classNames(
+                    'flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                    garden.liked
+                      ? 'bg-pink-100 text-pink-600 border border-pink-200'
+                      : 'bg-white text-slate-500 border border-slate-200 hover:border-pink-200 hover:text-pink-500'
+                  )}
+                >
+                  <Heart size={14} className={garden.liked ? 'fill-pink-500' : ''} />
+                  {garden.liked ? '已赞' : '点赞'}
+                </button>
+                {garden.isFriend ? (
+                  <button
+                    onClick={() => openPrivateChat(garden.user.id, garden.user.nickname, garden.user.avatar || '')}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-garden-50 text-garden-700 border border-garden-200 hover:bg-garden-100"
+                  >
+                    <MessageCircle size={14} /> 私聊
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => sendFriendRequestTo(garden.user.id, garden.user.nickname)}
+                    disabled={liking}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    <UserPlus size={14} /> 加好友
+                  </button>
                 )}
-              >
-                <Heart size={14} className={garden.liked ? 'fill-pink-500' : ''} />
-                {garden.liked ? '已赞' : '点赞'}
-              </button>
+              </>
             )}
           </div>
 

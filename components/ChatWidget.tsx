@@ -49,6 +49,8 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
   const [threadLoading, setThreadLoading] = useState(false)
   const convPollingRef = useRef(0)
   const threadPollingRef = useRef(0)
+  // 由外部事件带入的对方昵称/头像（尚未有历史会话时用于展示）
+  const [pendingPeerMeta, setPendingPeerMeta] = useState<{ name?: string; avatar?: string } | null>(null)
 
   // 当 parent 传入 initialPeerId（好友列表点击私聊跳转）→ 自动打开好友Tab并进入会话
   useEffect(() => {
@@ -69,6 +71,10 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
       setActivePeerId(peerId)
       setFriendView('thread')
       setChatExpanded(true)
+      setPendingPeerMeta({
+        name: String(e?.detail?.peerName || ''),
+        avatar: String(e?.detail?.peerAvatar || ''),
+      })
     }
     if (typeof window === 'undefined') return
     window.addEventListener('garden:open-private-chat', onOpenPm)
@@ -252,6 +258,15 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
   // ===== 渲染内容 =====
   const headerTime = formatDateTime(Date.now()).slice(0, 16)
   const activeConv = conversations.find(c => c.peerId === activePeerId)
+  // 无历史会话时，用事件带入的昵称/头像兜底
+  const threadPeer: PrivateConversation | undefined = activeConv || (pendingPeerMeta?.name ? {
+    peerId: activePeerId,
+    peerName: pendingPeerMeta.name,
+    peerAvatar: pendingPeerMeta.avatar || '🌱',
+    lastMessage: '',
+    lastMessageAt: Date.now(),
+    unreadCount: 0,
+  } : undefined)
 
   return (
     <div className="fixed bottom-24 right-4 z-50 w-[92vw] max-w-sm h-[480px] max-h-[75vh] card slide-up overflow-hidden flex flex-col shadow-2xl md:bottom-20 md:right-4 md:w-96 md:h-[560px] md:max-h-[80vh]">
@@ -269,8 +284,8 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
           )}
           <MessageCircle size={18} className="text-white flex-shrink-0" />
           <span className="text-white font-semibold text-sm truncate">
-            {currentChatChannel === 'friend' && friendView === 'thread' && activeConv
-              ? `私聊 · ${activeConv.peerName}`
+            {currentChatChannel === 'friend' && friendView === 'thread' && threadPeer
+              ? `私聊 · ${threadPeer.peerName}`
               : currentChatChannel === 'friend' ? '私聊' : '聊天'}
           </span>
           <span className="text-garden-100 text-xs ml-2 flex-shrink-0 hidden sm:inline">{headerTime}</span>
@@ -335,7 +350,7 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
             />
           ) : (
             <ThreadView
-              peer={activeConv}
+              peer={threadPeer}
               peerId={activePeerId}
               messages={threadMessages}
               currentUserId={user?.id}

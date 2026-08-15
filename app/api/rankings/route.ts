@@ -1,16 +1,21 @@
 import { getAllUsers, ensureSeasonTick } from '@/lib/server-store'
 import { FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
-import { sanitizeUser, jsonResponse } from '@/lib/auth'
+import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
 export const runtime = 'edge'
 
 export async function GET(req: Request) {
   try {
+    const user = await authRequest(req)
+    if (!user) return jsonResponse(false, null, '请先登录', 401)
+
     const url = new URL(req.url)
     const type = url.searchParams.get('type') || 'coins'
 
     const users = await getAllUsers()
+    const friendIds = new Set(user.friends || [])
     const ranked = users
+      .filter(u => !u.deleted)
       .map(u => {
         let value = u.coins
         if (type === 'flowers') {
@@ -29,7 +34,7 @@ export async function GET(req: Request) {
             }
           })
         }
-        return { ...sanitizeUser(u), value }
+        return { ...sanitizeUser(u), value, isFriend: friendIds.has(u.id) }
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, 50)

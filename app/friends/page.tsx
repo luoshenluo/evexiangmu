@@ -103,6 +103,15 @@ export default function FriendsPage() {
     } finally { setLoading(null) }
   }
 
+  // 唤起全局聊天面板的私聊会话（ChatWidget 监听 garden:open-private-chat）
+  const openPrivateChat = (friend: any) => {
+    if (!user) return
+    window.dispatchEvent(new CustomEvent('garden:open-private-chat', {
+      detail: { peerId: friend.id, peerName: friend.nickname, peerAvatar: friend.avatar },
+    }))
+    showToast(`开始和 ${friend.nickname} 聊天~`, 'info')
+  }
+
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
@@ -214,6 +223,12 @@ export default function FriendsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openPrivateChat(f)}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-garden-50 text-garden-700 hover:bg-garden-100 flex items-center gap-1"
+                  >
+                    <MessageCircle size={12} /> 私聊
+                  </button>
                   <button
                     onClick={() => window.open(`/visit?u=${f.id}`, '_blank')}
                     className="px-2.5 py-1 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1"

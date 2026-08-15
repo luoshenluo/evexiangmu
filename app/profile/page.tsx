@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert, Palette, Calendar, Flower2 } from 'lucide-react'
+import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert, Palette, Calendar, Flower2, MessageCircle, UserPlus } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
 export default function ProfilePage() {
@@ -277,6 +277,36 @@ export default function ProfilePage() {
                       <div className="text-[11px] text-slate-500">@{u.username}</div>
                     </div>
                     <div className="font-bold text-amber-600 text-sm">{formatNumber(u.value || u.coins || 0)}</div>
+                    {u.id !== user.id && (
+                      u.isFriend ? (
+                        <button
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('garden:open-private-chat', {
+                              detail: { peerId: u.id, peerName: u.nickname, peerAvatar: u.avatar || '' },
+                            }))
+                            setShowRankList(false)
+                            showToast(`开始和 ${u.nickname} 聊天~`, 'info')
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] bg-garden-50 text-garden-700 border border-garden-200 hover:bg-garden-100 flex-shrink-0"
+                        >
+                          <MessageCircle size={12} /> 私聊
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const res = await apiFetch('/api/friends', {
+                              method: 'POST',
+                              body: JSON.stringify({ mode: 'send-request', toUserId: u.id }),
+                            })
+                            if (res.success) showToast(`好友申请已发送给 ${u.nickname}`, 'success')
+                            else showToast(res.error || '发送失败', 'error')
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 flex-shrink-0"
+                        >
+                          <UserPlus size={12} /> 加好友
+                        </button>
+                      )
+                    )}
                   </div>
                 ))
               )}
