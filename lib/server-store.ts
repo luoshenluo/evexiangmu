@@ -2935,7 +2935,41 @@ export async function setPriceOverrides(adminId: string, overrides: PriceOverrid
   })
   if (error) return { success: false, error: error.message }
   _priceOverridesCache = { data: { ...overrides, updatedAt: Date.now(), updatedBy: adminId }, fetchedAt: Date.now() }
+  // 覆盖变更后，同步官方挂售与官方收购单价格，保证官方价随调控生效
+  await syncOfficialPrices().catch((e: any) => logger.warn('market', `syncOfficialPrices 失败: ${e?.message || 'unknown'}`))
   return { success: true }
+}
+
+/**
+ * 同步官方挂售/官方收购单价格到当前有效价：
+ * - 官方挂售的种子/工具 → getSeedPriceEffective / getToolPriceEffective
+ * - 官方收购单的花 → getFlowerSellPriceEffective
+ * 仅更新已存在的官方商品行，不新增（避免污染市场）。
+ */
+export async function syncOfficialPrices(): Promise<void> {
+  await seedDatabase()
+  const sb = getSupabase()
+
+  // 官方挂售：种子/工具随覆盖价
+  const { data: listings } = await sb.from('listings').select('*').eq('is_official', true)
+  for (const l of listings || []) {
+    let newPrice: number | null = null
+    if (l.item_type === 'seed') newPrice = await getSeedPriceEffective(l.reference_id)
+    else if (l.item_type === 'tool') newPrice = await getToolPriceEffective(l.reference_id)
+    if (newPrice != null && newPrice > 0 && newPrice !== l.price) {
+      await sb.from('listings').update({ price: newPrice }).eq('id', l.id)
+    }
+  }
+
+  // 官方收购单：花按等级随覆盖价
+  const { data: orders } = await sb.from('buy_orders').select('*').eq('is_official', true)
+  for (const o of orders || []) {
+    if (o.item_type !== 'flower') continue
+    const newPrice = await getFlowerSellPriceEffective(o.reference_id, o.rank || 1)
+    if (newPrice > 0 && newPrice !== o.price) {
+      await sb.from('buy_orders').update({ price: newPrice }).eq('id', o.id)
+    }
+  }
 }
 
 // ============== 有效价格（应用价格覆盖后的对外定价） ==============
