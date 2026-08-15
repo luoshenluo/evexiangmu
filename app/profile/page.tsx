@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert, Palette, Calendar, Flower2, MessageCircle, UserPlus } from 'lucide-react'
+import { User, Coins, Award, LogOut, Bell, Gift, Settings, Users, Crown, ChevronRight, X, Search, LogIn, HelpCircle, Sparkles, ShieldAlert, Palette, Calendar, Flower2, MessageCircle, UserPlus, MessageSquare } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
 export default function ProfilePage() {
@@ -91,6 +91,7 @@ export default function ProfilePage() {
     { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-amber-400 to-amber-600' },
     { icon: Sparkles, label: '小游戏', tip: '转盘 & 猜大小，消耗花瓣赢金币', onClick: () => window.location.href = '/minigames', color: 'from-amber-400 to-amber-600' },
     { icon: Users, label: '好友系统', tip: `${user?.friends?.length || 0}位好友`, onClick: () => window.location.href = '/friends', color: 'from-garden-400 to-garden-600' },
+    { icon: MessageSquare, label: '论坛', tip: '发帖分享 · 讨论交流', onClick: () => window.location.href = '/forum', color: 'from-garden-400 to-garden-600' },
     { icon: Flower2, label: '家族', tip: user?.familyId ? '查看家族成员与领地' : '加入家族，一起经营', onClick: () => window.location.href = '/family', color: 'from-garden-400 to-garden-600' },
     { icon: HelpCircle, label: '帮助反馈', tip: '游戏介绍', onClick: () => setShowAnnouncements(true), color: 'from-slate-400 to-slate-600' },
   ]

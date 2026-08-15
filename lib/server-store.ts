@@ -3234,4 +3234,481 @@ export async function getPrivateMessageUnreadCount(currentUserId: string): Promi
   }
 }
 
+// ==================== 论坛（帖子/评论/点赞/举报） ====================
+
+export interface ForumPost {
+  id: string
+  userId: string
+  title: string
+  content: string
+  createdAt: number
+  updatedAt: number
+  likeCount: number
+  commentCount: number
+  author?: { id: string; nickname: string; avatar: string }
+  liked?: boolean
+}
+
+export interface ForumComment {
+  id: string
+  postId: string
+  userId: string
+  content: string
+  createdAt: number
+  author?: { id: string; nickname: string; avatar: string }
+}
+
+export interface ForumListResult {
+  items: ForumPost[]
+  total: number
+}
+
+// 论坛建表（幂等）
+export async function ensureForumTables(): Promise<void> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    await sb.from('posts').select('id').limit(1)
+  } catch {
+    // 表不存在时静默，具体查询会再报错
+  }
+}
+
+// 获取帖子列表（sort: latest | hot | newest）
+export async function listForumPosts(
+  sort: 'latest' | 'hot' = 'latest',
+  page = 1,
+  pageSize = 20,
+  currentUserId?: string,
+): Promise<ForumListResult> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    let query = sb
+      .from('posts')
+      .select('*')
+      .eq('deleted', false)
+      .range((page - 1) * pageSize, page * pageSize - 1)
+
+    if (sort === 'hot') {
+      query = query.order('like_count', { ascending: false }).order('created_at', { ascending: false })
+    } else {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const { data, error } = await query
+    if (error) return { items: [], total: 0 }
+
+    // 统计总数
+    const { count } = await sb
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('deleted', false)
+
+    const userIds = [...new Set((data as any[]).map((p) => p.user_id))]
+    const authors = await getUsersByIds(userIds)
+    let likedSet = new Set<string>()
+    if (currentUserId) {
+      likedSet = await getUserLikedPostIds(currentUserId)
+    }
+
+    const items: ForumPost[] = (data as any[]).map((p) => ({
+      id: p.id,
+      userId: p.user_id,
+      title: p.title,
+      content: p.content,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      likeCount: p.like_count ?? 0,
+      commentCount: p.comment_count ?? 0,
+      author: authors.get(p.user_id),
+      liked: likedSet.has(p.id),
+    }))
+
+    return { items, total: count ?? 0 }
+  } catch (e: any) {
+    logger.warn('forum', `listForumPosts 异常: ${e?.message}`)
+    return { items: [], total: 0 }
+  }
+}
+
+// 批量获取用户信息（昵称/头像），过滤已注销
+async function getUsersByIds(ids: string[]): Promise<Map<string, { id: string; nickname: string; avatar: string }>> {
+  const result = new Map<string, { id: string; nickname: string; avatar: string }>()
+  if (ids.length === 0) return result
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb
+      .from('users')
+      .select('id, nickname, avatar, deleted')
+      .in('id', ids)
+    if (error || !data) return result
+    for (const u of data) {
+      if (u.deleted) continue
+      result.set(u.id, { id: u.id, nickname: u.nickname, avatar: u.avatar })
+    }
+  } catch {}
+  return result
+}
+
+// 获取当前用户点赞过的帖子 id 集合
+async function getUserLikedPostIds(userId: string): Promise<Set<string>> {
+  const set = new Set<string>()
+  if (!userId) return set
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('post_likes').select('post_id').eq('user_id', userId)
+    if (error || !data) return set
+    for (const l of data) set.add(l.post_id)
+  } catch {}
+  return set
+}
+
+// 创建帖子（敏感词过滤 + 标题/正文校验）
+export async function createForumPost(
+  userId: string,
+  title: string,
+  content: string,
+): Promise<{ success: boolean; error?: string; post?: ForumPost }> {
+  if (!userId) return { success: false, error: '请先登录' }
+  const t = (title || '').trim().slice(0, 50)
+  const c = (content || '').trim().slice(0, 2000)
+  if (!t) return { success: false, error: '标题不能为空' }
+  if (!c) return { success: false, error: '内容不能为空' }
+
+  await seedDatabase()
+  const sb = getSupabase()
+
+  const sensitiveWords = await getSensitiveWordList()
+  const filteredTitle = filterSensitiveWords(t, sensitiveWords)
+  const filteredContent = filterSensitiveWords(c, sensitiveWords)
+
+  const now = Date.now()
+  const id = genId('fp')
+  const { error } = await sb.from('posts').insert({
+    id,
+    user_id: userId,
+    title: filteredTitle,
+    content: filteredContent,
+    created_at: now,
+    updated_at: now,
+    like_count: 0,
+    comment_count: 0,
+    deleted: false,
+  })
+  if (error) {
+    if (/relation .* does not exist/i.test(error.message)) return { success: false, error: '论坛功能尚未初始化（请先执行 migration_forum.sql）' }
+    logger.error('forum', 'createForumPost 失败', { error: error.message })
+    return { success: false, error: '发帖失败' }
+  }
+  const author = await findUserById(userId)
+  return {
+    success: true,
+    post: {
+      id,
+      userId,
+      title: filteredTitle,
+      content: filteredContent,
+      createdAt: now,
+      updatedAt: now,
+      likeCount: 0,
+      commentCount: 0,
+      author: author ? { id: author.id, nickname: author.nickname, avatar: author.avatar } : undefined,
+      liked: false,
+    },
+  }
+}
+
+// 获取帖子详情（含作者与评论）
+export async function getForumPost(
+  postId: string,
+  currentUserId?: string,
+): Promise<{ success: boolean; error?: string; post?: ForumPost; comments?: ForumComment[] }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data: postRows, error: postErr } = await sb
+      .from('posts')
+      .select('*')
+      .eq('id', postId)
+      .eq('deleted', false)
+      .limit(1)
+    if (postErr || !postRows || postRows.length === 0) return { success: false, error: '帖子不存在或已删除' }
+
+    const p = postRows[0]
+    const authors = await getUsersByIds([p.user_id])
+    let liked = false
+    if (currentUserId) {
+      const likedSet = await getUserLikedPostIds(currentUserId)
+      liked = likedSet.has(postId)
+    }
+
+    // 评论
+    const { data: commentRows, error: cmtErr } = await sb
+      .from('post_comments')
+      .select('*')
+      .eq('post_id', postId)
+      .eq('deleted', false)
+      .order('created_at', { ascending: true })
+    if (cmtErr) return { success: false, error: '获取评论失败' }
+
+    const commentUserIds = [...new Set((commentRows as any[]).map((c) => c.user_id))]
+    const commentAuthors = await getUsersByIds(commentUserIds)
+    const comments: ForumComment[] = (commentRows as any[]).map((c) => ({
+      id: c.id,
+      postId: c.post_id,
+      userId: c.user_id,
+      content: c.content,
+      createdAt: c.created_at,
+      author: commentAuthors.get(c.user_id),
+    }))
+
+    return {
+      success: true,
+      post: {
+        id: p.id,
+        userId: p.user_id,
+        title: p.title,
+        content: p.content,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+        likeCount: p.like_count ?? 0,
+        commentCount: p.comment_count ?? 0,
+        author: authors.get(p.user_id),
+        liked,
+      },
+      comments,
+    }
+  } catch (e: any) {
+    logger.warn('forum', `getForumPost 异常: ${e?.message}`)
+    return { success: false, error: '获取帖子失败' }
+  }
+}
+
+// 删除帖子（作者本人或管理员）
+export async function deleteForumPost(
+  postId: string,
+  currentUserId: string,
+  isAdmin: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('posts').select('id, user_id').eq('id', postId).limit(1)
+    if (error || !data || data.length === 0) return { success: false, error: '帖子不存在' }
+    if (!isAdmin && data[0].user_id !== currentUserId) return { success: false, error: '无权删除该帖子' }
+
+    const { error: delErr } = await sb.from('posts').update({ deleted: true }).eq('id', postId)
+    if (delErr) return { success: false, error: '删除失败' }
+    return { success: true }
+  } catch (e: any) {
+    logger.warn('forum', `deleteForumPost 异常: ${e?.message}`)
+    return { success: false, error: '删除失败' }
+  }
+}
+
+// 点赞 / 取消点赞（原子操作 like_count）
+export async function toggleForumLike(
+  postId: string,
+  currentUserId: string,
+): Promise<{ success: boolean; error?: string; liked?: boolean; likeCount?: number }> {
+  if (!currentUserId) return { success: false, error: '请先登录' }
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    // 校验帖子存在
+    const { data: postRows, error: postErr } = await sb.from('posts').select('id').eq('id', postId).eq('deleted', false).limit(1)
+    if (postErr || !postRows || postRows.length === 0) return { success: false, error: '帖子不存在' }
+
+    // 查是否已点赞
+    const { data: likeRows, error: likeErr } = await sb
+      .from('post_likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', currentUserId)
+      .limit(1)
+    if (likeErr) return { success: false, error: '操作失败' }
+
+    if (likeRows && likeRows.length > 0) {
+      // 取消点赞
+      const { error: delErr } = await sb.from('post_likes').delete().eq('id', likeRows[0].id)
+      if (delErr) return { success: false, error: '操作失败' }
+      // 递减
+      await sb.rpc('_garden_forum_decr_likes', { p_post_id: postId }).then((r: any) => {
+        if (r.error) {
+          // RPC 不存在时用读取更新（尽力而为）
+          return sb.from('posts').select('like_count').eq('id', postId).single().then((p: any) => {
+            const n = Math.max(0, (p.data?.like_count ?? 1) - 1)
+            return sb.from('posts').update({ like_count: n }).eq('id', postId)
+          })
+        }
+        return r
+      })
+      return { success: true, liked: false }
+    }
+
+    // 新增点赞
+    const now = Date.now()
+    const { error: insErr } = await sb.from('post_likes').insert({
+      id: genId('pl'),
+      post_id: postId,
+      user_id: currentUserId,
+      created_at: now,
+    })
+    if (insErr) {
+      // 唯一约束冲突=已点赞（并发）
+      if (insErr.code === '23505') return { success: true, liked: true }
+      return { success: false, error: '操作失败' }
+    }
+    // 递增
+    await sb.rpc('_garden_forum_incr_likes', { p_post_id: postId }).then((r: any) => {
+      if (r.error) {
+        return sb.from('posts').select('like_count').eq('id', postId).single().then((p: any) => {
+          const n = (p.data?.like_count ?? 0) + 1
+          return sb.from('posts').update({ like_count: n }).eq('id', postId)
+        })
+      }
+      return r
+    })
+    return { success: true, liked: true }
+  } catch (e: any) {
+    logger.warn('forum', `toggleForumLike 异常: ${e?.message}`)
+    return { success: false, error: '操作失败' }
+  }
+}
+
+// 发表评论（敏感词过滤）
+export async function createForumComment(
+  postId: string,
+  userId: string,
+  content: string,
+): Promise<{ success: boolean; error?: string; comment?: ForumComment }> {
+  if (!userId) return { success: false, error: '请先登录' }
+  const c = (content || '').trim().slice(0, 500)
+  if (!c) return { success: false, error: '评论内容不能为空' }
+
+  await seedDatabase()
+  const sb = getSupabase()
+
+  // 校验帖子存在
+  const { data: postRows, error: postErr } = await sb.from('posts').select('id').eq('id', postId).eq('deleted', false).limit(1)
+  if (postErr || !postRows || postRows.length === 0) return { success: false, error: '帖子不存在或已删除' }
+
+  const sensitiveWords = await getSensitiveWordList()
+  const filteredContent = filterSensitiveWords(c, sensitiveWords)
+
+  const now = Date.now()
+  const id = genId('fc')
+  const { error: insErr } = await sb.from('post_comments').insert({
+    id,
+    post_id: postId,
+    user_id: userId,
+    content: filteredContent,
+    created_at: now,
+    deleted: false,
+  })
+  if (insErr) {
+    logger.error('forum', 'createForumComment 失败', { error: insErr.message })
+    return { success: false, error: '评论失败' }
+  }
+
+  // 帖子评论数 +1
+  await sb.rpc('_garden_forum_incr_comments', { p_post_id: postId }).then((r: any) => {
+    if (r.error) {
+      return sb.from('posts').select('comment_count').eq('id', postId).single().then((p: any) => {
+        const n = (p.data?.comment_count ?? 0) + 1
+        return sb.from('posts').update({ comment_count: n }).eq('id', postId)
+      })
+    }
+    return r
+  })
+
+  const author = await findUserById(userId)
+  return {
+    success: true,
+    comment: {
+      id,
+      postId,
+      userId,
+      content: filteredContent,
+      createdAt: now,
+      author: author ? { id: author.id, nickname: author.nickname, avatar: author.avatar } : undefined,
+    },
+  }
+}
+
+// 删除评论（作者本人或管理员）
+export async function deleteForumComment(
+  commentId: string,
+  currentUserId: string,
+  isAdmin: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('post_comments').select('id, user_id, post_id').eq('id', commentId).limit(1)
+    if (error || !data || data.length === 0) return { success: false, error: '评论不存在' }
+    if (!isAdmin && data[0].user_id !== currentUserId) return { success: false, error: '无权删除该评论' }
+
+    const { error: delErr } = await sb.from('post_comments').update({ deleted: true }).eq('id', commentId)
+    if (delErr) return { success: false, error: '删除失败' }
+    // 帖子评论数 -1
+    const postId = data[0].post_id
+    await sb.rpc('_garden_forum_decr_comments', { p_post_id: postId }).then((r: any) => {
+      if (r.error) {
+        return sb.from('posts').select('comment_count').eq('id', postId).single().then((p: any) => {
+          const n = Math.max(0, (p.data?.comment_count ?? 1) - 1)
+          return sb.from('posts').update({ comment_count: n }).eq('id', postId)
+        })
+      }
+      return r
+    })
+    return { success: true }
+  } catch (e: any) {
+    logger.warn('forum', `deleteForumComment 异常: ${e?.message}`)
+    return { success: false, error: '删除失败' }
+  }
+}
+
+// 举报帖子或评论
+export async function reportForumTarget(
+  targetType: 'post' | 'comment',
+  targetId: string,
+  reporterId: string,
+  reason: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!reporterId) return { success: false, error: '请先登录' }
+  const r = (reason || '').trim().slice(0, 200)
+  if (!r) return { success: false, error: '请填写举报原因' }
+
+  await seedDatabase()
+  const sb = getSupabase()
+
+  // 校验目标存在
+  const table = targetType === 'post' ? 'posts' : 'post_comments'
+  const { data: rows, error: tErr } = await sb.from(table).select('id').eq('id', targetId).limit(1)
+  if (tErr || !rows || rows.length === 0) return { success: false, error: '目标不存在' }
+
+  // 防重复举报（同一用户同一目标多次提交则更新原因）
+  const { data: existing } = await sb.from('post_reports').select('id').eq('target_type', targetType).eq('target_id', targetId).eq('reporter_id', reporterId).limit(1)
+  const now = Date.now()
+  if (existing && existing.length > 0) {
+    const { error: upErr } = await sb.from('post_reports').update({ reason: r, status: 'pending', created_at: now }).eq('id', existing[0].id)
+    if (upErr) return { success: false, error: '举报失败' }
+    return { success: true }
+  }
+
+  const { error } = await sb.from('post_reports').insert({
+    id: genId('pr'),
+    target_type: targetType,
+    target_id: targetId,
+    reporter_id: reporterId,
+    reason: r,
+    created_at: now,
+    status: 'pending',
+  })
+  if (error) return { success: false, error: '举报失败' }
+  return { success: true }
+}
+
 

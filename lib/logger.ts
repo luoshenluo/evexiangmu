@@ -2,7 +2,7 @@
 // 在 Cloudflare Edge 环境下使用 console.log（Workers 日志会自动收集）
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type LogCategory = 'garden' | 'auth' | 'market' | 'chat' | 'season' | 'pest' | 'steal' | 'system' | 'tasks' | 'admin' | 'family' | 'pm'
+export type LogCategory = 'garden' | 'auth' | 'market' | 'chat' | 'season' | 'pest' | 'steal' | 'system' | 'tasks' | 'admin' | 'family' | 'pm' | 'forum'
 
 interface LogEntry {
   level: LogLevel
@@ -33,6 +33,7 @@ const CATEGORY_TAG: Record<LogCategory, string> = {
   admin: '[ADMIN]',
   family: '[FAMILY]',
   pm: '[PM]',
+  forum: '[FORUM]',
 }
 
 function formatLog(entry: LogEntry): string {
