@@ -339,8 +339,13 @@ export default function MiniGamesPage() {
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
             {(() => {
               const total = WHEEL_REWARDS.reduce((s, r) => s + r.weight, 0)
+              const fmtPct = (v: number) => {
+                // 概率 <0.1% 显示 2 位小数（如 0.01%），否则 1 位；去掉尾随零
+                const s = (v >= 0.1 ? v.toFixed(1) : v.toFixed(2)).replace(/\.0+$/, '')
+                return s
+              }
               return WHEEL_REWARDS.map(r => {
-                const pct = ((r.weight / total) * 100).toFixed(1)
+                const pct = fmtPct((r.weight / total) * 100)
                 const isHigh = r.coins >= 200 || r.itemType === 'seed' || r.itemType === 'flower'
                 return (
                   <div key={r.key} className="flex items-center justify-between text-[11px]">
