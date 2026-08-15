@@ -10,7 +10,7 @@ import {
   Settings, Users, MessageSquare, TrendingUp, Gift, Coins, Tag, Plus, X,
   Search, Ban, Crown, Shield, AlertCircle, Bell, Trash2, Edit, Key,
   RefreshCw, Lock, Unlock, UserCheck, UserX, Eye, Leaf, Flower2, Medal, Sparkles, Hammer,
-  ClipboardList
+  ClipboardList, Flag
 } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 import ChatManagement from '@/components/admin/ChatManagement'
@@ -18,6 +18,7 @@ import SensitiveWords from '@/components/admin/SensitiveWords'
 import ChatSettingsPanel from '@/components/admin/ChatSettingsPanel'
 import AdminMarketPanel from '@/components/admin/AdminMarketPanel'
 import TaskManagement from '@/components/admin/TaskManagement'
+import ForumManagement from '@/components/admin/ForumManagement'
 
 // CDK 奖励物品行结构
 interface CDKItemReward {
@@ -40,7 +41,7 @@ const TITLE_OPTIONS: { key: string; label: string }[] = [
   { key: 'checkin_dragon', label: '🐉 签到达人' },
 ]
 
-type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'market' | 'tasks' | 'cdk' | 'permissions' | 'settings'
+type Tab = 'dashboard' | 'users' | 'announcements' | 'chat' | 'sensitive' | 'forum' | 'market' | 'tasks' | 'cdk' | 'permissions' | 'settings'
 
 // 将 Tab 映射到权限位
 const TAB_PERM_BIT: Record<Tab, number | null> = {
@@ -49,6 +50,7 @@ const TAB_PERM_BIT: Record<Tab, number | null> = {
   announcements: 1,
   chat: 2,
   sensitive: 2,
+  forum: 2,       // 论坛管理 - 复用聊天管理权限（社区治理）
   market: 4,
   tasks: 7,       // 任务管理 - 经济调控权限
   cdk: 3,
@@ -456,6 +458,7 @@ export default function AdminPage() {
     { k: 'announcements', label: '公告管理', icon: Bell },
     { k: 'chat', label: '聊天管理', icon: MessageSquare },
     { k: 'sensitive', label: '敏感词库', icon: Shield },
+    { k: 'forum', label: '论坛管理', icon: Flag },
     { k: 'market', label: '市场调控', icon: Tag },
     { k: 'tasks', label: '任务管理', icon: ClipboardList },
     { k: 'cdk', label: 'CDK管理', icon: Gift },
@@ -853,6 +856,8 @@ export default function AdminPage() {
           {tab === 'chat' && <ChatManagement />}
 
           {tab === 'sensitive' && <SensitiveWords />}
+
+          {tab === 'forum' && <ForumManagement />}
 
           {tab === 'market' && (
             <div className="space-y-4">

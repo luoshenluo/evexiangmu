@@ -3247,6 +3247,7 @@ export interface ForumPost {
   commentCount: number
   author?: { id: string; nickname: string; avatar: string }
   liked?: boolean
+  deleted?: boolean
 }
 
 export interface ForumComment {
@@ -3709,6 +3710,164 @@ export async function reportForumTarget(
   })
   if (error) return { success: false, error: '举报失败' }
   return { success: true }
+}
+
+// ==================== 论坛管理（管理员后台） ====================
+
+export interface ForumReportItem {
+  id: string
+  targetType: string
+  targetId: string
+  reporterId: string
+  reason: string
+  createdAt: number
+  status: string
+  reporter?: { id: string; nickname: string; avatar: string }
+  targetTitle?: string   // 帖子标题或评论前 80 字
+  targetUserId?: string  // 被举报内容作者
+  postId?: string
+}
+
+// 举报队列（按状态过滤，默认 pending）
+export async function listForumReports(
+  status: 'pending' | 'handled' | 'dismissed' | 'all' = 'pending',
+  limit = 100,
+): Promise<ForumReportItem[]> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    let query = sb.from('post_reports').select('*').order('created_at', { ascending: false }).limit(limit)
+    if (status !== 'all') query = query.eq('status', status)
+
+    const { data, error } = await query
+    if (error) return []
+
+    const reporterIds = [...new Set((data as any[]).map((r) => r.reporter_id))]
+    const reporters = await getUsersByIds(reporterIds)
+    const targetIds = [...new Set((data as any[]).map((r) => r.target_id))]
+    const targetUsers = await getUsersByIds(targetIds)
+
+    const items: ForumReportItem[] = []
+    for (const r of data as any[]) {
+      const item: ForumReportItem = {
+        id: r.id,
+        targetType: r.target_type,
+        targetId: r.target_id,
+        reporterId: r.reporter_id,
+        reason: r.reason,
+        createdAt: r.created_at,
+        status: r.status,
+        reporter: reporters.get(r.reporter_id),
+      }
+      // 获取目标内容摘要
+      const table = r.target_type === 'post' ? 'posts' : 'post_comments'
+      const { data: tRows } = await sb.from(table).select('title, content, user_id, post_id').eq('id', r.target_id).limit(1)
+      if (tRows && tRows.length > 0) {
+        const t = tRows[0]
+        item.targetUserId = t.user_id
+        if (r.target_type === 'post') {
+          item.targetTitle = t.title
+          item.postId = r.target_id
+        } else {
+          item.targetTitle = (t.content || '').slice(0, 80)
+          item.postId = t.post_id
+        }
+      }
+      items.push(item)
+    }
+    return items
+  } catch (e: any) {
+    logger.warn('forum', `listForumReports 异常: ${e?.message}`)
+    return []
+  }
+}
+
+// 处理举报：status = handled（已处理，可顺带删内容）或 dismissed（驳回）
+export async function handleForumReport(
+  reportId: string,
+  status: 'handled' | 'dismissed',
+  deleteTarget = false,
+): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('post_reports').select('*').eq('id', reportId).limit(1)
+    if (error || !data || data.length === 0) return { success: false, error: '举报不存在' }
+    const report = data[0]
+
+    if (deleteTarget) {
+      const table = report.target_type === 'post' ? 'posts' : 'post_comments'
+      const { error: delErr } = await sb.from(table).update({ deleted: true }).eq('id', report.target_id)
+      if (delErr) return { success: false, error: '删除目标内容失败' }
+    }
+
+    const { error: upErr } = await sb.from('post_reports').update({ status }).eq('id', reportId)
+    if (upErr) return { success: false, error: '更新状态失败' }
+    return { success: true }
+  } catch (e: any) {
+    logger.warn('forum', `handleForumReport 异常: ${e?.message}`)
+    return { success: false, error: '操作失败' }
+  }
+}
+
+// 管理端帖子列表（含已删除）
+export async function listForumPostsAdmin(
+  page = 1,
+  pageSize = 20,
+): Promise<{ items: ForumPost[]; total: number }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb
+      .from('posts')
+      .select('*')
+      .range((page - 1) * pageSize, page * pageSize - 1)
+      .order('created_at', { ascending: false })
+    if (error) return { items: [], total: 0 }
+
+    const { count } = await sb.from('posts').select('id', { count: 'exact', head: true })
+    const userIds = [...new Set((data as any[]).map((p) => p.user_id))]
+    const authors = await getUsersByIds(userIds)
+
+    const items: ForumPost[] = (data as any[]).map((p) => ({
+      id: p.id,
+      userId: p.user_id,
+      title: p.title,
+      content: p.content,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      likeCount: p.like_count ?? 0,
+      commentCount: p.comment_count ?? 0,
+      author: authors.get(p.user_id),
+      deleted: p.deleted,
+    }))
+    return { items, total: count ?? 0 }
+  } catch (e: any) {
+    logger.warn('forum', `listForumPostsAdmin 异常: ${e?.message}`)
+    return { items: [], total: 0 }
+  }
+}
+
+// 论坛统计
+export async function getForumStats(): Promise<{ posts: number; comments: number; reports: number; pendingReports: number }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const out = { posts: 0, comments: 0, reports: 0, pendingReports: 0 }
+  try {
+    const [p, c, r, pr] = await Promise.all([
+      sb.from('posts').select('id', { count: 'exact', head: true }),
+      sb.from('post_comments').select('id', { count: 'exact', head: true }),
+      sb.from('post_reports').select('id', { count: 'exact', head: true }),
+      sb.from('post_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    ])
+    out.posts = p.count ?? 0
+    out.comments = c.count ?? 0
+    out.reports = r.count ?? 0
+    out.pendingReports = pr.count ?? 0
+  } catch {
+    // 表不存在时返回 0
+  }
+  return out
 }
 
 
