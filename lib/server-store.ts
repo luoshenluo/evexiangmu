@@ -1027,6 +1027,94 @@ export async function atomicSpendPetals(userId: string, cost: number): Promise<b
   return data === true
 }
 
+// 原子加金币
+export async function atomicAddCoins(userId: string, amount: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_add_coins', { p_user_id: userId, p_amount: amount })
+  if (error) {
+    logger.warn('system', 'atomicAddCoins 失败', { userId, amount, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子扣金币（余额不足返回 false）
+export async function atomicSpendCoins(userId: string, cost: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_spend_coins', { p_user_id: userId, p_cost: cost })
+  if (error) {
+    logger.warn('system', 'atomicSpendCoins 失败', { userId, cost, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子加花瓣
+export async function atomicAddPetals(userId: string, amount: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_add_petals', { p_user_id: userId, p_amount: amount })
+  if (error) {
+    logger.warn('system', 'atomicAddPetals 失败', { userId, amount, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子扣库存（按 item.id 扣数量，不足返回 false）
+export async function atomicConsumeInventory(userId: string, itemId: string, qty: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_consume_inventory_item', { p_user_id: userId, p_item_id: itemId, p_qty: qty })
+  if (error) {
+    logger.warn('system', 'atomicConsumeInventory 失败', { userId, itemId, qty, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子卖出：扣库存 + 加金币（一步，防复制道具/刷钱）
+export async function atomicSellInventory(userId: string, itemId: string, qty: number, coins: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_sell_inventory_item', { p_user_id: userId, p_item_id: itemId, p_qty: qty, p_coins: coins })
+  if (error) {
+    logger.warn('system', 'atomicSellInventory 失败', { userId, itemId, qty, coins, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 原子加库存（含合并堆叠/背包满检查），返回新库存数组或 null
+export async function atomicAddInventory(userId: string, item: Record<string, any>, inventorySize: number): Promise<any[] | null> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_add_inventory_item', { p_user_id: userId, p_item: item, p_inventory_size: inventorySize })
+  if (error) {
+    logger.warn('system', 'atomicAddInventory 失败', { userId, error: error.message })
+    return null
+  }
+  return data
+}
+
+// 偷花占位（防并发偷同一地块）
+export async function atomicStealClaimPlot(victimId: string, plotId: number, thiefId: string, now: number, cooldown: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_steal_claim_plot', { p_victim_id: victimId, p_plot_id: plotId, p_thief_id: thiefId, p_now: now, p_cooldown: cooldown })
+  if (error) {
+    logger.warn('steal', 'atomicStealClaimPlot 失败', { victimId, plotId, thiefId, error: error.message })
+    return false
+  }
+  return data === true
+}
+
+// 偷花取走：原子移除受害者地块的花并补偿金币
+export async function atomicStealTakeFlower(victimId: string, plotId: number, compensation: number): Promise<boolean> {
+  const sb = getSupabase()
+  const { data, error } = await sb.rpc('atomic_steal_take_flower', { p_victim_id: victimId, p_plot_id: plotId, p_compensation: compensation })
+  if (error) {
+    logger.warn('steal', 'atomicStealTakeFlower 失败', { victimId, plotId, compensation, error: error.message })
+    return false
+  }
+  return data === true
+}
+
 // 原子领取任务：仅当该任务未被领取时标记，防止并发重复领取（防并发刷任务奖励）
 export async function atomicClaimTask(userId: string, taskId: string): Promise<boolean> {
   const sb = getSupabase()
@@ -1712,6 +1800,8 @@ export async function attemptSteal(
   if (!thief || !victim) return { success: false, message: '用户不存在' }
   if (thiefId === victimId) return { success: false, message: '不能偷自己的花' }
 
+  const sb = getSupabase()
+
   logger.info('steal', '偷花尝试', {
     thiefId, thiefName: thief.nickname,
     victimId, victimName: victim.nickname, plotId,
@@ -1745,16 +1835,9 @@ export async function attemptSteal(
     return { success: false, message: '只有成熟的花才能被偷取' }
   }
 
-  // 检查同地块冷却
-  const sb = getSupabase()
-  const { data: stealRecord } = await sb.from('plot_steal_records')
-    .select('*')
-    .eq('victim_id', victimId)
-    .eq('plot_id', plotId)
-    .gt('reset_at', now)
-    .single()
-
-  if (stealRecord) {
+  // 检查同地块冷却 + 原子占位（防并发偷同一地块）
+  const claimed = await atomicStealClaimPlot(victimId, plotId, thiefId, now, STEAL_CONFIG.plotStealCooldown)
+  if (!claimed) {
     return { success: false, message: '该地块今天已经被偷过了' }
   }
 
@@ -1764,7 +1847,7 @@ export async function attemptSteal(
   const success = Math.random() < successRate
 
   if (!success) {
-    // 偷花失败，增加计数
+    // 偷花失败，增加计数（原子加）
     await updateUser(thiefId, {
       stealCountToday: stealCountToday + 1,
       stealResetAt: now + STEAL_CONFIG.plotStealCooldown,
@@ -1782,27 +1865,18 @@ export async function attemptSteal(
     return { success: false, message: '偷花失败！花太牢固了，没能得手' }
   }
 
-  // 偷花成功！
+  // 偷花成功！先原子取走花（防并发双方同时取同一朵）
   const flowerType = FLOWER_TYPES.find(f => f.id === plot.flower!.flowerTypeId)
   if (!flowerType) return { success: false, message: '花朵类型异常' }
 
-  const stolenFlower = plot.flower
-  const flowerName = flowerType.name
-  const flowerEmoji = flowerType.emoji
-
-  // 从受害者地块移除花
-  const victimNewPlots = victim.plots.map(p =>
-    p.id === plotId ? { ...p, flower: null } : p
-  )
-
   // 给受害者补偿金币
-  const sellPrice = getFlowerSellPrice(flowerType, stolenFlower.rank)
+  const sellPrice = getFlowerSellPrice(flowerType, plot.flower!.rank)
   const compensation = Math.floor(sellPrice * STEAL_CONFIG.victimCompensationRate)
 
-  await updateUser(victimId, {
-    plots: victimNewPlots,
-    coins: victim.coins + compensation,
-  })
+  const took = await atomicStealTakeFlower(victimId, plotId, compensation)
+  if (!took) {
+    return { success: false, message: '该地块的花已被偷走了' }
+  }
 
   // 更新偷花者计数
   await updateUser(thiefId, {
@@ -1819,21 +1893,11 @@ export async function attemptSteal(
     victim_id: victimId,
     victim_name: victim.nickname,
     plot_id: plotId,
-    flower_type_id: stolenFlower.flowerTypeId,
-    flower_name: flowerName,
-    flower_emoji: flowerEmoji,
-    rank: stolenFlower.rank,
+    flower_type_id: plot.flower!.flowerTypeId,
+    flower_name: flowerType.name,
+    flower_emoji: flowerType.emoji,
+    rank: plot.flower!.rank,
     stolen_at: now,
-  })
-
-  // 记录地块偷花冷却
-  await sb.from('plot_steal_records').insert({
-    id: genId('psr'),
-    victim_id: victimId,
-    plot_id: plotId,
-    thief_id: thiefId,
-    stolen_at: now,
-    reset_at: now + STEAL_CONFIG.plotStealCooldown,
   })
 
   // 给受害者发通知
@@ -1841,24 +1905,24 @@ export async function attemptSteal(
     userId: victimId,
     type: 'system',
     title: '💔 花被偷了！',
-    content: `${thief.nickname} 偷走了你的 ${flowerEmoji} ${flowerName}！获得补偿 ${compensation} 金币。`,
+    content: `${thief.nickname} 偷走了你的 ${flowerType.emoji} ${flowerType.name}！获得补偿 ${compensation} 金币。`,
   })
 
   logger.warn('steal', '偷花成功', {
     thiefId, thiefName: thief.nickname,
     victimId, victimName: victim.nickname,
-    plotId, flowerType: stolenFlower.flowerTypeId, rank: stolenFlower.rank,
+    plotId, flowerType: plot.flower!.flowerTypeId, rank: plot.flower!.rank,
     compensation,
   })
 
   return {
     success: true,
-    message: `偷花成功！获得 ${flowerEmoji} ${flowerName}（${['黑铁', '青铜', '白银', '黄金', '铂金', '钻石', '传说'][stolenFlower.rank - 1]}）`,
+    message: `偷花成功！获得 ${flowerType.emoji} ${flowerType.name}（${['黑铁', '青铜', '白银', '黄金', '铂金', '钻石', '传说'][plot.flower!.rank - 1]}）`,
     flower: {
-      flowerTypeId: stolenFlower.flowerTypeId,
-      name: flowerName,
-      emoji: flowerEmoji,
-      rank: stolenFlower.rank,
+      flowerTypeId: plot.flower!.flowerTypeId,
+      name: flowerType.name,
+      emoji: flowerType.emoji,
+      rank: plot.flower!.rank,
     },
   }
 }

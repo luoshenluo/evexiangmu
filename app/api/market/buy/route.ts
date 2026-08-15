@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
-import { findListing, removeListing, updateListingQuantity, atomicDecreaseListing, updateUser, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
+import { findListing, removeListing, atomicDecreaseListing, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress, atomicSpendCoins, atomicAddInventory, atomicAddCoins } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOLS } from '@/lib/game-data'
-import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -23,44 +22,37 @@ export async function POST(req: NextRequest) {
     const totalCost = listing.price * quantity
     if (user.coins < totalCost) return jsonResponse(false, null, '金币不足', 400)
 
-    // 添加物品到背包
-    let newInventory = [...user.inventory]
-    for (let i = 0; i < quantity; i++) {
-      let baseInfo: any = null
-      if (listing.itemType === 'flower') {
-        baseInfo = FLOWER_TYPES.find(f => f.id === listing.referenceId)
-      } else if (listing.itemType === 'seed') {
-        baseInfo = SEED_TYPES.find(s => s.id === listing.referenceId)
-      } else if (listing.itemType === 'tool') {
-        baseInfo = TOOLS.find(t => t.id === listing.referenceId)
-      }
-      if (!baseInfo) continue
+    // 原子扣减买家金币（防并发超扣）
+    const spent = await atomicSpendCoins(user.id, totalCost)
+    if (!spent) return jsonResponse(false, null, '金币不足', 400)
 
-      const existing = newInventory.find(
-        it => it.type === listing.itemType
-          && it.referenceId === listing.referenceId
-          && (listing.itemType !== 'flower' || it.rank === (listing.rank || 1))
-          && it.quantity < it.maxStack
-      )
-      if (existing) {
-        newInventory = newInventory.map(it => it.id === existing.id ? { ...it, quantity: it.quantity + 1 } : it)
-      } else {
-        if (newInventory.filter(it => it.quantity > 0).length >= user.inventorySize) {
-          return jsonResponse(false, null, '背包已满，请先清理或扩容', 400)
-        }
-        newInventory.push({
-          id: `inv_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 5)}`,
-          type: listing.itemType,
-          referenceId: listing.referenceId,
-          name: listing.name,
-          emoji: listing.emoji,
-          rank: listing.itemType === 'flower' ? listing.rank : undefined,
-          quantity: 1,
-          maxStack: 99,
-          sellable: listing.itemType !== 'seed',
-          tradeable: true,
-        })
-      }
+    // 原子添加物品到背包（含合并堆叠/背包满检查，防并发覆盖库存）
+    const baseInfo: any = listing.itemType === 'flower'
+      ? FLOWER_TYPES.find(f => f.id === listing.referenceId)
+      : listing.itemType === 'seed'
+        ? SEED_TYPES.find(s => s.id === listing.referenceId)
+        : TOOLS.find(t => t.id === listing.referenceId)
+    if (!baseInfo) {
+      await atomicAddCoins(user.id, totalCost).catch(() => {})
+      return jsonResponse(false, null, '物品数据异常', 400)
+    }
+
+    const newInv = await atomicAddInventory(user.id, {
+      type: listing.itemType,
+      referenceId: listing.referenceId,
+      name: listing.name,
+      emoji: listing.emoji,
+      rank: listing.itemType === 'flower' ? listing.rank : undefined,
+      quantity,
+      maxStack: 99,
+      sellable: listing.itemType !== 'seed',
+      tradeable: true,
+    }, user.inventorySize)
+
+    // 背包满：退款
+    if (!newInv) {
+      await atomicAddCoins(user.id, totalCost).catch(() => {})
+      return jsonResponse(false, null, '背包已满，请先清理或扩容', 400)
     }
 
     // 更新 listing 库存（原子扣减，防并发超卖）——必须在任何发奖/扣款之前
@@ -82,7 +74,7 @@ export async function POST(req: NextRequest) {
       const seller = await findUserById(listing.sellerId)
       if (seller) {
         const sellerCoins = Math.floor(totalCost * 0.95) // 5% 手续费
-        await updateUser(seller.id, { coins: seller.coins + sellerCoins })
+        await atomicAddCoins(seller.id, sellerCoins)
 
         // 卖家任务：贸易达人（日） + 周常富豪（累计获得金币）
         try { await incrementTaskProgress(seller.id, 'trade', 1) } catch {}
@@ -90,10 +82,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const updatedUser = await updateUser(user.id, {
-      coins: user.coins - totalCost,
-      inventory: newInventory.filter(i => i.quantity > 0 || true),
-    })
+    const updatedUser = await findUserById(user.id)
 
     await createNotification({
       userId: user.id,

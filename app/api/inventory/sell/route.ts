@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick, getBuyOrders } from '@/lib/server-store'
-import { FLOWER_TYPES, SEED_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { findUserById, ensureSeasonTick, atomicSellInventory } from '@/lib/server-store'
+import { FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
 
     const { itemId, quantity } = await req.json()
     if (!itemId || !quantity) return jsonResponse(false, null, '参数错误', 400)
+    if (!Number.isInteger(quantity) || quantity < 1) return jsonResponse(false, null, '数量无效', 400)
 
     const item = user.inventory.find(i => i.id === itemId)
     if (!item || item.quantity < quantity || !item.sellable) {
@@ -36,12 +37,12 @@ export async function POST(req: NextRequest) {
 
     const coinsEarned = price * quantity
 
-    const newInv = user.inventory.map(i =>
-      i.id === itemId ? { ...i, quantity: i.quantity - quantity } : i
-    ).filter(i => i.quantity > 0)
+    // 原子卖出：扣库存 + 加金币一步完成，防并发复制道具/刷金币
+    const ok = await atomicSellInventory(user.id, itemId, quantity, coinsEarned)
+    if (!ok) return jsonResponse(false, null, '物品不可出售或数量不足', 400)
 
-    const updated = await updateUser(user.id, { coins: user.coins + coinsEarned, inventory: newInv })
-    return jsonResponse(true, { user: sanitizeUser(updated), coinsEarned })
+    const fresh = await findUserById(user.id)
+    return jsonResponse(true, { user: fresh ? sanitizeUser(fresh) : null, coinsEarned })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
   }

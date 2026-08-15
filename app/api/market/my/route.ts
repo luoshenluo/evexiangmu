@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import {
-  findUserById, updateUser,
+  findUserById,
   createListing, removeListing, findListing,
-  removeInventoryItem, addInventoryItem,
+  removeInventoryItem,
   createNotification,
   createBuyOrder, getBuyOrders, removeBuyOrder, findBuyOrder,
+  atomicConsumeInventory, atomicAddInventory, atomicSpendCoins, atomicAddCoins,
 } from '@/lib/server-store'
 import { authRequest, jsonResponse } from '@/lib/auth'
 import type { InventoryItem } from '@/lib/types'
@@ -71,9 +72,9 @@ async function handleCreateListing(user: any, body: any) {
   if (price < minPrice) return jsonResponse(false, null, `单价过低（最低 ${minPrice} 金币）`, 400)
   if (price > minPrice * 50) return jsonResponse(false, null, `单价过高（最高 ${minPrice * 50} 金币）`, 400)
 
-  // 从背包扣除
-  const [newInv, removed] = removeInventoryItem(user.inventory, itemType, referenceId, rank, quantity)
-  if (removed < quantity) return jsonResponse(false, null, '背包数量校验失败', 400)
+  // 从背包扣除（原子，防并发复制道具）
+  const consumed = await atomicConsumeInventory(user.id, item.id, quantity)
+  if (!consumed) return jsonResponse(false, null, '背包数量校验失败', 400)
 
   // 创建挂售
   const listing = await createListing({
@@ -89,9 +90,7 @@ async function handleCreateListing(user: any, body: any) {
     quantity,
   })
 
-  await updateUser(user.id, { inventory: newInv })
-
-  return jsonResponse(true, { listing, newInventory: newInv })
+  return jsonResponse(true, { listing })
 }
 
 // 下架自己的挂售
@@ -103,29 +102,25 @@ async function handleCancelListing(user: any, body: any) {
   if (!listing) return jsonResponse(false, null, '挂售不存在', 404)
   if (listing.sellerId !== user.id) return jsonResponse(false, null, '只能下架自己的挂售', 403)
 
-  // 归还物品到背包
-  try {
-    const newInventory = addInventoryItem(
-      user.inventory,
-      {
-        type: listing.itemType as any,
-        referenceId: listing.referenceId,
-        name: listing.name,
-        emoji: listing.emoji,
-        rank: listing.rank as any,
-        quantity: listing.quantity,
-        maxStack: 99,
-        sellable: true,
-        tradeable: true,
-      },
-      user.inventorySize,
-    )
-    await removeListing(id)
-    await updateUser(user.id, { inventory: newInventory })
-    return jsonResponse(true, { newInventory })
-  } catch (e: any) {
-    return jsonResponse(false, null, e.message || '下架失败', 400)
-  }
+  // 归还物品到背包（原子加库存，防并发覆盖）
+  const newInventory = await atomicAddInventory(
+    user.id,
+    {
+      type: listing.itemType as any,
+      referenceId: listing.referenceId,
+      name: listing.name,
+      emoji: listing.emoji,
+      rank: listing.rank as any,
+      quantity: listing.quantity,
+      maxStack: 99,
+      sellable: true,
+      tradeable: true,
+    },
+    user.inventorySize,
+  )
+  if (!newInventory) return jsonResponse(false, null, '背包已满，请先清理或扩容', 400)
+  await removeListing(id)
+  return jsonResponse(true, { newInventory })
 }
 
 // 玩家发布收购单（我出金币收物品）
@@ -155,8 +150,9 @@ async function handleCreateBuyOrder(user: any, body: any) {
   }
   if (price > maxPrice) return jsonResponse(false, null, `收购价过高（最多 ${maxPrice} 金币/件）`, 400)
 
-  // 锁定金币
-  await updateUser(user.id, { coins: user.coins - total })
+  // 锁定金币（原子扣减，防并发超扣）
+  const spent = await atomicSpendCoins(user.id, total)
+  if (!spent) return jsonResponse(false, null, '金币不足，无法发布收购单（已锁定所需金币）', 400)
 
   const order = await createBuyOrder({
     buyerId: user.id,
@@ -190,8 +186,8 @@ async function handleCancelOrder(user: any, body: any) {
 
   const refund = order.price * order.quantity
   await removeBuyOrder(id)
-  const u = await findUserById(user.id)
-  if (u) await updateUser(user.id, { coins: u.coins + refund })
+  // 原子退还金币
+  await atomicAddCoins(user.id, refund)
 
   await createNotification({
     userId: user.id,

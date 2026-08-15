@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import {
-  updateUser, findUserById, ensureSeasonTick, getBuyOrders,
-  updateBuyOrderQuantity, atomicDecreaseBuyOrder, addInventoryItem, createNotification, incrementTaskProgress,
+  findUserById, ensureSeasonTick, getBuyOrders,
+  atomicDecreaseBuyOrder, atomicSellInventory, atomicAddInventory, createNotification, incrementTaskProgress,
 } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
@@ -37,18 +37,19 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, '收购单数量不足，请重试', 409)
     }
 
-    // 扣除背包物品
-    const newInventory = user.inventory.map(i =>
-      i.id === inventoryItemId ? { ...i, quantity: i.quantity - quantity } : i
-    ).filter(i => i.quantity > 0)
+    // 原子卖出：扣背包 + 加金币一步完成（防并发复制道具/刷金币）
+    const sold = await atomicSellInventory(user.id, inventoryItemId, quantity, coinsEarned)
+    if (!sold) {
+      return jsonResponse(false, null, '背包中没有该物品', 400)
+    }
 
     // 玩家收购单：物品直接送入买家背包；金币已经在创建收购单时锁定，因此这里不再扣买家金币
     if (!order.isOfficial && order.buyerId !== 'system') {
       const buyer = await findUserById(order.buyerId)
       if (buyer) {
         try {
-          const buyerInv = addInventoryItem(
-            buyer.inventory,
+          const buyerInv = await atomicAddInventory(
+            buyer.id,
             {
               type: order.itemType as any,
               referenceId: order.referenceId,
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
             },
             buyer.inventorySize,
           )
-          await updateUser(buyer.id, { inventory: buyerInv })
+          if (!buyerInv) throw new Error('背包已满')
           await createNotification({
             userId: buyer.id,
             type: 'trade',
@@ -82,10 +83,7 @@ export async function POST(req: NextRequest) {
 
     // 更新收购单剩余数量（已在前面通过 atomicDecreaseBuyOrder 原子扣减）
 
-    const updated = await updateUser(user.id, {
-      coins: user.coins + coinsEarned,
-      inventory: newInventory,
-    })
+    const updated = await findUserById(user.id)
 
     await createNotification({
       userId: user.id,

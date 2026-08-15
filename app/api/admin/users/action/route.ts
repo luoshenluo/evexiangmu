@@ -19,6 +19,10 @@ export async function POST(req: Request) {
     if (newPassword) {
       if (!userHasPermission(admin, 0)) return jsonResponse(false, null, '无「用户管理」权限', 403)
       if (newPassword.length < 4) return jsonResponse(false, null, '密码至少4位', 400)
+      // 非超管不能重置超管密码（防子管理员接管）
+      if (!isSuperAdmin(admin.id) && isSuperAdmin(target.id)) {
+        return jsonResponse(false, null, '不能修改超级管理员密码', 403)
+      }
       updates.password = bcrypt.hashSync(newPassword, 10)
     }
 
@@ -34,7 +38,15 @@ export async function POST(req: Request) {
       if (makeAdmin) {
         // 首次任命管理员时：如果前端没有传 adminPermissions，给默认基础权限 0b0000_0111 = Bit0+Bit1+Bit2
         if (adminPermissions === undefined) {
-          updates.adminPermissions = (1 | 2 | 4)
+          // 非超管只能授予自己拥有的权限位
+          if (!isSuperAdmin(admin.id)) {
+            const mine = (admin.adminPermissions ?? 0) & 0xff
+            const base = (1 | 2 | 4) & mine
+            if (base === 0) return jsonResponse(false, null, '不能授予自己未拥有的权限', 403)
+            updates.adminPermissions = base
+          } else {
+            updates.adminPermissions = (1 | 2 | 4)
+          }
         }
       } else {
         // 撤管时清除权限位
@@ -47,6 +59,18 @@ export async function POST(req: Request) {
       if (!userHasPermission(admin, 5)) return jsonResponse(false, null, '无「权限管理」权限', 403)
       if (!isSuperAdmin(admin.id) && isSuperAdmin(target.id)) {
         return jsonResponse(false, null, '不能修改超级管理员权限', 403)
+      }
+      // 非超管不能修改自己的权限位（防子管理员给自己提升权限/自封经济调控）
+      if (!isSuperAdmin(admin.id) && target.id === admin.id) {
+        return jsonResponse(false, null, '不能修改自己的权限', 403)
+      }
+      // 非超管只能授予自己已拥有的权限位（防子管理员越权授权经济调控/权限管理等）
+      if (!isSuperAdmin(admin.id)) {
+        const mine = (admin.adminPermissions ?? 0) & 0xff
+        const granted = Number(adminPermissions) & 0xff
+        if ((granted & ~mine) !== 0) {
+          return jsonResponse(false, null, '不能授予自己未拥有的权限', 403)
+        }
       }
       // 权限位只允许低 8 位
       const masked = Number(adminPermissions) & 0xff
