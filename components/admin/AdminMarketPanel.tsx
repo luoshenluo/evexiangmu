@@ -113,6 +113,24 @@ export default function AdminMarketPanel() {
     } finally { setLoading(false) }
   }
 
+  const resetPrices = async () => {
+    if (!window.confirm('确定一键恢复默认价格？当前所有价格覆盖将清空，恢复游戏默认定价。')) return
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/admin/market', {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'set-price-overrides',
+          overrides: { flowers: null, seeds: null, tools: null, feeRate: null, minListPrice: null, maxListPrice: null },
+        }),
+      })
+      if (res.success) {
+        showToast('已恢复默认价格', 'success')
+        setRefresher((k) => k + 1)
+      } else showToast(res.error || '恢复失败', 'error')
+    } finally { setLoading(false) }
+  }
+
   const removeListing = async (id: string) => {
     if (!confirm('确定下架该官方商品？')) return
     setLoading(true)
@@ -447,7 +465,10 @@ export default function AdminMarketPanel() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button onClick={resetPrices} disabled={loading} className="btn-secondary py-2.5 px-5 text-rose-600 hover:bg-rose-50">
+              一键恢复默认
+            </button>
             <button onClick={savePrices} disabled={loading} className="btn-primary py-2.5 px-5">
               {loading ? '保存中...' : '保存价格调控'}
             </button>
