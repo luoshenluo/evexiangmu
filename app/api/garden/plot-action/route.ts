@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick, createNotification, incrementTaskProgress, getFlowerSellPriceEffective } from '@/lib/server-store'
+import { updateUser, ensureSeasonTick, createNotification, incrementTaskProgress, getFlowerSellPriceEffective, getToolPriceEffective } from '@/lib/server-store'
 import { FLOWER_TYPES, TOOLS, PEST_CONFIG } from '@/lib/game-data'
 import type { InventoryItem, PlantedFlower } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
@@ -154,11 +154,12 @@ export async function POST(req: NextRequest) {
       // 允许直接扣除金币购买使用
       const tool = TOOLS.find(t => t.id === toolId)
       if (!tool) return jsonResponse(false, null, '道具不足，请先购买', 400)
-      if (user.coins < tool.price) {
+      const toolPrice = await getToolPriceEffective(toolId)
+      if (user.coins < toolPrice) {
         return jsonResponse(false, null, `道具不足（${tool.name}），且金币不够购买`, 400)
       }
-      logger.info('garden', '道具不足，使用金币购买', { userId: user.id, toolId, toolPrice: tool.price })
-      coins = user.coins - tool.price
+      logger.info('garden', '道具不足，使用金币购买', { userId: user.id, toolId, toolPrice })
+      coins = user.coins - toolPrice
       return await executeAction(user, plotId, action, user.inventory, coins, gs.currentSeason)
     }
 

@@ -41,8 +41,28 @@ export default function Plot({ plot, onUpdate }: Props) {
   const [showPlant, setShowPlant] = useState(false)
   const [showActions, setShowActions] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [toolPrices, setToolPrices] = useState<Record<string, number>>({})
   const flower = plot.flower
   const flowerType = flower ? FLOWER_TYPES.find(f => f.id === flower.flowerTypeId) : null
+
+  // 拉取应用了后台价格覆盖后的有效工具价（与后端扣费口径一致）
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/market/prices').then(res => {
+      if (!alive || !res.success || !res.data) return
+      const t: Record<string, number> = {}
+      for (const [id, v] of Object.entries(res.data.tools || {})) t[id] = (v as any)?.price ?? 0
+      setToolPrices(t)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  // 工具的单价（优先覆盖价，回退静态价）
+  const effToolPrice = (toolId: string): number => {
+    const over = toolPrices[toolId]
+    if (over && over > 0) return over
+    return TOOLS.find(t => t.id === toolId)?.price ?? 0
+  }
 
   // 从背包获取指定工具的剩余数量
   const getToolCount = (toolRefId: string) => {
@@ -342,7 +362,7 @@ export default function Plot({ plot, onUpdate }: Props) {
                             'text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full',
                             hasTool ? 'bg-white/80 text-slate-700' : 'bg-amber-50 text-amber-700'
                           )}>
-                            {hasTool ? `剩余 ${cnt}` : `💰${tool.price}/次`}
+                            {hasTool ? `剩余 ${cnt}` : `💰${effToolPrice(toolId)}/次`}
                           </span>
                         </button>
                       )
@@ -360,7 +380,7 @@ export default function Plot({ plot, onUpdate }: Props) {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="text-[11px] text-amber-800">
                           <span className="font-bold">💡 道具不足：</span>
-                          {lacking.map(x => `${x.tool.name}（${x.tool.price}💰）`).join(' · ')}
+                          {lacking.map(x => `${x.tool.name}（${effToolPrice(x.tool.id)}💰）`).join(' · ')}
                           ，无道具时将直接扣除金币使用；也可前往市场购买入背包。
                         </div>
                         <button
