@@ -4,6 +4,34 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter'
 
 export type RankLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
+// 种子阶级（决定杂交升级路径）
+export type SeedTier = 'black_iron' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'legend'
+
+export const SeedTierNames: Record<SeedTier, string> = {
+  black_iron: '黑铁',
+  bronze: '青铜',
+  silver: '白银',
+  gold: '黄金',
+  platinum: '铂金',
+  diamond: '钻石',
+  legend: '传说',
+}
+
+// 种子阶级顺序（0=最低，6=最高），用于杂交阶梯升级判断
+export const SEED_TIER_ORDER: SeedTier[] = [
+  'black_iron', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'legend',
+]
+
+export const SEED_TIER_INDEX: Record<SeedTier, number> = {
+  black_iron: 0,
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 4,
+  diamond: 5,
+  legend: 6,
+}
+
 export const RankNames: Record<RankLevel, string> = {
   1: '黑铁',
   2: '青铜',
@@ -43,6 +71,9 @@ export interface SeedType {
   emoji: string
   price: number
   description: string
+  season: Season[]      // 可种植季节
+  tier: SeedTier        // 种子阶级
+  officialSell: boolean // 是否官方售卖（仅基础种子）
 }
 
 export interface PlantedFlower {

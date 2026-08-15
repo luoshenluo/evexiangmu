@@ -496,16 +496,15 @@ async function doSeed(): Promise<void> {
     is_system: true,
   })
 
-  // 官方挂售
+  // 官方挂售（只卖基础种子 + 工具，官方价比种植处便宜）
   const listings: Record<string, any>[] = [
-    { id: 'l1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_rose', name: '玫瑰种子', emoji: '🌱', price: 18, quantity: 99, created_at: now - 100000 },
-    { id: 'l2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_tulip', name: '郁金香种子', emoji: '🌱', price: 15, quantity: 99, created_at: now - 90000 },
-    { id: 'l3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_daisy', name: '雏菊种子', emoji: '🌱', price: 8, quantity: 99, created_at: now - 80000 },
-    { id: 'l4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'flower', reference_id: 'sunflower', name: '向日葵', emoji: '🌻', rank: 3, price: 45, quantity: 5, created_at: now - 70000 },
-    { id: 'l_t1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'watering_can', name: '水壶', emoji: '💧', price: 10, quantity: 99, created_at: now - 65000 },
-    { id: 'l_t2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'fertilizer', name: '化肥', emoji: '🧪', price: 25, quantity: 99, created_at: now - 60000 },
-    { id: 'l_t3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'pesticide', name: '除虫剂', emoji: '🧴', price: 30, quantity: 99, created_at: now - 55000 },
-    { id: 'l_t4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'speedup_card', name: '加速卡', emoji: '⚡', price: 100, quantity: 50, created_at: now - 50000 },
+    { id: 'l1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_tulip', name: '郁金香种子', emoji: '🌱', price: 12, quantity: 99, created_at: now - 100000 },
+    { id: 'l2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_daisy', name: '雏菊种子', emoji: '🌱', price: 6, quantity: 99, created_at: now - 90000 },
+    { id: 'l3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', price: 10, quantity: 99, created_at: now - 80000 },
+    { id: 'l_t1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'watering_can', name: '水壶', emoji: '💧', price: 5, quantity: 99, created_at: now - 65000 },
+    { id: 'l_t2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'fertilizer', name: '化肥', emoji: '🧪', price: 8, quantity: 99, created_at: now - 60000 },
+    { id: 'l_t3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'pesticide', name: '除虫剂', emoji: '🧴', price: 10, quantity: 99, created_at: now - 55000 },
+    { id: 'l_t4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'speedup_card', name: '加速卡', emoji: '⚡', price: 30, quantity: 50, created_at: now - 50000 },
   ]
   for (const l of listings) {
     await sb.from('listings').upsert(l)
@@ -626,12 +625,11 @@ export async function createUser(data: { username: string; password: string; nic
     last_login: now,
     plots: createInitialPlots(1),
     inventory: [
+      // 新用户赠送：3 种官方基础种子各 3 颗 + 除虫剂 ×5
       { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-      { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 2, maxStack: 99, sellable: false, tradeable: true },
-      { id: 'inv_t1', type: 'tool', referenceId: 'watering_can', name: '水壶', emoji: '💧', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
-      { id: 'inv_t2', type: 'tool', referenceId: 'fertilizer',   name: '化肥', emoji: '🧪', quantity: 3, maxStack: 99, sellable: true, tradeable: true },
-      { id: 'inv_t3', type: 'tool', referenceId: 'pesticide',    name: '除虫剂', emoji: '🧴', quantity: 2, maxStack: 99, sellable: true, tradeable: true },
-      { id: 'inv_t4', type: 'tool', referenceId: 'speedup_card', name: '加速卡', emoji: '⚡', quantity: 1, maxStack: 99, sellable: true, tradeable: true },
+      { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
+      { id: 'inv_s3', type: 'seed', referenceId: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
+      { id: 'inv_t1', type: 'tool', referenceId: 'pesticide', name: '除虫剂', emoji: '🧴', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
     ],
     inventory_size: 5,
     is_admin: false,
