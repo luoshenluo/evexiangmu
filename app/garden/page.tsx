@@ -160,43 +160,49 @@ export default function GardenPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
-      {/* 顶部状态栏 */}
-      <div className="card p-3 mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-garden-400 to-garden-600 flex items-center justify-center text-xl shadow-md shadow-garden-200">
-            {user.avatar || '🌱'}
-          </div>
-          <div>
-            <div className="font-bold text-slate-800">{user.nickname}</div>
+      {/* 顶部 HUD：一行内 头像/昵称/副标题 + 金币 + 快捷入口（地块进首屏） */}
+      <div className="flex items-center gap-2.5 pb-3 mb-2 border-b border-dashed border-slate-200">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-garden-300 to-garden-500 flex items-center justify-center text-xl shadow-sm flex-shrink-0">
+          {user.avatar || '🌱'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-slate-800 truncate">{user.nickname}</div>
+          <div className="text-[11px] text-slate-500 truncate">
+            {unlockedCount} 块花田 · 种植 {plantedCount} 朵
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/inventory" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center">
-            <Package size={20} className="text-slate-600" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-bold">
-              {user.inventory.filter(i => i.quantity > 0).length}
-            </span>
-          </Link>
-          <Link href="/profile" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center">
-            <Bell size={20} className="text-slate-600" />
-            {announcements.filter(a => a.priority === 'urgent').length > 0 && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
+        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold flex-shrink-0">
+          <Coins size={15} /> {formatNumber(user.coins)}
+        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Link href="/inventory" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="背包">
+            <Package size={18} />
+            {user.inventory.filter(i => i.quantity > 0).length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center px-0.5 font-bold">
+                {user.inventory.filter(i => i.quantity > 0).length}
+              </span>
             )}
           </Link>
-          <Link href="/visit" className="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors min-h-[44px] flex items-center justify-center" title="访问好友花园">
-            <Users size={20} className="text-slate-600" />
+          <Link href="/profile" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="消息与公告">
+            <Bell size={18} />
+            {announcements.filter(a => a.priority === 'urgent').length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
+            )}
+          </Link>
+          <Link href="/visit" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="访问好友花园">
+            <Users size={18} />
           </Link>
         </div>
       </div>
 
-      {/* 重要公告 */}
-      {loaded && announcements.filter(a => a.priority === 'urgent' || a.priority === 'important').slice(0, 2).map((a) => (
+      {/* 重要公告：手账左侧强调条 */}
+      {loaded && announcements.filter(a => a.priority === 'urgent' || a.priority === 'important').slice(0, 1).map((a) => (
         <div
           key={a.id}
-          className={`mb-3 px-3 py-2 rounded-xl text-xs flex items-start gap-2 ${
+          className={`mb-3 px-3 py-2 rounded-lg text-xs flex items-start gap-2 border-l-4 ${
             a.priority === 'urgent'
-              ? 'bg-amber-50 border border-amber-200 text-amber-800'
-              : 'bg-blue-50 border border-blue-200 text-blue-800'
+              ? 'bg-amber-50/80 border-amber-400 text-amber-800'
+              : 'bg-blue-50/80 border-blue-400 text-blue-800'
           }`}
         >
           <Sparkles size={14} className="flex-shrink-0 mt-0.5" />
@@ -207,60 +213,29 @@ export default function GardenPage() {
         </div>
       ))}
 
-      {/* 金币 + 季节 */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="card p-3 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center shadow-md shadow-amber-200">
-            <Coins size={20} className="text-white" />
-          </div>
-          <div>
-            <div className="text-[11px] text-slate-500">金币</div>
-            <div className="text-lg font-bold text-amber-600">{formatNumber(user.coins)}</div>
-          </div>
-        </div>
-        {/* 季节：统一加白色半透明底层 + 深色文字，保证任意渐变背景下都清晰可读 */}
-        <div className={`card p-0 overflow-hidden bg-gradient-to-br ${
-          SEASON_COLORS[currentSeason] || SEASON_COLORS.spring
-        }`}>
-          <div className="p-3 flex items-center gap-3 bg-white/55 backdrop-blur-[1px] text-slate-900">
-            <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
-              <Sun size={20} className="text-amber-600" />
-            </div>
-            <div>
-              <div className="text-[11px] text-slate-600/90">当前季节</div>
-              <div className="text-lg font-bold text-slate-900">
-                {SEASON_NAMES[currentSeason] || '春季'}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* 季节 + 统计：一行轻量信息带 */}
+      <div className="flex items-center gap-2 mb-3 px-0.5 text-[11px] text-slate-500 flex-wrap">
+        <span className="flex items-center gap-1 font-medium text-amber-600">
+          <Sun size={13} /> {SEASON_NAMES[currentSeason] || '春季'}
+        </span>
+        <span className="text-slate-300">|</span>
+        <span>已解锁 <b className="text-garden-700">{unlockedCount}/30</b></span>
+        <span className="text-slate-300">|</span>
+        <span>种植中 <b className="text-garden-700">{plantedCount}</b></span>
+        <span className="text-slate-300">|</span>
+        <span>背包 <b className="text-garden-700">{user.inventorySize}格</b></span>
       </div>
 
-      {/* 统计信息 */}
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-        <div className="card py-2 px-2">
-          <div className="text-xs text-slate-500">已解锁</div>
-          <div className="text-sm font-bold text-garden-700">{unlockedCount}/30</div>
-        </div>
-        <div className="card py-2 px-2">
-          <div className="text-xs text-slate-500">种植中</div>
-          <div className="text-sm font-bold text-garden-700">{plantedCount}</div>
-        </div>
-        <div className="card py-2 px-2">
-          <div className="text-xs text-slate-500">背包</div>
-          <div className="text-sm font-bold text-garden-700">{user.inventorySize}格</div>
-        </div>
-      </div>
-
-      {/* 花园标题 */}
+      {/* 花园标题：手账 plaque 虚线延展 */}
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+        <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2 flex-1 min-w-0">
           🌳 我的花园
-          <span className="text-xs font-normal text-slate-400">
+          <span className="flex-1 border-b border-dashed border-slate-200 translate-y-[-2px]" />
+          <span className="text-xs font-normal text-slate-400 flex-shrink-0">
             第 {page + 1} / {totalPages} 页
           </span>
         </h1>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 ml-2">
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
@@ -279,7 +254,7 @@ export default function GardenPage() {
       </div>
 
       {/* 九宫格地块 */}
-      <div className={classNames('rounded-2xl p-3 bg-gradient-to-br shadow-inner relative overflow-hidden', bgClass, bgIsDark ? 'text-white' : '')}>
+      <div className={classNames('rounded-2xl p-3 border border-slate-200/70 shadow-sm bg-gradient-to-br relative overflow-hidden', bgClass, bgIsDark ? 'text-white' : '')}>
         <div className="absolute inset-0 opacity-30 pointer-events-none bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.4),transparent_40%),radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.25),transparent_45%)]" />
         <div className="grid grid-cols-3 gap-2.5 relative">
           {Array.from({ length: plotsPerPage }).map((_, i) => {
