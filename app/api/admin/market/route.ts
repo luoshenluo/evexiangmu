@@ -4,10 +4,24 @@ import {
   getPriceOverrides, setPriceOverrides,
   getListingItems, removeListingExt, createAdminListing,
   getAllFamilies, logAdminAction, getEconomyStats, listAdminLogs,
+  getSeedConfigs, setSeedOverride, getSeedOverrides,
+  getBouquetPriceOverrides, setBouquetPriceOverride,
 } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES } from '@/lib/game-data'
+import { getTodayBouquetPrices, BOUQUET_PRICE_RANGES, RANK_CN } from '@/lib/bouquet-config'
 
 export const runtime = 'edge'
+
+// 种子阶级下拉选项（全中文）
+const SEED_TIER_CN_OPTIONS = [
+  { key: 'black_iron', label: '黑铁' },
+  { key: 'bronze', label: '青铜' },
+  { key: 'silver', label: '白银' },
+  { key: 'gold', label: '黄金' },
+  { key: 'platinum', label: '铂金' },
+  { key: 'diamond', label: '钻石' },
+  { key: 'legend', label: '传说' },
+]
 
 // 管理员：市场价格调控、官方商品上下架、统计等
 export async function GET(req: NextRequest) {
@@ -51,6 +65,26 @@ export async function GET(req: NextRequest) {
       return jsonResponse(true, { ...stats, familyCount: families.length })
     }
 
+    if (action === 'seed-manage') {
+      const configs = await getSeedConfigs()
+      const overrides = await getSeedOverrides()
+      return jsonResponse(true, {
+        seeds: configs,
+        overrides,
+        tierOptions: SEED_TIER_CN_OPTIONS,
+      })
+    }
+
+    if (action === 'bouquet-prices') {
+      const overrides = await getBouquetPriceOverrides()
+      const today = getTodayBouquetPrices(overrides as any)
+      return jsonResponse(true, {
+        today,
+        ranges: BOUQUET_PRICE_RANGES,
+        rankNames: RANK_CN,
+      })
+    }
+
     if (action === 'override-history') {
       const logs = await listAdminLogs({ action: 'market_price', limit: 50 })
       return jsonResponse(true, { items: logs.items })
@@ -74,6 +108,32 @@ export async function POST(req: NextRequest) {
       | 'set-price-overrides'
       | 'create-official-listing'
       | 'remove-official-listing'
+      | 'update-seed'
+      | 'update-bouquet-price'
+
+    if (mode === 'update-seed') {
+      const { seedId, season, tier, price, officialSell } = body
+      if (!seedId) return jsonResponse(false, null, '缺少种子ID', 400)
+      const res = await setSeedOverride(admin.id, seedId, {
+        season: season !== undefined ? season : undefined,
+        tier: tier !== undefined ? tier : undefined,
+        price: price !== undefined ? Number(price) : undefined,
+        officialSell: officialSell !== undefined ? !!officialSell : undefined,
+      })
+      if (!res.success) return jsonResponse(false, null, res.error, 400)
+      await logAdminAction(admin, 'seed_edit', { targetType: 'other', targetId: seedId, detail: { desc: `修改种子配置 ${seedId}` } })
+      return jsonResponse(true, { ok: true })
+    }
+
+    if (mode === 'update-bouquet-price') {
+      // 覆盖今日某等级花束价格
+      const { rank, price } = body
+      if (!rank || !price) return jsonResponse(false, null, '参数缺失', 400)
+      const r = await setBouquetPriceOverride(admin.id, Number(rank) as any, Number(price))
+      if (!r.success) return jsonResponse(false, null, r.error, 400)
+      await logAdminAction(admin, 'bouquet_price', { targetType: 'other', detail: { desc: `覆盖花束价 rank${rank} → ${price}` } })
+      return jsonResponse(true, { ok: true })
+    }
 
     if (mode === 'set-price-overrides') {
       // overrides 形状： { flowers:{[id]:{baseSellPrice, seedPrice}}, seeds:{[id]:{price}}, tools:{[id]:{price}}, feeRate, minListPrice, maxListPrice }

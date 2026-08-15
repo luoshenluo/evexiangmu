@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch, classNames, formatDateTime, formatNumber } from '@/lib/utils'
-import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart, BarChart3, History } from 'lucide-react'
+import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart, BarChart3, History, Sprout, Flower } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
-type SubTab = 'overview' | 'prices' | 'official' | 'player'
+type SubTab = 'overview' | 'prices' | 'official' | 'player' | 'seeds' | 'bouquet'
 
 export default function AdminMarketPanel() {
   const { showToast } = useAppStore()
@@ -38,15 +38,24 @@ export default function AdminMarketPanel() {
   const [newQty, setNewQty] = useState<number>(999)
   const [newRank, setNewRank] = useState<number>(1)
   const [refresher, setRefresher] = useState(0)
+  // 种子管理
+  const [seedManage, setSeedManage] = useState<any[]>([])
+  const [seedOverrides, setSeedOverrides] = useState<any>({})
+  const [tierOptions, setTierOptions] = useState<{ key: string; label: string }[]>([])
+  // 花束价格
+  const [bouquetPrices, setBouquetPrices] = useState<{ today: any; ranges: any; rankNames: any } | null>(null)
+  const [bqEdits, setBqEdits] = useState<Record<string, string>>({})
 
   const refresh = async () => {
     setLoading(true)
     try {
-      const [p, m, e, h] = await Promise.all([
+      const [p, m, e, h, s, bp] = await Promise.all([
         apiFetch('/api/admin/market?action=price-overrides'),
         apiFetch('/api/admin/market?action=market-items'),
         apiFetch('/api/admin/market?action=econ-stats'),
         apiFetch('/api/admin/market?action=override-history'),
+        apiFetch('/api/admin/market?action=seed-manage'),
+        apiFetch('/api/admin/market?action=bouquet-prices'),
       ])
       if (p.success) {
         setFlowerTypes(p.data?.flowerTypes || [])
@@ -84,6 +93,17 @@ export default function AdminMarketPanel() {
       }
       if (e.success) setEconStats(e.data)
       if (h.success) setOverrideHistory(h.data?.items || [])
+      if (s.success) {
+        setSeedManage(s.data?.seeds || [])
+        setSeedOverrides(s.data?.overrides || {})
+        setTierOptions(s.data?.tierOptions || [])
+      }
+      if (bp.success) {
+        setBouquetPrices({ today: bp.data?.today, ranges: bp.data?.ranges, rankNames: bp.data?.rankNames })
+        const edits: Record<string, string> = {}
+        for (const [k, v] of Object.entries(bp.data?.today || {})) edits[k] = String(v)
+        setBqEdits(edits)
+      }
     } finally { setLoading(false) }
   }
 
@@ -128,6 +148,65 @@ export default function AdminMarketPanel() {
         showToast('已恢复默认价格', 'success')
         setRefresher((k) => k + 1)
       } else showToast(res.error || '恢复失败', 'error')
+    } finally { setLoading(false) }
+  }
+
+  // 保存单个种子配置
+  const saveSeed = async (seed: any) => {
+    const over = seedOverrides[seed.id] || {}
+    const season = seed.seasonEdit
+    const tier = seed.tierEdit
+    const price = seed.priceEdit
+    const officialSell = seed.officialSellEdit
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/admin/market', {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'update-seed',
+          seedId: seed.id,
+          season: season !== undefined ? season : undefined,
+          tier: tier !== undefined ? tier : undefined,
+          price: price !== undefined ? Number(price) : undefined,
+          officialSell: officialSell !== undefined ? officialSell : undefined,
+        }),
+      })
+      if (res.success) {
+        showToast('已保存种子配置', 'success')
+        setRefresher((k) => k + 1)
+      } else showToast(res.error || '保存失败', 'error')
+    } finally { setLoading(false) }
+  }
+
+  // 保存花束价格覆盖
+  const saveBouquetPrice = async (rank: string) => {
+    const price = Number(bqEdits[rank])
+    if (!price || price <= 0) return showToast('请输入有效价格', 'error')
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/admin/market', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'update-bouquet-price', rank: Number(rank), price }),
+      })
+      if (res.success) {
+        showToast('已覆盖今日花束价', 'success')
+        setRefresher((k) => k + 1)
+      } else showToast(res.error || '保存失败', 'error')
+    } finally { setLoading(false) }
+  }
+
+  // 清空花束价格覆盖（恢复每日随机）
+  const resetBouquetPrice = async () => {
+    setLoading(true)
+    try {
+      for (const rank of [1, 2, 3, 4, 5, 6, 7]) {
+        await apiFetch('/api/admin/market', {
+          method: 'POST',
+          body: JSON.stringify({ mode: 'update-bouquet-price', rank, price: 0 }),
+        })
+      }
+      showToast('已恢复每日随机价', 'success')
+      setRefresher((k) => k + 1)
     } finally { setLoading(false) }
   }
 
@@ -238,12 +317,14 @@ export default function AdminMarketPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-1 p-1 bg-slate-100 rounded-xl">
         {([
-          { k: 'overview', label: '经济仪表盘', icon: BarChart3 },
+          { k: 'overview', label: '仪表盘', icon: BarChart3 },
           { k: 'prices', label: '价格调控', icon: Edit },
-          { k: 'official', label: `官方挂售 (${official.length})`, icon: Package },
-          { k: 'player', label: `玩家挂售 (${player.length})`, icon: ShoppingCart },
+          { k: 'seeds', label: '种子管理', icon: Sprout },
+          { k: 'bouquet', label: '花束价格', icon: Flower },
+          { k: 'official', label: `官方 (${official.length})`, icon: Package },
+          { k: 'player', label: `玩家 (${player.length})`, icon: ShoppingCart },
         ] as const).map((t) => (
           <button key={t.k}
             onClick={() => setSubTab(t.k)}
@@ -498,6 +579,125 @@ export default function AdminMarketPanel() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'seeds' && (
+        <div className="space-y-3">
+          <div className="card p-4">
+            <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-1"><Sprout size={14} /> 种子管理（共 {seedManage.length} 种）</h4>
+            <div className="text-xs text-slate-400 mb-3">可修改每种种子的季节、阶级、价格与是否官方售卖；修改后立即生效。</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs">
+                  <tr>
+                    <th className="text-left p-2">名称</th>
+                    <th className="text-left p-2">可种植季节</th>
+                    <th className="text-left p-2">阶级</th>
+                    <th className="text-left p-2">价格</th>
+                    <th className="text-left p-2">官方售卖</th>
+                    <th className="text-left p-2">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seedManage.map(seed => {
+                    const over = seedOverrides[seed.id] || {}
+                    const seasonVal = seed.season?.join(',') || ''
+                    return (
+                      <tr key={seed.id} className="border-t border-slate-100">
+                        <td className="p-2">
+                          <div className="font-medium text-slate-700">🌱 {seed.name}</div>
+                          <div className="text-[10px] text-slate-400">{seed.id}</div>
+                        </td>
+                        <td className="p-2">
+                          <input
+                            value={seed.seasonEdit !== undefined ? (seed.seasonEdit as string[]).join(',') : seasonVal}
+                            onChange={(e) => {
+                              const vals = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                              setSeedManage(prev => prev.map(s => s.id === seed.id ? { ...s, seasonEdit: vals } : s))
+                            }}
+                            placeholder="spring,summer"
+                            className="input !py-1 !px-2 text-xs w-36"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <select
+                            value={seed.tierEdit || over.tier || seed.tier || ''}
+                            onChange={(e) => setSeedManage(prev => prev.map(s => s.id === seed.id ? { ...s, tierEdit: e.target.value } : s))}
+                            className="input !py-1 !px-2 text-xs"
+                          >
+                            {tierOptions.map(t => (
+                              <option key={t.key} value={t.key}>{t.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={seed.priceEdit !== undefined ? seed.priceEdit : (over.price ?? seed.price)}
+                            onChange={(e) => setSeedManage(prev => prev.map(s => s.id === seed.id ? { ...s, priceEdit: Number(e.target.value) } : s))}
+                            className="input !py-1 !px-2 text-xs w-20"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="checkbox"
+                            checked={seed.officialSellEdit !== undefined ? seed.officialSellEdit : (over.officialSell ?? seed.officialSell)}
+                            onChange={(e) => setSeedManage(prev => prev.map(s => s.id === seed.id ? { ...s, officialSellEdit: e.target.checked } : s))}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <button onClick={() => saveSeed(seed)} disabled={loading} className="px-2 py-1 rounded bg-garden-500 text-white text-xs hover:bg-garden-600">
+                            保存
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subTab === 'bouquet' && (
+        <div className="space-y-3">
+          <div className="card p-4">
+            <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-1"><Flower size={14} /> 花束每日收购价（00:01 自动刷新）</h4>
+            <div className="text-xs text-slate-400 mb-3">各等级花束的官方收购价每日随机，可在下方手动覆盖当天价格。</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7].map(rank => (
+                <div key={rank} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
+                  <div className="text-xs font-bold text-slate-700 mb-1">
+                    {bouquetPrices?.rankNames?.[rank] || `rank${rank}`}花束
+                  </div>
+                  <div className="text-[10px] text-slate-400 mb-1">
+                    区间：{bouquetPrices?.ranges?.[rank]?.[0]}~{bouquetPrices?.ranges?.[rank]?.[1]}
+                  </div>
+                  <div className="text-lg font-bold text-amber-600">今日 {bouquetPrices?.today?.[rank] ?? '-'}</div>
+                  <div className="flex gap-1 mt-2">
+                    <input
+                      type="number"
+                      value={bqEdits[String(rank)] ?? ''}
+                      onChange={(e) => setBqEdits(prev => ({ ...prev, [String(rank)]: e.target.value }))}
+                      className="input !py-1 !px-2 text-xs flex-1"
+                      placeholder="覆盖价"
+                    />
+                    <button onClick={() => saveBouquetPrice(String(rank))} disabled={loading} className="px-2 py-1 rounded bg-garden-500 text-white text-xs hover:bg-garden-600">
+                      覆盖
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button onClick={resetBouquetPrice} disabled={loading} className="btn-secondary py-2 px-3 text-xs text-rose-600 hover:bg-rose-50">
+                恢复每日随机价
+              </button>
+            </div>
           </div>
         </div>
       )}

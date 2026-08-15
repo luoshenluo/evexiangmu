@@ -6,7 +6,7 @@ import type {
   Task, CDK, Notification, GameState, Announcement,
   StealLog, PestSeverity, PlantedFlower, Plot, RankLevel,
   SensitiveWord, ChatSettings, ChatStats, InventoryItem,
-  PrivateMessage, PrivateConversation,
+  PrivateMessage, PrivateConversation, Season, SeedTier, SeedType,
 } from './types'
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
@@ -2896,6 +2896,123 @@ function priceOverridesRow(row: any): PriceOverrides {
     updatedAt: row.updated_at,
     updatedBy: row.updated_by,
   }
+}
+
+// ============== 种子配置覆盖（后台种子管理） ==============
+
+export interface SeedOverride {
+  season?: string[]
+  tier?: string
+  price?: number
+  officialSell?: boolean
+  updatedAt?: number
+}
+
+let _seedOverridesCache: { data: Record<string, SeedOverride>; fetchedAt: number } = { data: {}, fetchedAt: 0 }
+const SEED_OVERRIDES_TTL = 15 * 1000
+
+/** 读取后台对种子的覆盖配置（季节/阶级/价格/官方售卖） */
+export async function getSeedOverrides(): Promise<Record<string, SeedOverride>> {
+  await seedDatabase()
+  const now = Date.now()
+  if (now - _seedOverridesCache.fetchedAt < SEED_OVERRIDES_TTL) return _seedOverridesCache.data
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb.from('seed_overrides').select('*')
+    if (error || !data) throw new Error(error?.message || 'no table')
+    const map: Record<string, SeedOverride> = {}
+    for (const r of data) {
+      map[r.seed_id] = {
+        season: r.season || undefined,
+        tier: r.tier || undefined,
+        price: r.price != null ? r.price : undefined,
+        officialSell: r.official_sell != null ? r.official_sell : undefined,
+        updatedAt: r.updated_at || undefined,
+      }
+    }
+    _seedOverridesCache = { data: map, fetchedAt: now }
+    return map
+  } catch (_e) {
+    _seedOverridesCache = { data: {}, fetchedAt: now }
+    return {}
+  }
+}
+
+/** 更新某种子配置（写入覆盖表） */
+export async function setSeedOverride(
+  adminId: string,
+  seedId: string,
+  patch: { season?: string[]; tier?: string; price?: number; officialSell?: boolean },
+): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const row: any = { seed_id: seedId, updated_at: Date.now(), updated_by: adminId }
+  if (patch.season !== undefined) row.season = patch.season
+  if (patch.tier !== undefined) row.tier = patch.tier
+  if (patch.price !== undefined) row.price = patch.price
+  if (patch.officialSell !== undefined) row.official_sell = patch.officialSell
+  const { error } = await sb.from('seed_overrides').upsert(row)
+  if (error) return { success: false, error: error.message }
+  // 刷新缓存
+  _seedOverridesCache = { data: {}, fetchedAt: 0 }
+  return { success: true }
+}
+
+/** 读取今日花束价格覆盖（按等级） */
+export async function getBouquetPriceOverrides(): Promise<Partial<Record<RankLevel, number>>> {
+  await seedDatabase()
+  const sb = getSupabase()
+  try {
+    const { data } = await sb.from('seed_overrides').select('*').eq('seed_id', 'bq_override').limit(1)
+    if (!data || data.length === 0) return {}
+    const raw = data[0]?.season || {}
+    const out: Partial<Record<RankLevel, number>> = {}
+    for (const [k, v] of Object.entries(raw)) {
+      const rank = Number(k) as RankLevel
+      if (rank >= 1 && rank <= 7) out[rank] = Number(v)
+    }
+    return out
+  } catch (_e) {
+    return {}
+  }
+}
+
+/** 设置今日花束价格覆盖（price<=0 表示移除该等级覆盖） */
+export async function setBouquetPriceOverride(
+  adminId: string,
+  rank: RankLevel,
+  price: number,
+): Promise<{ success: boolean; error?: string }> {
+  await seedDatabase()
+  const sb = getSupabase()
+  const existing = await getBouquetPriceOverrides()
+  const next = { ...existing }
+  if (price > 0) next[rank] = price
+  else delete next[rank]
+  const { error } = await sb.from('seed_overrides').upsert({
+    seed_id: 'bq_override',
+    season: next,
+    updated_at: Date.now(),
+    updated_by: adminId,
+  })
+  if (error) return { success: false, error: error.message }
+  _seedOverridesCache = { data: {}, fetchedAt: 0 }
+  return { success: true }
+}
+
+/** 应用种子覆盖后的有效种子配置（供各业务读取） */
+export async function getSeedConfigs(): Promise<(SeedType & { season: Season[]; tier: SeedTier })[]> {
+  const overrides = await getSeedOverrides()
+  return SEED_TYPES.map(s => {
+    const o = overrides[s.id] || {}
+    return {
+      ...s,
+      season: (o.season as Season[]) || s.season,
+      tier: (o.tier as SeedTier) || s.tier,
+      price: o.price ?? s.price,
+      officialSell: o.officialSell ?? s.officialSell,
+    }
+  })
 }
 
 export async function getPriceOverrides(): Promise<PriceOverrides> {
