@@ -138,6 +138,7 @@ export interface User {
   bannedUntil: number | null
   familyId: string | null
   friends: string[]
+  blacklist?: string[]
   deleted?: boolean
   // 偷花系统
   stealCountToday: number

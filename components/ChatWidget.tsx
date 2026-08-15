@@ -30,7 +30,7 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
   const {
     user, chatExpanded, currentChatChannel, messages,
     setChatExpanded, setCurrentChatChannel, setMessages, addMessage,
-    recordMessageTime, showToast,
+    recordMessageTime, showToast, updateUser,
     isGuest, isOffline,
   } = useAppStore()
   const [input, setInput] = useState('')
@@ -231,6 +231,27 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
     }
   }
 
+  // 拉黑当前会话对象
+  const handleBlockPeer = async () => {
+    const peer = threadPeer
+    if (!peer || !peer.peerId || !user) return
+    if (!confirm(`确定拉黑 ${peer.peerName} 吗？\n拉黑后将互相屏蔽消息、无法私聊，并自动解除好友关系。`)) return
+    const res = await apiFetch('/api/blacklist', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: peer.peerId, block: true }),
+    })
+    if (res.success) {
+      showToast(`已拉黑 ${peer.peerName}`, 'success')
+      const uRes = await apiFetch('/api/user/me')
+      if (uRes.success && uRes.data) updateUser(uRes.data)
+      // 退回会话列表
+      setFriendView('conversations')
+      setActivePeerId('')
+    } else {
+      showToast(res.error || '拉黑失败', 'error')
+    }
+  }
+
   // ===== 当前公共频道消息（必须在任何条件 return 之前调用，遵守 Hooks 规则）=====
   const currentPublicMessages = useMemo(
     () => (currentChatChannel === 'friend' ? [] : (messages[currentChatChannel] || []) as ChatMessage[]),
@@ -355,6 +376,8 @@ export default function ChatWidget({ onRequestLogin, initialPeerId }: Props) {
               messages={threadMessages}
               currentUserId={user?.id}
               loading={threadLoading}
+              onBlock={handleBlockPeer}
+              blocked={!!user?.blacklist?.includes(activePeerId)}
             />
           )
         ) : (
@@ -542,13 +565,15 @@ function ConversationsView({
 
 // ==================== 子组件：私聊会话线程 ====================
 function ThreadView({
-  peer, peerId, messages: msgs, currentUserId, loading,
+  peer, peerId, messages: msgs, currentUserId, loading, onBlock, blocked,
 }: {
   peer?: PrivateConversation
   peerId: string
   messages: PrivateMessage[]
   currentUserId?: string
   loading: boolean
+  onBlock?: () => void
+  blocked?: boolean
 }) {
   if (loading && msgs.length === 0) {
     return <div className="text-center text-slate-400 text-xs py-8">加载中...</div>
@@ -564,11 +589,33 @@ function ThreadView({
         </div>
         <p className="text-sm text-slate-600 font-medium">{peer?.peerName || '好友'}</p>
         <p className="mt-2">还没有消息，发送第一句问候吧~</p>
+        {onBlock && (
+          <button
+            onClick={onBlock}
+            className={blocked
+              ? 'mt-4 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'mt-4 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600'}
+          >
+            {blocked ? '已拉黑' : '拉黑该用户'}
+          </button>
+        )}
       </div>
     )
   }
   return (
     <div className="space-y-2">
+      {onBlock && (
+        <div className="flex justify-center">
+          <button
+            onClick={onBlock}
+            className={blocked
+              ? 'px-3 py-1 rounded-lg text-[11px] bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'px-3 py-1 rounded-lg text-[11px] bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600'}
+          >
+            {blocked ? '已拉黑该用户' : '🚫 拉黑该用户'}
+          </button>
+        </div>
+      )}
       {msgs.map((m) => {
         const isMe = m.fromUserId === currentUserId
         return (

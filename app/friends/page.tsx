@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatDateTime } from '@/lib/utils'
-import { Users, Search, Plus, X, Check, MessageCircle, UserPlus, Eye, Trash2, RefreshCw, AlertCircle } from 'lucide-react'
+import { Users, Search, Plus, X, Check, MessageCircle, UserPlus, Eye, Trash2, RefreshCw, AlertCircle, Ban } from 'lucide-react'
 import LoginModal from '@/components/LoginModal'
 
-type FriendTab = 'friends' | 'requests' | 'search'
+type FriendTab = 'friends' | 'requests' | 'search' | 'blacklist'
 
 export default function FriendsPage() {
   const { user, updateUser, showToast } = useAppStore()
@@ -14,6 +14,7 @@ export default function FriendsPage() {
   const [friends, setFriends] = useState<any[]>([])
   const [incoming, setIncoming] = useState<any[]>([])
   const [outgoing, setOutgoing] = useState<any[]>([])
+  const [blacklist, setBlacklist] = useState<any[]>([])
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searchKw, setSearchKw] = useState('')
   const [showLogin, setShowLogin] = useState(false)
@@ -24,15 +25,17 @@ export default function FriendsPage() {
     if (!user) return
     setLoading('refresh')
     try {
-      const [fRes, rRes] = await Promise.all([
+      const [fRes, rRes, bRes] = await Promise.all([
         apiFetch('/api/friends?action=list'),
         apiFetch('/api/friends?action=requests'),
+        apiFetch('/api/blacklist'),
       ])
       if (fRes.success) setFriends(fRes.data || [])
       if (rRes.success) {
         setIncoming(rRes.data?.incoming || [])
         setOutgoing(rRes.data?.outgoing || [])
       }
+      if (bRes.success) setBlacklist(bRes.data?.items || [])
     } finally {
       setLoading(null)
     }
@@ -112,6 +115,42 @@ export default function FriendsPage() {
     showToast(`开始和 ${friend.nickname} 聊天~`, 'info')
   }
 
+  // 拉黑好友（自动解除好友关系）
+  const blockUser = async (friend: any) => {
+    if (!confirm(`确定拉黑 ${friend.nickname} 吗？\n拉黑后将互相屏蔽消息、无法私聊，并自动解除好友关系。`)) return
+    setLoading(`block_${friend.id}`)
+    try {
+      const res = await apiFetch('/api/blacklist', {
+        method: 'POST',
+        body: JSON.stringify({ targetId: friend.id, block: true }),
+      })
+      if (res.success) {
+        showToast(`已拉黑 ${friend.nickname}`, 'success')
+        setRefreshKey((k) => k + 1)
+        const uRes = await apiFetch('/api/user/me')
+        if (uRes.success && uRes.data) updateUser(uRes.data)
+      } else showToast(res.error || '拉黑失败', 'error')
+    } finally { setLoading(null) }
+  }
+
+  // 取消拉黑
+  const unblockUser = async (target: any) => {
+    if (!confirm(`确定解除对 ${target.nickname} 的拉黑吗？`)) return
+    setLoading(`unblock_${target.id}`)
+    try {
+      const res = await apiFetch('/api/blacklist', {
+        method: 'POST',
+        body: JSON.stringify({ targetId: target.id, block: false }),
+      })
+      if (res.success) {
+        showToast('已解除拉黑', 'success')
+        setRefreshKey((k) => k + 1)
+        const uRes = await apiFetch('/api/user/me')
+        if (uRes.success && uRes.data) updateUser(uRes.data)
+      } else showToast(res.error || '操作失败', 'error')
+    } finally { setLoading(null) }
+  }
+
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-10 text-center" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
@@ -155,11 +194,12 @@ export default function FriendsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
         {([
-          { k: 'friends', label: '好友列表', count: friends.length },
-          { k: 'requests', label: '好友申请', count: pendingCount },
-          { k: 'search', label: '添加好友' },
+          { k: 'friends', label: '好友', count: friends.length },
+          { k: 'requests', label: '申请', count: pendingCount },
+          { k: 'search', label: '添加' },
+          { k: 'blacklist', label: '黑名单', count: blacklist.length },
         ] as const).map((t) => {
           const active = tab === t.k
           return (
@@ -241,6 +281,13 @@ export default function FriendsPage() {
                     className="px-2.5 py-1 rounded-lg text-xs bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1"
                   >
                     <Trash2 size={12} /> 删除
+                  </button>
+                  <button
+                    onClick={() => blockUser(f)}
+                    disabled={loading === `block_${f.id}`}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1"
+                  >
+                    <Ban size={12} /> 拉黑
                   </button>
                 </div>
               </div>
@@ -383,6 +430,42 @@ export default function FriendsPage() {
             <div className="card p-6 text-center text-sm text-slate-400">
               输入关键词搜索其他玩家~
             </div>
+          )}
+        </div>
+      )}
+
+      {/* 黑名单 */}
+      {tab === 'blacklist' && (
+        <div className="space-y-2">
+          <div className="card p-4 mb-2 bg-slate-50">
+            <p className="text-xs text-slate-500">
+              黑名单中的用户将被屏蔽：世界频道消息互不可见、无法私聊。拉黑会自动解除好友关系。
+            </p>
+          </div>
+          {blacklist.length === 0 ? (
+            <div className="card p-10 text-center">
+              <Ban size={32} className="mx-auto mb-2 text-slate-300" />
+              <p className="text-sm text-slate-500">黑名单为空</p>
+            </div>
+          ) : (
+            blacklist.map((b) => (
+              <div key={b.id} className="card p-3 flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-2xl">
+                  {b.avatar || '🚫'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-slate-800 truncate">{b.nickname}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">@{b.username}</div>
+                </div>
+                <button
+                  onClick={() => unblockUser(b)}
+                  disabled={loading === `unblock_${b.id}`}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-garden-500 text-white hover:bg-garden-600 flex items-center gap-1 disabled:opacity-60"
+                >
+                  <Check size={12} /> 解除拉黑
+                </button>
+              </div>
+            ))
           )}
         </div>
       )}

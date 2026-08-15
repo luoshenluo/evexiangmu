@@ -20,7 +20,12 @@ export async function GET(
 
     await ensureSeasonTick()
     const channel = params.channel as any
-    const msgs = await getMessages(channel, 200)
+    let msgs = await getMessages(channel, 200)
+    // 黑名单过滤：隐藏自己拉黑的用户发出的消息
+    const blacklist = new Set(user.blacklist || [])
+    if (blacklist.size > 0) {
+      msgs = msgs.filter((m: any) => !m.isSystem && !blacklist.has(m.userId))
+    }
     return jsonResponse(true, msgs)
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

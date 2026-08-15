@@ -38,6 +38,7 @@ function dbRowToUser(row: any): User {
     bannedUntil: row.banned_until || null,
     familyId: row.family_id,
     friends: row.friends || [],
+    blacklist: row.blacklist || [],
     deleted: row.deleted,
     stealCountToday: row.steal_count_today || 0,
     stealResetAt: row.steal_reset_at || 0,
@@ -81,6 +82,7 @@ function userToDbRow(user: Partial<User>): Record<string, any> {
   if (user.bannedUntil !== undefined) row.banned_until = user.bannedUntil
   if (user.familyId !== undefined) row.family_id = user.familyId
   if (user.friends !== undefined) row.friends = user.friends
+  if (user.blacklist !== undefined) row.blacklist = user.blacklist
   if (user.deleted !== undefined) row.deleted = user.deleted
   if (user.stealCountToday !== undefined) row.steal_count_today = user.stealCountToday
   if (user.stealResetAt !== undefined) row.steal_reset_at = user.stealResetAt
@@ -658,7 +660,7 @@ const NEW_USER_COLUMNS = new Set([
   'last_check_in_at', 'check_in_streak',
   'total_checkin_days', 'total_checkin_days_accum',
   'petal_coins', 'achievements', 'titles',
-  'last_active_at',
+  'last_active_at', 'blacklist',
 ])
 
 function isMissingColumnError(err: any): boolean {
@@ -2487,6 +2489,53 @@ export async function removeFriend(currentUserId: string, friendId: string): Pro
   return { success: true }
 }
 
+// ==================== 黑名单（拉黑/屏蔽） ====================
+
+// 拉黑或取消拉黑：拉黑时自动解除好友关系
+export async function toggleBlacklist(
+  currentUserId: string,
+  targetId: string,
+  block: boolean,
+): Promise<{ success: boolean; error?: string; blacklist?: string[] }> {
+  if (currentUserId === targetId) return { success: false, error: '不能拉黑自己' }
+  const me = await findUserById(currentUserId)
+  const target = await findUserById(targetId)
+  if (!me || !target) return { success: false, error: '用户不存在' }
+  if (target.deleted) return { success: false, error: '该用户已注销' }
+
+  const current = me.blacklist || []
+  if (block && current.includes(targetId)) return { success: false, error: '已在黑名单中' }
+  if (!block && !current.includes(targetId)) return { success: false, error: '该用户不在黑名单' }
+
+  const newBlacklist = block ? [...current, targetId] : current.filter((id) => id !== targetId)
+
+  // 拉黑时若为好友，自动解除好友关系（双方都删，否则拉黑方好友列表仍残留对方）
+  let updates: Promise<unknown>[] = []
+  if (block && me.friends.includes(targetId)) {
+    updates.push(
+      updateUser(currentUserId, {
+        blacklist: newBlacklist,
+        friends: me.friends.filter((f) => f !== targetId),
+      }),
+      updateUser(targetId, {
+        friends: (target.friends || []).filter((f) => f !== currentUserId),
+      }),
+    )
+  } else {
+    updates.push(updateUser(currentUserId, { blacklist: newBlacklist }))
+  }
+
+  await Promise.all(updates)
+  return { success: true, blacklist: newBlacklist }
+}
+
+// 判断两用户间是否有任意一方拉黑了对方（双向屏蔽）
+export function isBlockedBetween(aId: string, aBlacklist: string[] | undefined, bId: string, bBlacklist: string[] | undefined): boolean {
+  const a = aBlacklist || []
+  const b = bBlacklist || []
+  return a.includes(bId) || b.includes(aId)
+}
+
 // 获取好友列表资料
 export async function getFriendProfiles(currentUserId: string): Promise<any[]> {
   const me = await findUserById(currentUserId)
@@ -2967,6 +3016,11 @@ export async function sendPrivateMessage(
 
   const target = await findUserById(toUserId)
   if (!target) return { success: false, error: '对方用户不存在' }
+
+  // 黑名单拦截：任意一方拉黑了对方则禁止私聊
+  if (isBlockedBetween(fromUser.id, fromUser.blacklist, target.id, target.blacklist)) {
+    return { success: false, error: '消息发送失败' }
+  }
 
   const now = Date.now()
   const filteredContent = filterSensitiveWords(content.trim().slice(0, 500))
