@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { FLOWER_TYPES, getFlowerSellPrice, RankNames, RankColors } from '@/lib/game-data'
+import { FLOWER_TYPES, RankNames, RankColors } from '@/lib/game-data'
 import { Flower2, Sparkles, Coins, Beaker, Gift, ArrowRight, Info, X } from 'lucide-react'
 import type { InventoryItem } from '@/lib/types'
 
@@ -17,6 +17,28 @@ export default function WorkshopPage() {
   const [bouquetSelected, setBouquetSelected] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [flowerPrices, setFlowerPrices] = useState<Record<string, number>>({})
+
+  // 拉取应用了后台价格覆盖后的有效收购价（与后端结算口径一致）
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/market/prices').then(res => {
+      if (!alive || !res.success || !res.data) return
+      const f: Record<string, number> = {}
+      for (const [id, v] of Object.entries(res.data.flowers || {})) f[id] = (v as any)?.baseSellPrice ?? 0
+      setFlowerPrices(f)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  // 花朵的官方收购价（优先覆盖价，回退静态价）
+  const effFlowerSellPrice = (flowerId: string, rank: number): number => {
+    const over = flowerPrices[flowerId]
+    const base = over && over > 0 ? over : (FLOWER_TYPES.find(f => f.id === flowerId)?.baseSellPrice ?? 0)
+    const rankMultipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+    const mul = rankMultipliers[Math.max(0, Math.min(rankMultipliers.length - 1, rank - 1))] || 1
+    return Math.floor(base * mul)
+  }
 
   // 背包里的花（已收获）
   const flowers = useMemo(() => {
@@ -41,12 +63,12 @@ export default function WorkshopPage() {
 
   const ftA = selectedA ? FLOWER_TYPES.find(f => f.id === selectedA.referenceId) : null
   const ftB = selectedB ? FLOWER_TYPES.find(f => f.id === selectedB.referenceId) : null
-  const sellA = ftA ? getFlowerSellPrice(ftA, (selectedA?.rank || 1) as any) : 0
-  const sellB = ftB ? getFlowerSellPrice(ftB, (selectedB?.rank || 1) as any) : 0
+  const sellA = ftA ? effFlowerSellPrice(ftA.id, (selectedA?.rank || 1) as any) : 0
+  const sellB = ftB ? effFlowerSellPrice(ftB.id, (selectedB?.rank || 1) as any) : 0
   const breedCost = (sellA + sellB) * 2
 
   const bouquetFt = bouquetSelected ? FLOWER_TYPES.find(f => f.id === bouquetSelected.referenceId) : null
-  const bouquetSingleSell = bouquetFt ? getFlowerSellPrice(bouquetFt, (bouquetSelected?.rank || 1) as any) : 0
+  const bouquetSingleSell = bouquetFt ? effFlowerSellPrice(bouquetFt.id, (bouquetSelected?.rank || 1) as any) : 0
   const bouquetSell = Math.round(bouquetSingleSell * 3 * 1.5)
 
   const canBreed = selectedA && selectedB &&

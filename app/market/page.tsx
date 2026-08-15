@@ -700,8 +700,8 @@ export default function MarketPage() {
                         />
                       </div>
                       <div className="text-[11px] text-slate-400 mt-1">
-                        总收益（扣 5% 手续费后）：
-                        <span className="text-garden-700 font-medium ml-1">{formatNumber(Math.floor(createQuantity * createPrice * 0.95))}</span>
+                        总收益（扣 {((prices?.feeRate ?? 0.05) * 100).toFixed(1)}% 手续费后）：
+                        <span className="text-garden-700 font-medium ml-1">{formatNumber(Math.floor(createQuantity * createPrice * (1 - (prices?.feeRate ?? 0.05))))}</span>
                       </div>
                     </div>
 

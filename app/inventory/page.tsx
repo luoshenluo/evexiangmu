@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { RankNames, RankColors, getInventoryExpandPrice, FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { RankNames, RankColors, getInventoryExpandPrice, FLOWER_TYPES } from '@/lib/game-data'
 import { Package, Trash2, Tag, Droplets, Sparkles, Bug, Zap, Plus, X, Coins, ShoppingCart } from 'lucide-react'
 import type { InventoryItem } from '@/lib/types'
 
@@ -13,6 +13,19 @@ export default function InventoryPage() {
   const { user, updateUser, showToast } = useAppStore()
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
+  const [flowerPrices, setFlowerPrices] = useState<Record<string, number>>({})
+
+  // 拉取应用了后台价格覆盖后的有效收购价（与后端结算口径一致）
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/market/prices').then(res => {
+      if (!alive || !res.success || !res.data) return
+      const f: Record<string, number> = {}
+      for (const [id, v] of Object.entries(res.data.flowers || {})) f[id] = (v as any)?.baseSellPrice ?? 0
+      setFlowerPrices(f)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   const usedSlots = user ? user.inventory.filter(i => i.quantity > 0).length : 0
   const expandPrice = user ? getInventoryExpandPrice(user.inventorySize) : 100
@@ -57,12 +70,16 @@ export default function InventoryPage() {
     }
   }
 
-  // 计算花朵官方收购价（用户提示用途）
+  // 计算花朵官方收购价（用户提示用途，应用后台价格覆盖）
   const getOfficialPrice = (item: InventoryItem): number | null => {
     if (item.type !== 'flower') return null
     const ft = FLOWER_TYPES.find(f => f.id === item.referenceId)
     if (!ft) return null
-    return getFlowerSellPrice(ft, (item.rank || 1) as any)
+    const over = flowerPrices[ft.id]
+    const base = over && over > 0 ? over : ft.baseSellPrice
+    const rankMultipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+    const mul = rankMultipliers[Math.max(0, Math.min(rankMultipliers.length - 1, (item.rank || 1) - 1))] || 1
+    return Math.floor(base * mul)
   }
 
   const sellItem = async () => {

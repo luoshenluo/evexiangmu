@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { FLOWER_TYPES, SEASON_NAMES, SEASON_COLORS, TOOLS, getFlowerSellPrice, RankNames, RankColors } from '@/lib/game-data'
+import { FLOWER_TYPES, SEASON_NAMES, SEASON_COLORS, TOOLS, RankNames, RankColors } from '@/lib/game-data'
 import type { Plot as PlotType, InventoryItem, SeedType, PlantedFlower } from '@/lib/types'
 import { Lock, Droplets, Sparkles, Bug, Leaf, Coins, AlertTriangle, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -42,10 +42,11 @@ export default function Plot({ plot, onUpdate }: Props) {
   const [showActions, setShowActions] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toolPrices, setToolPrices] = useState<Record<string, number>>({})
+  const [flowerPrices, setFlowerPrices] = useState<Record<string, number>>({})
   const flower = plot.flower
   const flowerType = flower ? FLOWER_TYPES.find(f => f.id === flower.flowerTypeId) : null
 
-  // 拉取应用了后台价格覆盖后的有效工具价（与后端扣费口径一致）
+  // 拉取应用了后台价格覆盖后的有效价格（与后端结算口径一致）
   useEffect(() => {
     let alive = true
     apiFetch('/api/market/prices').then(res => {
@@ -53,6 +54,9 @@ export default function Plot({ plot, onUpdate }: Props) {
       const t: Record<string, number> = {}
       for (const [id, v] of Object.entries(res.data.tools || {})) t[id] = (v as any)?.price ?? 0
       setToolPrices(t)
+      const f: Record<string, number> = {}
+      for (const [id, v] of Object.entries(res.data.flowers || {})) f[id] = (v as any)?.baseSellPrice ?? 0
+      setFlowerPrices(f)
     }).catch(() => {})
     return () => { alive = false }
   }, [])
@@ -62,6 +66,15 @@ export default function Plot({ plot, onUpdate }: Props) {
     const over = toolPrices[toolId]
     if (over && over > 0) return over
     return TOOLS.find(t => t.id === toolId)?.price ?? 0
+  }
+
+  // 花朵的官方收购价（优先覆盖价，回退静态价）
+  const effFlowerSellPrice = (flowerId: string, rank: number): number => {
+    const over = flowerPrices[flowerId]
+    const base = over && over > 0 ? over : (FLOWER_TYPES.find(f => f.id === flowerId)?.baseSellPrice ?? 0)
+    const rankMultipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+    const mul = rankMultipliers[Math.max(0, Math.min(rankMultipliers.length - 1, rank - 1))] || 1
+    return Math.floor(base * mul)
   }
 
   // 从背包获取指定工具的剩余数量
@@ -177,7 +190,7 @@ export default function Plot({ plot, onUpdate }: Props) {
   }
 
   // 有花的地块
-  const sellPrice = getFlowerSellPrice(flowerType, flower.rank)
+  const sellPrice = effFlowerSellPrice(flower.flowerTypeId, flower.rank)
 
   // 生长分阶段：种子→幼苗→花苞→盛开
   const stage = getGrowthStage(flower.growthProgress, flower.isReady)
