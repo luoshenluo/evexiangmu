@@ -83,15 +83,15 @@ export default function ProfilePage() {
   }
 
   const menuItems = [
-    { icon: Calendar, label: '每日签到', tip: '每日奖励 + 成就', onClick: () => window.location.href = '/checkin', color: 'from-amber-400 to-orange-500' },
-    { icon: Bell, label: '消息中心', tip: notifications.filter(n => !n.read).length > 0 ? `${notifications.filter(n => !n.read).length}条未读` : '系统通知', onClick: loadNotifications, color: 'from-blue-400 to-blue-600' },
-    { icon: Palette, label: '外观设置', tip: '主题 & 花园皮肤', onClick: () => window.location.href = '/settings', color: 'from-purple-400 to-fuchsia-500' },
-    { icon: Award, label: '排行榜', tip: '查看全服排名', onClick: loadRanking, color: 'from-amber-400 to-orange-500' },
-    { icon: ShieldAlert, label: '偷花记录', tip: '谁动了我的花', onClick: loadStealLogs, color: 'from-red-400 to-rose-600' },
-    { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-purple-400 to-pink-500' },
-    { icon: Sparkles, label: '小游戏', tip: '转盘 & 猜大小，消耗花瓣赢金币', onClick: () => window.location.href = '/minigames', color: 'from-fuchsia-400 to-purple-600' },
-    { icon: Users, label: '好友系统', tip: `${user?.friends?.length || 0}位好友`, onClick: () => window.location.href = '/friends', color: 'from-green-400 to-emerald-600' },
-    { icon: Flower2, label: '家族', tip: user?.familyId ? '查看家族成员与领地' : '加入家族，一起经营', onClick: () => window.location.href = '/family', color: 'from-teal-400 to-cyan-600' },
+    { icon: Calendar, label: '每日签到', tip: '每日奖励 + 成就', onClick: () => window.location.href = '/checkin', color: 'from-garden-400 to-garden-600' },
+    { icon: Bell, label: '消息中心', tip: notifications.filter(n => !n.read).length > 0 ? `${notifications.filter(n => !n.read).length}条未读` : '系统通知', onClick: loadNotifications, color: 'from-garden-400 to-garden-600' },
+    { icon: Palette, label: '外观设置', tip: '主题 & 花园皮肤', onClick: () => window.location.href = '/settings', color: 'from-garden-400 to-garden-600' },
+    { icon: Award, label: '排行榜', tip: '查看全服排名', onClick: loadRanking, color: 'from-amber-400 to-amber-600' },
+    { icon: ShieldAlert, label: '偷花记录', tip: '谁动了我的花', onClick: loadStealLogs, color: 'from-rose-400 to-rose-600' },
+    { icon: Gift, label: 'CDK 兑换', tip: '输入CDK领奖励', onClick: () => setShowCDK(true), color: 'from-amber-400 to-amber-600' },
+    { icon: Sparkles, label: '小游戏', tip: '转盘 & 猜大小，消耗花瓣赢金币', onClick: () => window.location.href = '/minigames', color: 'from-amber-400 to-amber-600' },
+    { icon: Users, label: '好友系统', tip: `${user?.friends?.length || 0}位好友`, onClick: () => window.location.href = '/friends', color: 'from-garden-400 to-garden-600' },
+    { icon: Flower2, label: '家族', tip: user?.familyId ? '查看家族成员与领地' : '加入家族，一起经营', onClick: () => window.location.href = '/family', color: 'from-garden-400 to-garden-600' },
     { icon: HelpCircle, label: '帮助反馈', tip: '游戏介绍', onClick: () => setShowAnnouncements(true), color: 'from-slate-400 to-slate-600' },
   ]
 
@@ -99,7 +99,7 @@ export default function ProfilePage() {
     menuItems.unshift({
       icon: Settings, label: '管理员后台', tip: '进入后台管理',
       onClick: () => window.open('/admin', '_blank'),
-      color: 'from-indigo-500 to-purple-700'
+      color: 'from-indigo-500 to-indigo-700'
     })
   }
 
