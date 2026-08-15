@@ -5,6 +5,9 @@ import { WHEEL_REWARDS, pickWheelIndex, FLOWER_TYPES, SEED_TYPES } from '@/lib/g
 
 export const runtime = 'edge'
 
+// 每次抽奖消耗的花瓣数（花瓣回收机制）
+const COST_PER_SPIN = 10
+
 // 种子奖励的默认名称映射
 const SEED_NAMES: Record<string, string> = {
   'seed_rose': '玫瑰种子', 'seed_tulip': '郁金香种子', 'seed_daisy': '雏菊种子',
@@ -57,7 +60,7 @@ export async function GET(req: NextRequest) {
     return jsonResponse(true, {
       petalCoins: u?.petalCoins || 0,
       rewards: WHEEL_REWARDS.map(r => ({ key: r.key, label: r.label, weight: r.weight, coins: r.coins, petals: r.petals })),
-      costPerSpin: 1,
+      costPerSpin: COST_PER_SPIN,
     })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
@@ -76,12 +79,12 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(times) || !Number.isInteger(times) || times < 1) {
       return jsonResponse(false, null, '次数无效', 400)
     }
-    const cost = times // 1 花瓣/次
-    if ((u.petalCoins || 0) < cost) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${cost} 花瓣`, 400)
+    const cost = times * COST_PER_SPIN // 10 花瓣/次
+    if ((u.petalCoins || 0) < cost) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${COST_PER_SPIN} 花瓣`, 400)
 
     // 原子扣减花瓣（防并发超扣）：仅当余额足够时成功
     const spent = await atomicSpendPetals(u.id, cost)
-    if (!spent) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${cost} 花瓣`, 400)
+    if (!spent) return jsonResponse(false, null, `花瓣不足，每次抽奖需要 ${COST_PER_SPIN} 花瓣`, 400)
 
     const results: number[] = []
     let totalCoins = 0, totalPetals = 0

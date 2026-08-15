@@ -57,7 +57,7 @@ export default function MiniGamesPage() {
   const spin = async () => {
     if (!user) return
     if (spinning) return
-    if (petals < spinTimes) { showToast(`花瓣不足，需要 ${spinTimes} 花瓣`, 'error'); return }
+    if (petals < spinTimes * 10) { showToast(`花瓣不足，需要 ${spinTimes * 10} 花瓣`, 'error'); return }
 
     setSpinning(true)
     try {
@@ -239,7 +239,7 @@ export default function MiniGamesPage() {
         <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
           <Sparkles size={16} className="text-fuchsia-500" /> 幸运大转盘
         </h3>
-        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 1 花瓣，可赢取金币、种子与花朵奖励，大奖高达 500 金币～</div>
+        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 10 花瓣，可赢取金币、种子与花朵奖励，大奖高达 500 金币～</div>
         <div className="flex justify-center relative select-none" ref={canvasRef} style={{ touchAction: 'none' }}>
           {/* 外圈装饰 */}
           <div className="absolute -inset-3 rounded-full bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500 shadow-xl opacity-80" />
@@ -290,11 +290,11 @@ export default function MiniGamesPage() {
             {/* 中心按钮 */}
             <button
               onClick={spin}
-              disabled={spinning || petals < spinTimes}
+              disabled={spinning || petals < spinTimes * 10}
               className={classNames(
                 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full font-bold shadow-lg transition-all active:scale-95 z-30',
                 'w-[52px] h-[52px] text-xs leading-tight',
-                spinning || petals < spinTimes
+                spinning || petals < spinTimes * 10
                   ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
                   : 'bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 text-white hover:shadow-orange-200 hover:shadow-xl'
               )}
@@ -323,12 +323,12 @@ export default function MiniGamesPage() {
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50'
               )}>
               {n === 1 ? '单抽' : `${n} 连抽`}
-              <div className="text-[10px] opacity-80 mt-0.5">{n} 花瓣{n > 1 ? ` · 优惠 ${n - 1 >= 4 ? '高暴击' : ''}` : ''}</div>
+              <div className="text-[10px] opacity-80 mt-0.5">{n * 10} 花瓣{n > 1 ? ` · 优惠 ${n - 1 >= 4 ? '高暴击' : ''}` : ''}</div>
             </button>
           ))}
         </div>
-        <button onClick={spin} disabled={spinning || petals < spinTimes} className="btn-primary w-full py-3 mt-3 font-bold disabled:opacity-50 text-base">
-          {spinning ? '转动中...' : petals < spinTimes ? `花瓣不足（需要 ${spinTimes}）` : `立即抽奖（消耗 ${spinTimes} 花瓣）`}
+        <button onClick={spin} disabled={spinning || petals < spinTimes * 10} className="btn-primary w-full py-3 mt-3 font-bold disabled:opacity-50 text-base">
+          {spinning ? '转动中...' : petals < spinTimes * 10 ? `花瓣不足（需要 ${spinTimes * 10}）` : `立即抽奖（消耗 ${spinTimes * 10} 花瓣）`}
         </button>
 
         {/* 概率公示 */}
