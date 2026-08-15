@@ -3,7 +3,7 @@ import {
   getAllTaskTemplates, createTaskTemplate, updateTaskTemplate, deleteTaskTemplate,
   logAdminAction,
 } from '@/lib/server-store'
-import { authRequest, jsonResponse, userHasPermission, isSuperAdmin } from '@/lib/auth'
+import { authRequest, jsonResponse, userHasPermission, isSuperAdminUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   try {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
-    if (!isSuperAdmin(admin.id) && !userHasPermission(admin, 7)) {
+    if (!isSuperAdminUser(admin) && !userHasPermission(admin, 7)) {
       return jsonResponse(false, null, '无「经济调控」权限', 403)
     }
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
-    if (!isSuperAdmin(admin.id) && !userHasPermission(admin, 7)) {
+    if (!isSuperAdminUser(admin) && !userHasPermission(admin, 7)) {
       return jsonResponse(false, null, '无「经济调控」权限', 403)
     }
 

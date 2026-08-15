@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { authRequest, jsonResponse, isSuperAdmin, userHasPermission } from '@/lib/auth'
+import { authRequest, jsonResponse, isSuperAdminUser, userHasPermission } from '@/lib/auth'
 import {
   getPriceOverrides, setPriceOverrides,
   getListingItems, removeListingExt, createAdminListing,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const admin = await authRequest(req)
     if (!admin) return jsonResponse(false, null, '请先登录', 401)
     if (!admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
-    if (!isSuperAdmin(admin.id)) return jsonResponse(false, null, '仅超级管理员可操作市场', 403)
+    if (!isSuperAdminUser(admin)) return jsonResponse(false, null, '仅超级管理员可操作市场', 403)
 
     const body = await req.json()
     const mode = body.mode as

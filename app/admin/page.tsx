@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber, formatDateTime } from '@/lib/utils'
-import { ADMIN_PERMISSIONS, userHasPermission, isSuperAdmin as _isSuperAdmin } from '@/lib/auth'
+import { ADMIN_PERMISSIONS, userHasPermission, isSuperAdminUser as _isSuperAdmin } from '@/lib/auth'
 import { SEED_TYPES, FLOWER_TYPES, TOOLS } from '@/lib/game-data'
 import type { ItemType } from '@/lib/types'
 import {
@@ -398,7 +398,7 @@ export default function AdminPage() {
 
   const saveAdminPermissions = async () => {
     if (!editingUser) return
-    if (!_isSuperAdmin(user?.id || '')) return showToast('仅超级管理员可修改权限', 'error')
+    if (!_isSuperAdmin(user)) return showToast('仅超级管理员可修改权限', 'error')
     setLoading(`perm_${editingUser.id}`)
     const body: any = { userId: editingUser.id }
     // 有任意权限位 => 确保设为管理员；无权限位 => 撤管（同时在 action 端也会做）
@@ -469,14 +469,14 @@ export default function AdminPage() {
   // 有权限显示哪些 Tab
   const canSeeTab = (t: Tab): boolean => {
     if (!user) return false
-    if (_isSuperAdmin(user.id || '')) return true
+    if (_isSuperAdmin(user)) return true
     const bit = TAB_PERM_BIT[t]
     if (bit === null) return true
     if (t === 'dashboard') return userHasPermission(user, 6) || userHasPermission(user, 0)
     return userHasPermission(user, bit)
   }
 
-  const canSetAdminPerms = _isSuperAdmin(user?.id || '')
+  const canSetAdminPerms = _isSuperAdmin(user)
 
   const visibleTabs = tabs.filter(t => canSeeTab(t.k))
 
@@ -1351,7 +1351,7 @@ export default function AdminPage() {
               </div>
 
               {/* 子管理员权限配置（仅超级管理员可见） */}
-              {canSetAdminPerms && editingUser && _isSuperAdmin(editingUser.id) === false && (
+              {canSetAdminPerms && editingUser && _isSuperAdmin(editingUser) === false && (
                 <div className="border border-slate-200 rounded-xl p-3">
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-slate-700 flex items-center gap-1">

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { authRequest, jsonResponse, userHasPermission, isSuperAdmin } from '@/lib/auth'
+import { authRequest, jsonResponse, userHasPermission, isSuperAdminUser } from '@/lib/auth'
 import { getAllUsers, listAdminLogs, getListings, getBuyOrders } from '@/lib/server-store'
 import { SEASON_NAMES, getCurrentSeason } from '@/lib/game-data'
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const admin = await authRequest(req)
     if (!admin) return jsonResponse(false, null, '请先登录', 401)
     if (!admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
-    if (!userHasPermission(admin, 6) && !isSuperAdmin(admin.id)) return jsonResponse(false, null, '无「日志统计」权限', 403)
+    if (!userHasPermission(admin, 6) && !isSuperAdminUser(admin)) return jsonResponse(false, null, '无「日志统计」权限', 403)
 
     const url = new URL(req.url)
     const action = url.searchParams.get('action') || 'overview'

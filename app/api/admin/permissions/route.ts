@@ -1,5 +1,5 @@
 import { getAllUsers } from '@/lib/server-store'
-import { authRequest, jsonResponse, userHasPermission, isSuperAdmin, ADMIN_PERMISSIONS } from '@/lib/auth'
+import { authRequest, jsonResponse, userHasPermission, isSuperAdminUser, ADMIN_PERMISSIONS } from '@/lib/auth'
 
 export const runtime = 'edge'
 
@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const admin = await authRequest(req)
     if (!admin || !admin.isAdmin) return jsonResponse(false, null, '无权访问', 403)
     // 只有超级管理员或具备「权限管理」位(bit 5)的管理员可查看
-    if (!isSuperAdmin(admin.id) && !userHasPermission(admin, 5)) {
+    if (!isSuperAdminUser(admin) && !userHasPermission(admin, 5)) {
       return jsonResponse(false, null, '无「权限管理」权限', 403)
     }
 
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
       .filter((u) => u.isAdmin)
       .map((u) => {
         const perms = Number(u.adminPermissions) || 0
-        const isSuper = isSuperAdmin(u.id)
+        const isSuper = isSuperAdminUser(u)
         // 权限位解析：返回每项权限的启用状态
         const permFlags: Record<string, boolean> = {}
         for (const p of ADMIN_PERMISSIONS) {

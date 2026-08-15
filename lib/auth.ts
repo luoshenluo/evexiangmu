@@ -58,6 +58,16 @@ export function isSuperAdmin(userId: string): boolean {
   return userId === SUPER_ADMIN_ID
 }
 
+/**
+ * 判断是否为超级管理员用户（兼容 id 或 username 等于 SUPER_ADMIN_ID）
+ * 线上库超管的行 id 可能是自动生成的（如 adm_xxx），但 username 固定为 admin，
+ * 仅按 id 判断会导致超管保护失效。
+ */
+export function isSuperAdminUser(user: { id?: string; username?: string } | null | undefined): boolean {
+  if (!user) return false
+  return user.id === SUPER_ADMIN_ID || user.username === SUPER_ADMIN_ID
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
