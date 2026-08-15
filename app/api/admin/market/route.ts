@@ -3,7 +3,7 @@ import { authRequest, jsonResponse, isSuperAdminUser, userHasPermission } from '
 import {
   getPriceOverrides, setPriceOverrides,
   getListingItems, removeListingExt, createAdminListing,
-  getAllFamilies, getAllUserBaseCount, logAdminAction,
+  getAllFamilies, logAdminAction, getEconomyStats,
 } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES } from '@/lib/game-data'
 
@@ -45,14 +45,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === 'econ-stats') {
-      // 简易经济统计：用户数、家族数、最近成交等
-      const userCount = await getAllUserBaseCount()
+      // 经济仪表盘实时快照
+      const stats = await getEconomyStats()
       const families = await getAllFamilies()
-      return jsonResponse(true, {
-        userCount,
-        familyCount: families.length,
-        timestamp: Date.now(),
-      })
+      return jsonResponse(true, { ...stats, familyCount: families.length })
     }
 
     return jsonResponse(false, null, 'action 错误', 400)

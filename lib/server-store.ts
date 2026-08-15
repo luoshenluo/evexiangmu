@@ -3094,6 +3094,66 @@ export async function getAllFamilies(): Promise<Family[]> {
   return getFamilies(undefined, 500)
 }
 
+export interface EconomyStats {
+  userCount: number
+  totalCoins: number
+  avgCoins: number
+  totalListings: number
+  officialListings: number
+  playerListings: number
+  totalBuyOrders: number
+  totalBuyOrderValue: number
+  priceOverrideActive: boolean
+  overriddenItems: number
+  feeRate: number
+  timestamp: number
+}
+
+/** 经济仪表盘实时快照（管理员后台展示用） */
+export async function getEconomyStats(): Promise<EconomyStats> {
+  await seedDatabase()
+  const sb = getSupabase()
+
+  const [userRes, listingRes, orderRes, overrides] = await Promise.all([
+    sb.from('users').select('coins'),
+    sb.from('listings').select('is_official'),
+    sb.from('buy_orders').select('price, quantity'),
+    getPriceOverrides(),
+  ])
+
+  const users = userRes.data || []
+  const totalCoins = users.reduce((s, u: any) => s + (Number(u.coins) || 0), 0)
+
+  const listings = listingRes.data || []
+  const officialListings = listings.filter((l: any) => l.is_official).length
+  const playerListings = listings.length - officialListings
+
+  const orders = orderRes.data || []
+  const totalBuyOrderValue = orders.reduce((s, o: any) => s + (Number(o.price) || 0) * (Number(o.quantity) || 0), 0)
+
+  let overriddenItems = 0
+  if (overrides.flowers) overriddenItems += Object.keys(overrides.flowers).length
+  if (overrides.seeds) overriddenItems += Object.keys(overrides.seeds).length
+  if (overrides.tools) overriddenItems += Object.keys(overrides.tools).length
+
+  const eff = await getEffectivePrices()
+
+  return {
+    userCount: users.length,
+    totalCoins,
+    avgCoins: users.length > 0 ? Math.round(totalCoins / users.length) : 0,
+    totalListings: listings.length,
+    officialListings,
+    playerListings,
+    totalBuyOrders: orders.length,
+    totalBuyOrderValue,
+    priceOverrideActive: overriddenItems > 0 || overrides.feeRate != null || overrides.minListPrice != null || overrides.maxListPrice != null,
+    overriddenItems,
+    feeRate: eff.feeRate,
+    timestamp: Date.now(),
+  }
+}
+
 export async function findAdminByUserId(userId: string): Promise<User | null> {
   const user = await findUserById(userId)
   if (!user || !user.isAdmin) return null

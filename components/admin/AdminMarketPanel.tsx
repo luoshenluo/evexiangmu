@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch, classNames, formatDateTime, formatNumber } from '@/lib/utils'
-import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart } from 'lucide-react'
+import { Tag, Plus, X, Edit, Check, Coins, Trash2, RefreshCw, Package, ShoppingCart, BarChart3 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 
-type SubTab = 'prices' | 'official' | 'player'
+type SubTab = 'overview' | 'prices' | 'official' | 'player'
 
 export default function AdminMarketPanel() {
   const { showToast } = useAppStore()
@@ -26,6 +26,7 @@ export default function AdminMarketPanel() {
   const [official, setOfficial] = useState<any[]>([])
   const [player, setPlayer] = useState<any[]>([])
   const [totalListings, setTotalListings] = useState(0)
+  const [econStats, setEconStats] = useState<any>(null)
 
   const [showCreate, setShowCreate] = useState(false)
   const [newItemType, setNewItemType] = useState<'seed' | 'flower' | 'tool'>('seed')
@@ -40,9 +41,10 @@ export default function AdminMarketPanel() {
   const refresh = async () => {
     setLoading(true)
     try {
-      const [p, m] = await Promise.all([
+      const [p, m, e] = await Promise.all([
         apiFetch('/api/admin/market?action=price-overrides'),
         apiFetch('/api/admin/market?action=market-items'),
+        apiFetch('/api/admin/market?action=econ-stats'),
       ])
       if (p.success) {
         setFlowerTypes(p.data?.flowerTypes || [])
@@ -78,6 +80,7 @@ export default function AdminMarketPanel() {
         setPlayer(m.data?.player || [])
         setTotalListings(m.data?.totalListings || 0)
       }
+      if (e.success) setEconStats(e.data)
     } finally { setLoading(false) }
   }
 
@@ -214,8 +217,9 @@ export default function AdminMarketPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl">
+      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl">
         {([
+          { k: 'overview', label: '经济仪表盘', icon: BarChart3 },
           { k: 'prices', label: '价格调控', icon: Edit },
           { k: 'official', label: `官方挂售 (${official.length})`, icon: Package },
           { k: 'player', label: `玩家挂售 (${player.length})`, icon: ShoppingCart },
@@ -231,6 +235,45 @@ export default function AdminMarketPanel() {
           </button>
         ))}
       </div>
+
+      {subTab === 'overview' && (
+        <div className="space-y-3">
+          {!econStats ? (
+            <div className="card p-8 text-center text-slate-400 text-sm">暂无统计数据</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="card p-4">
+                  <div className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Coins size={12} /> 全服金币总量</div>
+                  <div className="text-2xl font-bold text-amber-600">{formatNumber(econStats.totalCoins)}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">玩家 {econStats.userCount} 人 · 人均 {formatNumber(econStats.avgCoins)}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-xs text-slate-500 mb-1 flex items-center gap-1"><Package size={12} /> 挂售商品</div>
+                  <div className="text-2xl font-bold text-garden-700">{econStats.totalListings}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">官方 {econStats.officialListings} · 玩家 {econStats.playerListings}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-xs text-slate-500 mb-1 flex items-center gap-1"><ShoppingCart size={12} /> 收购单</div>
+                  <div className="text-2xl font-bold text-indigo-600">{econStats.totalBuyOrders}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">锁定金币 {formatNumber(econStats.totalBuyOrderValue)}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-xs text-slate-500 mb-1 flex items-center gap-1"><BarChart3 size={12} /> 价格调控</div>
+                  <div className={classNames('text-2xl font-bold', econStats.priceOverrideActive ? 'text-emerald-600' : 'text-slate-300')}>
+                    {econStats.priceOverrideActive ? '生效中' : '未调控'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">调控物品 {econStats.overriddenItems} 项 · 费率 {(econStats.feeRate * 100).toFixed(2)}%</div>
+                </div>
+              </div>
+              <div className="card p-4 flex items-center justify-between">
+                <span className="text-xs text-slate-500">家族数：<b>{econStats.familyCount}</b></span>
+                <span className="text-[10px] text-slate-400">更新于 {formatDateTime(econStats.timestamp).slice(5, 16)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {subTab === 'prices' && (
         <div className="space-y-4">
