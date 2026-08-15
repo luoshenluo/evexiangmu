@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSensitiveWords, addSensitiveWord } from '@/lib/server-store'
+import { getSensitiveWords, addSensitiveWord, logAdminAction } from '@/lib/server-store'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
     logger.info('admin', '管理员添加敏感词', {
       adminId: admin.id, added: added.length, duplicated: duplicated.length,
     })
+    if (added.length > 0) {
+      await logAdminAction(admin, 'add_sensitive_words', { targetType: 'other', detail: { desc: `添加敏感词: ${added.join('、')}` } })
+    }
 
     return jsonResponse(true, { added, duplicated, addedCount: added.length })
   } catch (e: any) {

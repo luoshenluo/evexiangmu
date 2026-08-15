@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findUserById, updateUser } from '@/lib/server-store'
+import { findUserById, updateUser, logAdminAction } from '@/lib/server-store'
 import bcrypt from 'bcryptjs'
 import { authRequest, jsonResponse, isSuperAdminUser, userHasPermission } from '@/lib/auth'
 
@@ -117,6 +117,21 @@ export async function POST(req: Request) {
     }
 
     await updateUser(userId, updates)
+
+    // 审计日志：记录本次修改内容
+    const descParts: string[] = []
+    if (newPassword) descParts.push('重置密码')
+    if (makeAdmin !== undefined) descParts.push(makeAdmin ? '设为管理员' : '撤销管理员')
+    if (adminPermissions !== undefined) descParts.push(`设置权限位=${Number(adminPermissions) & 0xff}`)
+    if (banUser) descParts.push(banDays ? `封号${banDays}天` : '永久封号')
+    if (unbanUser) descParts.push('解除封号')
+    if (nickname !== undefined) descParts.push(`修改昵称为「${nickname.trim()}」`)
+    if (avatar !== undefined) descParts.push('修改头像')
+    await logAdminAction(admin, 'user_action', {
+      targetType: 'user', targetId: userId,
+      detail: { desc: `对用户「${target.nickname || target.username || target.id}」执行: ${descParts.join('、') || '无操作'}` },
+    })
+
     return jsonResponse(true, { ok: true })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

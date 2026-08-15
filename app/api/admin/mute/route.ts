@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { muteUser, getAllUsers, findUserById, updateUser } from '@/lib/server-store'
+import { muteUser, getAllUsers, findUserById, updateUser, logAdminAction } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse, isSuperAdminUser, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -16,6 +16,10 @@ export async function POST(req: NextRequest) {
     if (target.isAdmin && !isSuperAdminUser(admin)) return jsonResponse(false, null, '不能禁言其他管理员', 403)
 
     await muteUser(userId, (days || 0) * 24 * 60 * 60 * 1000)
+    await logAdminAction(admin, 'mute_user', {
+      targetType: 'user', targetId: userId,
+      detail: { desc: days > 0 ? `禁言用户「${target.nickname || target.username || target.id}」${days}天` : `解除用户「${target.nickname || target.username || target.id}」的禁言` },
+    })
     return jsonResponse(true, { ok: true })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

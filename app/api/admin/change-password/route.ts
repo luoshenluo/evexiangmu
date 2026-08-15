@@ -1,4 +1,4 @@
-import { findUserById, updateUser } from '@/lib/server-store'
+import { findUserById, updateUser, logAdminAction } from '@/lib/server-store'
 import bcrypt from 'bcryptjs'
 import { authRequest, jsonResponse } from '@/lib/auth'
 
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
     const newHash = bcrypt.hashSync(newPassword, 10)
     await updateUser(admin.id, { password: newHash })
+    await logAdminAction(admin, 'change_password', { targetType: 'user', targetId: admin.id, detail: { desc: '修改自己的管理员密码' } })
     return jsonResponse(true, { ok: true })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

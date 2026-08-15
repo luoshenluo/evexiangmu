@@ -3,7 +3,7 @@ import { authRequest, jsonResponse, isSuperAdminUser, userHasPermission } from '
 import {
   getPriceOverrides, setPriceOverrides,
   getListingItems, removeListingExt, createAdminListing,
-  getAllFamilies, getAllUserBaseCount,
+  getAllFamilies, getAllUserBaseCount, logAdminAction,
 } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES } from '@/lib/game-data'
 
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       // overrides 形状： { flowers:{[id]:{baseSellPrice, seedPrice}}, seeds:{[id]:{price}}, tools:{[id]:{price}}, feeRate, minListPrice, maxListPrice }
       const res = await setPriceOverrides(admin.id, body.overrides)
       if (!res.success) return jsonResponse(false, null, res.error, 400)
+      await logAdminAction(admin, 'market_price', { targetType: 'other', detail: { desc: '修改市场价格调控', overrides: body.overrides } })
       return jsonResponse(true, { ok: true })
     }
 
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
         quantity: Number(quantity),
       })
       if (!r.success) return jsonResponse(false, null, r.error, 400)
+      await logAdminAction(admin, 'market_create', { targetType: 'other', targetId: r.listing?.id, detail: { desc: `创建官方商品「${name}」(${itemType}/${referenceId}) 价格${price} 数量${quantity}` } })
       return jsonResponse(true, { ok: true, listing: r.listing })
     }
 
@@ -101,6 +103,7 @@ export async function POST(req: NextRequest) {
       if (!id) return jsonResponse(false, null, 'id 缺失', 400)
       const r = await removeListingExt(null, id, true)
       if (!r.success) return jsonResponse(false, null, r.error, 400)
+      await logAdminAction(admin, 'market_remove', { targetType: 'other', targetId: id, detail: { desc: `下架官方商品 ${id}` } })
       return jsonResponse(true, { ok: true })
     }
 

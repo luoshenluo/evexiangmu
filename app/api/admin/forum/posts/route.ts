@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { listForumPostsAdmin, deleteForumPost } from '@/lib/server-store'
+import { listForumPostsAdmin, deleteForumPost, logAdminAction } from '@/lib/server-store'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -32,6 +32,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) return jsonResponse(false, null, '缺少帖子 id', 400)
     const r = await deleteForumPost(id, user.id, true)
     if (!r.success) return jsonResponse(false, null, r.error, 400)
+    await logAdminAction(user, 'delete_post', { targetType: 'other', targetId: id, detail: { desc: `删除论坛帖子 ${id}` } })
     return jsonResponse(true, null, '已删除')
   } catch (e: any) {
     return jsonResponse(false, null, e.message || '服务器错误', 500)

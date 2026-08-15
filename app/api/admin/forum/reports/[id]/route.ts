@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { handleForumReport } from '@/lib/server-store'
+import { handleForumReport, logAdminAction } from '@/lib/server-store'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -19,6 +19,7 @@ export async function POST(
     const deleteTarget = !!body.deleteTarget
     const r = await handleForumReport(params.id, status, deleteTarget)
     if (!r.success) return jsonResponse(false, null, r.error, 400)
+    await logAdminAction(user, 'handle_report', { targetType: 'other', targetId: params.id, detail: { desc: `处理举报 ${params.id}：${status === 'dismissed' ? '驳回' : '已处理'}${deleteTarget ? '（已删除违规内容）' : ''}` } })
     return jsonResponse(true, null, '处理完成')
   } catch (e: any) {
     return jsonResponse(false, null, e.message || '服务器错误', 500)

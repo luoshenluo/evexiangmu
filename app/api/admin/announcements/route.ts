@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getAnnouncements, createAnnouncement } from '@/lib/server-store'
+import { getAnnouncements, createAnnouncement, logAdminAction } from '@/lib/server-store'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 
 export const runtime = 'edge'
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       content: content.trim(),
       priority: priority || 'normal',
     })
+    await logAdminAction(user, 'create_announcement', { targetType: 'other', targetId: a?.id, detail: { desc: `发布公告「${title.trim()}」` } })
     return jsonResponse(true, a)
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getAllCDKs, createCDK } from '@/lib/server-store'
+import { getAllCDKs, createCDK, logAdminAction } from '@/lib/server-store'
 import type { CDK } from '@/lib/types'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         createdAt: Date.now(),
       }))
     }
+    await logAdminAction(admin, 'create_cdk', { targetType: 'other', detail: { desc: `生成 ${count} 个 CDK，有效期${days}天，奖励 coins=${coins} petals=${petalCoins}` } })
     return jsonResponse(true, { count: created.length, codes: created.map(c => c.code), firstCode: created[0]?.code })
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)

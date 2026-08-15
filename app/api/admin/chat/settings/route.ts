@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getChatSettings, updateChatSettings } from '@/lib/server-store'
+import { getChatSettings, updateChatSettings, logAdminAction } from '@/lib/server-store'
 import { authRequest, jsonResponse, userHasPermission } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     if (!updated) return jsonResponse(false, null, '更新失败', 500)
 
     logger.info('admin', '管理员更新聊天设置', { adminId: admin.id, updates })
+    await logAdminAction(admin, 'chat_settings', { targetType: 'other', detail: { desc: '更新聊天设置', updates } })
     return jsonResponse(true, updated)
   } catch (e: any) {
     return jsonResponse(false, null, e.message, 500)
