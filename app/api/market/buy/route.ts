@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { findListing, removeListing, atomicDecreaseListing, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress, atomicSpendCoins, atomicAddInventory, atomicAddCoins } from '@/lib/server-store'
+import { findListing, removeListing, atomicDecreaseListing, findUserById, ensureSeasonTick, createNotification, incrementTaskProgress, atomicSpendCoins, atomicAddInventory, atomicAddCoins, getEffectivePrices } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES, TOOLS } from '@/lib/game-data'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 
@@ -73,7 +73,9 @@ export async function POST(req: NextRequest) {
     if (!listing.isOfficial && listing.sellerId !== 'system') {
       const seller = await findUserById(listing.sellerId)
       if (seller) {
-        const sellerCoins = Math.floor(totalCost * 0.95) // 5% 手续费
+        const eff = await getEffectivePrices()
+        const feeRate = eff.feeRate
+        const sellerCoins = Math.floor(totalCost * (1 - feeRate)) // 手续费 feeRate%
         await atomicAddCoins(seller.id, sellerCoins)
 
         // 卖家任务：贸易达人（日） + 周常富豪（累计获得金币）

@@ -14,6 +14,7 @@ import {
   getFlowerSellPrice, getSeasonByMonth,
   FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
   filterSensitiveWords,
+  SEED_TYPES, TOOLS,
 } from './game-data'
 import bcrypt from 'bcryptjs'
 
@@ -2880,7 +2881,10 @@ export interface PriceOverrides {
   updatedBy?: string
 }
 
-let _priceOverridesCache: PriceOverrides | null = null
+let _priceOverridesCache: { data: PriceOverrides; fetchedAt: number } | null = null
+// 价格覆盖缓存 TTL：15 秒。多实例下后台改价后最迟 15 秒内全局生效，
+// 避免个别实例长期持有旧缓存导致结算不一致
+const PRICE_OVERRIDES_TTL = 15 * 1000
 
 function priceOverridesRow(row: any): PriceOverrides {
   if (!row) return {}
@@ -2898,18 +2902,22 @@ function priceOverridesRow(row: any): PriceOverrides {
 
 export async function getPriceOverrides(): Promise<PriceOverrides> {
   await seedDatabase()
-  if (_priceOverridesCache) return _priceOverridesCache
+  const now = Date.now()
+  if (_priceOverridesCache && now - _priceOverridesCache.fetchedAt < PRICE_OVERRIDES_TTL) {
+    return _priceOverridesCache.data
+  }
   const sb = getSupabase()
   const { data, error } = await sb.from('price_overrides').select('*').order('updated_at', { ascending: false }).limit(1)
   if (error || !data || data.length === 0) {
     try {
       // 无表则 fall back 空
-      _priceOverridesCache = {}
+      _priceOverridesCache = { data: {}, fetchedAt: now }
     } catch {}
-    return _priceOverridesCache || {}
+    return _priceOverridesCache?.data || {}
   }
-  _priceOverridesCache = priceOverridesRow(data[0])
-  return _priceOverridesCache
+  const parsed = priceOverridesRow(data[0])
+  _priceOverridesCache = { data: parsed, fetchedAt: now }
+  return parsed
 }
 
 export async function setPriceOverrides(adminId: string, overrides: PriceOverrides): Promise<{ success: boolean; error?: string }> {
@@ -2926,8 +2934,74 @@ export async function setPriceOverrides(adminId: string, overrides: PriceOverrid
     updated_at: Date.now(),
   })
   if (error) return { success: false, error: error.message }
-  _priceOverridesCache = { ...overrides, updatedAt: Date.now(), updatedBy: adminId }
+  _priceOverridesCache = { data: { ...overrides, updatedAt: Date.now(), updatedBy: adminId }, fetchedAt: Date.now() }
   return { success: true }
+}
+
+// ============== 有效价格（应用价格覆盖后的对外定价） ==============
+
+export interface EffectivePrices {
+  flowers: Record<string, { baseSellPrice: number; seedPrice: number }>
+  seeds: Record<string, { price: number }>
+  tools: Record<string, { price: number }>
+  feeRate: number
+  minListPrice: number
+  maxListPrice: number
+}
+
+const DEFAULT_FEE_RATE = 0.05
+const DEFAULT_MIN_LIST_PRICE = 1
+const DEFAULT_MAX_LIST_PRICE = 999999
+
+/** 返回应用了后台价格覆盖后的有效定价（供前台结算/展示与后台共用） */
+export async function getEffectivePrices(): Promise<EffectivePrices> {
+  const o = await getPriceOverrides()
+  const flowers: EffectivePrices['flowers'] = {}
+  for (const f of FLOWER_TYPES) {
+    const seed = SEED_TYPES.find((s) => s.flowerTypeId === f.id)
+    const over = o.flowers?.[f.id] || {}
+    flowers[f.id] = {
+      baseSellPrice: over.baseSellPrice ?? f.baseSellPrice,
+      seedPrice: over.seedPrice ?? seed?.price ?? 0,
+    }
+  }
+  const seeds: EffectivePrices['seeds'] = {}
+  for (const s of SEED_TYPES) {
+    seeds[s.id] = { price: o.seeds?.[s.id]?.price ?? s.price }
+  }
+  const tools: EffectivePrices['tools'] = {}
+  for (const t of TOOLS) {
+    tools[t.id] = { price: o.tools?.[t.id]?.price ?? t.price }
+  }
+  return {
+    flowers,
+    seeds,
+    tools,
+    feeRate: o.feeRate ?? DEFAULT_FEE_RATE,
+    minListPrice: o.minListPrice ?? DEFAULT_MIN_LIST_PRICE,
+    maxListPrice: o.maxListPrice ?? DEFAULT_MAX_LIST_PRICE,
+  }
+}
+
+/** 花（按等级）的官方收购价：应用价格覆盖 */
+export async function getFlowerSellPriceEffective(flowerId: string, rank: number): Promise<number> {
+  const p = await getEffectivePrices()
+  const base = p.flowers[flowerId]?.baseSellPrice ?? 0
+  const rankMultipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+  const rankMul = rankMultipliers[Math.max(0, Math.min(rankMultipliers.length - 1, rank - 1))] || 1
+  return Math.floor(base * rankMul)
+}
+
+/** 种子售价：应用价格覆盖 */
+export async function getSeedPriceEffective(seedId: string): Promise<number> {
+  const p = await getEffectivePrices()
+  return p.seeds[seedId]?.price ?? 1
+}
+
+/** 工具售价：应用价格覆盖 */
+export async function getToolPriceEffective(toolId: string): Promise<number> {
+  const p = await getEffectivePrices()
+  return p.tools[toolId]?.price ?? 1
 }
 
 // 应用价格覆盖到实际售价 / 收购价 / 工具价

@@ -6,14 +6,13 @@ import {
   createNotification,
   createBuyOrder, getBuyOrders, removeBuyOrder, findBuyOrder,
   atomicConsumeInventory, atomicAddInventory, atomicSpendCoins, atomicAddCoins,
+  getFlowerSellPriceEffective, getSeedPriceEffective, getEffectivePrices,
 } from '@/lib/server-store'
 import { authRequest, jsonResponse } from '@/lib/auth'
 import type { InventoryItem } from '@/lib/types'
-import { getFlowerSellPrice, SEED_TYPES, FLOWER_TYPES } from '@/lib/game-data'
+import { SEED_TYPES, FLOWER_TYPES } from '@/lib/game-data'
 
 export const runtime = 'edge'
-
-const LISTING_FEE_RATE = 0.05 // 5% 手续费
 
 // 创建挂售（POST）：玩家从背包出售商品
 // 下架挂售（DELETE ?id=xxx）
@@ -60,17 +59,18 @@ async function handleCreateListing(user: any, body: any) {
   if (item.quantity < quantity) return jsonResponse(false, null, '数量不足', 400)
   if (!item.tradeable) return jsonResponse(false, null, '该物品不可交易', 400)
 
-  // 价格合理性检查：不低于官方收购价的 30%，防止恶意洗号
+  // 价格合理性检查：不低于官方收购价的 30%，防止恶意洗号（应用价格覆盖）
+  const eff = await getEffectivePrices()
   let minPrice = 1
+  let maxPrice = eff.maxListPrice
   if (itemType === 'flower') {
-    const ft = FLOWER_TYPES.find((f) => f.id === referenceId)
-    minPrice = Math.max(1, Math.floor((ft ? getFlowerSellPrice(ft, (item.rank || 1) as any) : 10) * 0.3))
+    minPrice = Math.max(1, Math.floor((await getFlowerSellPriceEffective(referenceId, (item.rank || 1) as any)) * 0.3))
   } else if (itemType === 'seed') {
-    const s = SEED_TYPES.find((s) => s.id === referenceId)
-    minPrice = Math.max(1, Math.floor((s?.price || 10) * 0.3))
+    minPrice = Math.max(1, Math.floor((await getSeedPriceEffective(referenceId)) * 0.3))
   }
+  minPrice = Math.max(minPrice, eff.minListPrice)
   if (price < minPrice) return jsonResponse(false, null, `单价过低（最低 ${minPrice} 金币）`, 400)
-  if (price > minPrice * 50) return jsonResponse(false, null, `单价过高（最高 ${minPrice * 50} 金币）`, 400)
+  if (price > maxPrice) return jsonResponse(false, null, `单价过高（最高 ${maxPrice} 金币）`, 400)
 
   // 从背包扣除（原子，防并发复制道具）
   const consumed = await atomicConsumeInventory(user.id, item.id, quantity)
@@ -146,7 +146,7 @@ async function handleCreateBuyOrder(user: any, body: any) {
     const s = SEED_TYPES.find((s) => s.id === referenceId)
     name = s?.name || '种子'
     emoji = s?.emoji || '🌱'
-    maxPrice = (s?.price || 100) * 20
+    maxPrice = (await getSeedPriceEffective(referenceId)) * 20
   }
   if (price > maxPrice) return jsonResponse(false, null, `收购价过高（最多 ${maxPrice} 金币/件）`, 400)
 

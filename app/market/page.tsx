@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES, RankNames, RankColors, getFlowerSellPrice } from '@/lib/game-data'
+import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES, RankNames, RankColors } from '@/lib/game-data'
 import type { MarketListing, BuyOrder, InventoryItem } from '@/lib/types'
 import { ShoppingCart, Tag, Download, Flower2, Leaf, Search, ArrowRightLeft, Coins, Plus, X, Minus, ShoppingBag, MessageCircle, Trash2, Sparkles } from 'lucide-react'
 
@@ -16,6 +16,7 @@ export default function MarketPage() {
   const [buyOrders, setBuyOrders] = useState<BuyOrder[]>([])
   const [myListings, setMyListings] = useState<MarketListing[]>([])
   const [myOrders, setMyOrders] = useState<BuyOrder[]>([])
+  const [prices, setPrices] = useState<any>(null) // 应用价格覆盖后的有效定价
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -33,11 +34,12 @@ export default function MarketPage() {
   const [subTab, setSubTab] = useState<'listings' | 'orders' | 'create'>('listings')
 
   const refresh = async () => {
-    const [fRes, sRes, tRes, oRes, myLRes, myORes] = await Promise.all([
+    const [fRes, sRes, tRes, oRes, pRes, myLRes, myORes] = await Promise.all([
       apiFetch('/api/market/listings?type=flower'),
       apiFetch('/api/market/listings?type=seed'),
       apiFetch('/api/market/listings?type=tool'),
       apiFetch('/api/market/buy-orders'),
+      apiFetch('/api/market/prices'),
       user && !isGuest ? apiFetch('/api/market/my?kind=listings') : { data: [] },
       user && !isGuest ? apiFetch('/api/market/my?kind=orders') : { data: [] },
     ])
@@ -48,11 +50,22 @@ export default function MarketPage() {
     ] as MarketListing[]
     setListings(allListings)
     setBuyOrders((oRes.data || []) as BuyOrder[])
+    if (pRes.success && pRes.data) setPrices(pRes.data)
     setMyListings((myLRes.data || []) as MarketListing[])
     setMyOrders((myORes.data || []) as BuyOrder[])
   }
 
   useEffect(() => { refresh() }, [user, isGuest])
+
+  // 有效售价（应用价格覆盖）：花按等级倍率，种子/工具取覆盖价
+  const effFlowerPrice = (flowerId: string, rank: number): number => {
+    const base = prices?.flowers?.[flowerId]?.baseSellPrice
+    const multipliers = [1, 1.5, 2.2, 3.2, 5, 8, 15]
+    const m = multipliers[Math.max(0, Math.min(multipliers.length - 1, rank - 1))] || 1
+    return Math.floor((base ?? FLOWER_TYPES.find(f => f.id === flowerId)?.baseSellPrice ?? 0) * m)
+  }
+  const effSeedPrice = (seedId: string): number =>
+    prices?.seeds?.[seedId]?.price ?? SEED_TYPES.find(s => s.id === seedId)?.price ?? 10
 
   const buy = async (listing: MarketListing) => {
     if (!user) return
@@ -152,7 +165,7 @@ export default function MarketPage() {
     setCreateRank(item.rank)
     setCreateQuantity(1)
     const ft = FLOWER_TYPES.find((f) => f.id === item.referenceId)
-    const base = ft ? getFlowerSellPrice(ft, (item.rank || 1) as any) : SEED_TYPES.find(s => s.id === item.referenceId)?.price || 10
+    const base = ft ? effFlowerPrice(item.referenceId, (item.rank || 1) as any) : effSeedPrice(item.referenceId as any)
     setCreatePrice(base)
   }
 
@@ -725,8 +738,8 @@ export default function MarketPage() {
                             setCreateEmoji(createItemType === 'flower' ? (c as any).emoji : '🌱')
                             if (createItemType === 'flower') setCreateRank(1)
                             const p = createItemType === 'flower'
-                              ? getFlowerSellPrice(c as any, 1) || 10
-                              : (c as any).price || 10
+                              ? effFlowerPrice(c.id, 1) || 10
+                              : effSeedPrice(c.id) || 10
                             setCreatePrice(Math.floor(p * 1.1))
                           }}
                           className={classNames(
@@ -749,8 +762,7 @@ export default function MarketPage() {
                         <button key={r}
                           onClick={() => {
                             setCreateRank(r)
-                            const ft = FLOWER_TYPES.find(f => f.id === createReferenceId)
-                            const p = ft ? getFlowerSellPrice(ft, r) : 10
+                            const p = effFlowerPrice(createReferenceId, r)
                             setCreatePrice(Math.floor(p * 1.1))
                           }}
                           className={classNames(

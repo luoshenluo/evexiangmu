@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { updateUser, ensureSeasonTick, createNotification, incrementTaskProgress } from '@/lib/server-store'
-import { FLOWER_TYPES, TOOLS, getFlowerSellPrice, PEST_CONFIG } from '@/lib/game-data'
+import { updateUser, ensureSeasonTick, createNotification, incrementTaskProgress, getFlowerSellPriceEffective } from '@/lib/server-store'
+import { FLOWER_TYPES, TOOLS, PEST_CONFIG } from '@/lib/game-data'
 import type { InventoryItem, PlantedFlower } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       const newPlots = user.plots.map(p => p.id === plotId ? { ...p, flower: null } : p)
       const updated = await updateUser(user.id, { plots: newPlots, inventory: newInventory })
 
-      const sellPrice = getFlowerSellPrice(flowerType, plot.flower.rank)
+      const sellPrice = await getFlowerSellPriceEffective(flowerType.id, plot.flower.rank)
 
       await createNotification({
         userId: user.id,

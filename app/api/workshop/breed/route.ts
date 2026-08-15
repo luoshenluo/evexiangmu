@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { updateUser, createNotification } from '@/lib/server-store'
-import { FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { updateUser, createNotification, getFlowerSellPriceEffective } from '@/lib/server-store'
+import { FLOWER_TYPES } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
     const ftB = FLOWER_TYPES.find(f => f.id === itemB.referenceId)
     if (!ftA || !ftB) return jsonResponse(false, null, '花型异常', 400)
 
-    // 金币成本
-    const sellA = getFlowerSellPrice(ftA, (itemA.rank || 1) as any)
-    const sellB = getFlowerSellPrice(ftB, (itemB.rank || 1) as any)
+    // 金币成本（应用价格覆盖）
+    const sellA = await getFlowerSellPriceEffective(itemA.referenceId, (itemA.rank || 1) as any)
+    const sellB = await getFlowerSellPriceEffective(itemB.referenceId, (itemB.rank || 1) as any)
     const cost = (sellA + sellB) * 2
     if (user.coins < cost) {
       return jsonResponse(false, null, `金币不足，需要 ${cost} 金币`, 400)

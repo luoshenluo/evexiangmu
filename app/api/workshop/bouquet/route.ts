@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { updateUser, createNotification } from '@/lib/server-store'
-import { FLOWER_TYPES, getFlowerSellPrice } from '@/lib/game-data'
+import { updateUser, createNotification, getFlowerSellPriceEffective } from '@/lib/server-store'
+import { FLOWER_TYPES } from '@/lib/game-data'
 import type { InventoryItem } from '@/lib/types'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
       return jsonResponse(false, null, `金币不足，需要 ${BOUQUET_FEE} 金币手工费`, 400)
     }
 
-    // 花束售价 = 3 × 单朵售价 × 1.5
-    const singleSell = getFlowerSellPrice(ft, (item.rank || 1) as any)
+    // 花束售价 = 3 × 单朵售价 × 1.5（应用价格覆盖）
+    const singleSell = await getFlowerSellPriceEffective(item.referenceId, (item.rank || 1) as any)
     const bouquetSell = Math.round(singleSell * 3 * BOUQUET_BONUS)
 
     // 消耗 3 朵花
