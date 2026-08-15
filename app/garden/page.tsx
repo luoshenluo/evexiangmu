@@ -175,7 +175,7 @@ export default function GardenPage() {
           <Coins size={15} /> {formatNumber(user.coins)}
         </span>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <Link href="/inventory" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="背包">
+          <Link href="/inventory" className="icon-btn" title="背包">
             <Package size={18} />
             {user.inventory.filter(i => i.quantity > 0).length > 0 && (
               <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center px-0.5 font-bold">
@@ -183,13 +183,13 @@ export default function GardenPage() {
               </span>
             )}
           </Link>
-          <Link href="/profile" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="消息与公告">
+          <Link href="/profile" className="icon-btn" title="消息与公告">
             <Bell size={18} />
             {announcements.filter(a => a.priority === 'urgent').length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
             )}
           </Link>
-          <Link href="/visit" className="relative p-2 rounded-lg bg-white/70 border border-slate-200 text-slate-600 min-h-[40px] flex items-center justify-center hover:bg-white transition-colors" title="访问好友花园">
+          <Link href="/visit" className="icon-btn" title="访问好友花园">
             <Users size={18} />
           </Link>
         </div>
@@ -239,14 +239,14 @@ export default function GardenPage() {
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="p-2.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40 min-h-[44px] flex items-center"
+            className="icon-btn-sm"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="p-2.5 rounded-lg bg-white border border-slate-200 disabled:opacity-40 min-h-[44px] flex items-center"
+            className="icon-btn-sm"
           >
             <ChevronRight size={18} />
           </button>

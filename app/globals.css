@@ -214,6 +214,27 @@ html[data-font="song"] {
   .chip {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
+  /* 统一图标按钮：一致的触碰目标（44px）、圆角、边框与交互反馈 */
+  .icon-btn {
+    @apply relative inline-flex items-center justify-center w-11 h-11 rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+  }
+  .icon-btn:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .icon-btn-sm {
+    @apply relative inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+  }
+  .icon-btn-sm:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
 }
 
 /* ======= 深色主题下纯 Tailwind slate 文字的适配层 =======
