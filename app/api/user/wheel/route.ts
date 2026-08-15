@@ -1,9 +1,53 @@
 import { NextRequest } from 'next/server'
 import { updateUser, findUserById, createNotification, atomicSpendPetals } from '@/lib/server-store'
 import { authRequest, jsonResponse, sanitizeUser } from '@/lib/auth'
-import { WHEEL_REWARDS, pickWheelIndex } from '@/lib/game-data'
+import { WHEEL_REWARDS, pickWheelIndex, FLOWER_TYPES, SEED_TYPES } from '@/lib/game-data'
 
 export const runtime = 'edge'
+
+// 种子奖励的默认名称映射
+const SEED_NAMES: Record<string, string> = {
+  'seed_rose': '玫瑰种子', 'seed_tulip': '郁金香种子', 'seed_daisy': '雏菊种子',
+  'seed_plum': '梅花种子', 'seed_sunflower': '向日葵种子', 'seed_chrysanthemum': '菊花种子',
+  'seed_cherry': '樱花种子', 'seed_lotus': '荷花种子',
+}
+
+// 根据奖励生成背包物品（seed/flower），不发放则返回 null
+function buildRewardItem(reward: (typeof WHEEL_REWARDS)[number]) {
+  if (reward.itemType === 'seed' && reward.referenceId) {
+    const seed = SEED_TYPES.find(s => s.id === reward.referenceId)
+    return {
+      id: `wheel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: 'seed' as const,
+      referenceId: reward.referenceId,
+      name: seed?.name || SEED_NAMES[reward.referenceId] || '种子',
+      emoji: '🌱',
+      quantity: reward.quantity || 1,
+      maxStack: 99,
+      sellable: false,
+      tradeable: true,
+    }
+  }
+  if (reward.itemType === 'flower') {
+    // 随机花朵：随机选一种当季适种的花
+    const randomFlower = FLOWER_TYPES[Math.floor(Math.random() * FLOWER_TYPES.length)]
+    // flower_common → rank1，flower_rare → rank3
+    const rank: 1 | 3 = reward.key === 'flower_rare' ? 3 : 1
+    return {
+      id: `wheel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: 'flower' as const,
+      referenceId: randomFlower.id,
+      name: randomFlower.name,
+      emoji: randomFlower.emoji,
+      rank,
+      quantity: reward.quantity || 1,
+      maxStack: 99,
+      sellable: false,
+      tradeable: true,
+    }
+  }
+  return null
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,29 +85,55 @@ export async function POST(req: NextRequest) {
 
     const results: number[] = []
     let totalCoins = 0, totalPetals = 0
+    // 收集需要入背包的种子/花朵奖励
+    const itemRewards: ReturnType<typeof buildRewardItem>[] = []
     for (let i = 0; i < times; i++) {
       const idx = pickWheelIndex()
       results.push(idx)
-      totalCoins += WHEEL_REWARDS[idx].coins
-      totalPetals += WHEEL_REWARDS[idx].petals || 0
+      const reward = WHEEL_REWARDS[idx]
+      totalCoins += reward.coins
+      totalPetals += reward.petals || 0
+      if (reward.itemType) itemRewards.push(buildRewardItem(reward))
     }
 
     // 原子扣减后重新读取最新花瓣数，避免用旧值覆盖并发扣减结果
     const fresh = await findUserById(u.id)
     const basePetals = fresh?.petalCoins ?? (u.petalCoins || 0)
 
+    // 将种子/花朵奖励合并进背包
+    let newInventory = fresh?.inventory ? [...fresh.inventory] : []
+    if (itemRewards.length > 0) {
+      for (const item of itemRewards) {
+        if (!item) continue
+        const existing = newInventory.find(
+          i => i && i.type === item.type && i.referenceId === item.referenceId && (i.rank || 1) === (item.rank || 1)
+        )
+        if (existing) {
+          newInventory = newInventory.map(i =>
+            i.id === existing.id
+              ? { ...i, quantity: Math.min(i.maxStack || 99, (i.quantity || 0) + (item.quantity || 1)) }
+              : i,
+          )
+        } else {
+          newInventory.push(item)
+        }
+      }
+    }
+
     const patch: any = {
       petalCoins: basePetals + totalPetals,
       coins: (u.coins || 0) + totalCoins,
     }
+    if (newInventory.length > 0) patch.inventory = newInventory
     const updated = await updateUser(u.id, patch)
 
     const lastIdx = results[results.length - 1]
+    const rewardLabels = results.map(idx => WHEEL_REWARDS[idx].label).join('、')
     await createNotification({
       userId: u.id,
       type: 'reward',
       title: times > 1 ? `幸运转盘 x${times}` : '幸运转盘',
-      content: `共获得 ${totalCoins} 金币${totalPetals ? ` + ${totalPetals} 花瓣` : ''}，最后一次：${WHEEL_REWARDS[lastIdx].label}`,
+      content: `共获得 ${totalCoins} 金币${totalPetals ? ` + ${totalPetals} 花瓣` : ''}${itemRewards.length ? `，物品：${itemRewards.map(i => i?.name).join('、')}` : ''}`,
     })
 
     return jsonResponse(true, {
@@ -71,6 +141,8 @@ export async function POST(req: NextRequest) {
       results,
       totalCoins,
       totalPetals,
+      items: itemRewards.map(i => i ? { type: i.type, name: i.name, emoji: i.emoji, quantity: i.quantity } : null).filter(Boolean),
+      lastLabel: WHEEL_REWARDS[lastIdx].label,
       netCost: cost - totalPetals,
     })
   } catch (e: any) {

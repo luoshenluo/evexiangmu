@@ -24,11 +24,11 @@ export default function MiniGamesPage() {
   const [spinning, setSpinning] = useState(false)
   const [spinTimes, setSpinTimes] = useState<1 | 5 | 10>(1)
   const [rotation, setRotation] = useState(0)   // 当前指针相对角度
-  const [history, setHistory] = useState<{ index: number; at: number; time: number; coins: number; petals: number }[]>([])
-  const [lastBatch, setLastBatch] = useState<{ results: number[]; totalCoins: number; totalPetals: number } | null>(null)
+  const [history, setHistory] = useState<{ index: number; at: number; time: number; coins: number; petals: number; itemName?: string; itemEmoji?: string }[]>([])
+  const [lastBatch, setLastBatch] = useState<{ results: number[]; totalCoins: number; totalPetals: number; items?: { type: string; name: string; emoji: string; quantity: number }[] } | null>(null)
   // 猜大小
   const [diceBetType, setDiceBetType] = useState<'small' | 'big' | 'middle' | 'exact'>('middle')
-  const [diceBetAmount, setDiceBetAmount] = useState(1)
+  const [diceBetAmount, setDiceBetAmount] = useState(5)
   const [diceTarget, setDiceTarget] = useState<number>(7)
   const [diceAnimating, setDiceAnimating] = useState(false)
   const [lastDiceResult, setLastDiceResult] = useState<{ dice: number[]; sum: number; won: boolean; netPetals: number; netCoins: number } | null>(null)
@@ -66,10 +66,10 @@ export default function MiniGamesPage() {
         body: JSON.stringify({ times: spinTimes }),
       })
       if (!r.success) { showToast(r.error || '抽奖失败', 'error'); setSpinning(false); return }
-      const { results, totalCoins, totalPetals, user: updated } = r.data
+      const { results, totalCoins, totalPetals, items, user: updated } = r.data
       if (updated) updateUser(updated)
       setPetals(updated?.petalCoins || petals - spinTimes + totalPetals)
-      setLastBatch({ results, totalCoins, totalPetals })
+      setLastBatch({ results, totalCoins, totalPetals, items })
 
       // 动画：最终停在最后一个结果
       const lastIdx = results[results.length - 1]
@@ -79,21 +79,38 @@ export default function MiniGamesPage() {
       const next = rotation + (360 - base) + targetAngle
       setRotation(next)
 
-      // 记录历史
+      // 记录历史（含种子/花朵奖励名称）
       const now = Date.now()
-      const hist: { index: number; at: number; time: number; coins: number; petals: number }[] = results.map((idx: number, i: number) => ({
-        index: idx,
-        at: now + i,
-        time: now + i,
-        coins: WHEEL_REWARDS[idx].coins,
-        petals: WHEEL_REWARDS[idx].petals || 0,
-      }))
+      let itemCursor = 0
+      const hist: { index: number; at: number; time: number; coins: number; petals: number; itemName?: string; itemEmoji?: string }[] = results.map((idx: number, i: number) => {
+        const reward = WHEEL_REWARDS[idx]
+        let itemName: string | undefined
+        let itemEmoji: string | undefined
+        if (reward.itemType && items && items[itemCursor]) {
+          itemName = items[itemCursor].name
+          itemEmoji = items[itemCursor].emoji
+          itemCursor++
+        }
+        return {
+          index: idx,
+          at: now + i,
+          time: now + i,
+          coins: reward.coins,
+          petals: reward.petals || 0,
+          itemName,
+          itemEmoji,
+        }
+      })
       setHistory(h => [...hist.reverse(), ...h].slice(0, 12))
 
       // 3.5s 后显示结果
       setTimeout(() => {
         setSpinning(false)
-        showToast(`抽奖完成：${totalCoins > 0 ? `+${formatNumber(totalCoins)} 金币` : ''}${totalPetals > 0 ? ` +${totalPetals} 花瓣` : ''}`, 'success')
+        const parts: string[] = []
+        if (totalCoins > 0) parts.push(`+${formatNumber(totalCoins)} 金币`)
+        if (totalPetals > 0) parts.push(`+${totalPetals} 花瓣`)
+        if (items?.length) parts.push(`${items.length} 件物品`)
+        showToast(`抽奖完成：${parts.join(' ')}`, 'success')
       }, 3500)
     } catch (e: any) {
       setSpinning(false)
@@ -222,7 +239,7 @@ export default function MiniGamesPage() {
         <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
           <Sparkles size={16} className="text-fuchsia-500" /> 幸运大转盘
         </h3>
-        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 1 花瓣，大奖高达 1000 金币～</div>
+        <div className="text-xs text-slate-500 mb-4">每次抽奖消耗 1 花瓣，可赢取金币、种子与花朵奖励，大奖高达 500 金币～</div>
         <div className="flex justify-center relative select-none" ref={canvasRef} style={{ touchAction: 'none' }}>
           {/* 外圈装饰 */}
           <div className="absolute -inset-3 rounded-full bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500 shadow-xl opacity-80" />
@@ -259,9 +276,9 @@ export default function MiniGamesPage() {
                       textAnchor="middle"
                       dominantBaseline="middle"
                       transform={`rotate(${rot} ${tx} ${ty})`}
-                      fontSize={r.coins >= 5000 ? 14 : 12}
-                      fontWeight={r.coins >= 5000 ? 800 : 600}
-                      fill={r.coins >= 5000 ? '#b91c1c' : r.key === 'nothing' ? '#94a3b8' : '#334155'}>
+                      fontSize={r.coins >= 500 ? 14 : 12}
+                      fontWeight={r.coins >= 500 ? 800 : 600}
+                      fill={r.coins >= 500 ? '#b91c1c' : r.key === 'nothing' ? '#94a3b8' : '#334155'}>
                       {short}
                     </text>
                   )
@@ -324,7 +341,7 @@ export default function MiniGamesPage() {
               const total = WHEEL_REWARDS.reduce((s, r) => s + r.weight, 0)
               return WHEEL_REWARDS.map(r => {
                 const pct = ((r.weight / total) * 100).toFixed(1)
-                const isHigh = r.coins >= 200
+                const isHigh = r.coins >= 200 || r.itemType === 'seed' || r.itemType === 'flower'
                 return (
                   <div key={r.key} className="flex items-center justify-between text-[11px]">
                     <span className={classNames('truncate', isHigh ? 'text-amber-700 font-semibold' : 'text-slate-600')}>{r.label}</span>
@@ -342,13 +359,20 @@ export default function MiniGamesPage() {
         <div className="card p-4 mb-4 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200">
           <div className="text-xs text-emerald-700 mb-1 flex items-center gap-1"><Trophy size={12} /> 本次奖励</div>
           <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-1 text-amber-600 font-bold text-base"><Coins size={16} /> +{formatNumber(lastBatch.totalCoins)}</div>
+            {lastBatch.totalCoins > 0 && (
+              <div className="flex items-center gap-1 text-amber-600 font-bold text-base"><Coins size={16} /> +{formatNumber(lastBatch.totalCoins)}</div>
+            )}
             {lastBatch.totalPetals > 0 && <div className="flex items-center gap-1 text-pink-600 font-bold text-base"><Flower size={16} /> +{lastBatch.totalPetals}</div>}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {lastBatch.results.map((idx, i) => (
               <div key={i} className="px-2 py-1 rounded-lg bg-white/80 border border-emerald-200 text-[10px] text-slate-700">
                 {WHEEL_REWARDS[idx].label}
+              </div>
+            ))}
+            {lastBatch.items?.map((it, i) => (
+              <div key={`item-${i}`} className="px-2 py-1 rounded-lg bg-purple-50 border border-purple-200 text-[10px] text-purple-700">
+                {it.emoji} {it.name}×{it.quantity}
               </div>
             ))}
           </div>
@@ -368,13 +392,14 @@ export default function MiniGamesPage() {
             <div key={`${h.at}-${i}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
               <div className="text-sm text-slate-700 flex items-center gap-2">
                 <span className={classNames('w-6 h-6 rounded-lg flex items-center justify-center text-xs',
-                  WHEEL_REWARDS[h.index].coins >= 5000 ? 'bg-red-100 text-red-600'
-                    : WHEEL_REWARDS[h.index].coins >= 1000 ? 'bg-amber-100 text-amber-600'
+                  WHEEL_REWARDS[h.index].coins >= 500 ? 'bg-red-100 text-red-600'
+                    : WHEEL_REWARDS[h.index].coins >= 100 ? 'bg-amber-100 text-amber-600'
                     : WHEEL_REWARDS[h.index].key === 'nothing' ? 'bg-slate-200 text-slate-500'
+                    : h.itemName ? 'bg-purple-100 text-purple-700'
                     : 'bg-emerald-100 text-emerald-700')}>
-                  {WHEEL_REWARDS[h.index].coins >= 5000 ? '🏆' : WHEEL_REWARDS[h.index].key === 'nothing' ? '·' : '✓'}
+                  {WHEEL_REWARDS[h.index].coins >= 500 ? '🏆' : WHEEL_REWARDS[h.index].key === 'nothing' ? '·' : h.itemName ? '🎁' : '✓'}
                 </span>
-                {WHEEL_REWARDS[h.index].label}
+                {h.itemName ? `${h.itemEmoji || ''} ${h.itemName}` : WHEEL_REWARDS[h.index].label}
               </div>
               <div className="text-xs text-slate-400 flex gap-2">
                 {h.coins > 0 && <span className="text-amber-600 font-medium">+{formatNumber(h.coins)}</span>}
@@ -394,14 +419,14 @@ export default function MiniGamesPage() {
             <h3 className="font-bold text-slate-800 mb-1 flex items-center gap-2">
               <Dices size={16} className="text-indigo-500" /> 猜大小
             </h3>
-            <div className="text-xs text-slate-500 mb-4">两颗骰子之和，猜中可赢取多倍花瓣 + 金币</div>
+            <div className="text-xs text-slate-500 mb-4">两颗骰子之和，猜中赢金币（每次下注 5 花瓣，单次最高 50 金币）</div>
 
             <div className="grid grid-cols-4 gap-2 mb-4">
               {([
                 { k: 'small', label: '小 (2-6)', payout: '×2' },
                 { k: 'big', label: '大 (8-12)', payout: '×2' },
                 { k: 'middle', label: '7', payout: '×5' },
-                { k: 'exact', label: '精确7', payout: '×20' },
+                { k: 'exact', label: '精确7', payout: '×10' },
               ] as const).map(o => {
                 const active = diceBetType === o.k
                 return (
@@ -432,13 +457,7 @@ export default function MiniGamesPage() {
 
             <div className="flex items-center gap-2 mb-4">
               <span className="text-xs text-slate-600">下注：</span>
-              {[1, 5, 10, 20, 50].map(n => (
-                <button key={n} onClick={() => setDiceBetAmount(n)}
-                  className={classNames(
-                    'px-3 py-1 rounded-lg text-xs font-bold',
-                    diceBetAmount === n ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'
-                  )}>{n} 花瓣</button>
-              ))}
+              <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold">5 花瓣/次（固定）</span>
             </div>
 
             <div className="flex gap-3 mb-4">
@@ -458,7 +477,7 @@ export default function MiniGamesPage() {
                   'ml-auto px-3 py-1.5 rounded-xl text-sm font-bold',
                   lastDiceResult.won ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                 )}>
-                  {lastDiceResult.won ? `🎉 命中！+${lastDiceResult.netPetals}花瓣 +${lastDiceResult.netCoins}金币` : `未中 -${diceBetAmount}花瓣`}
+                  {lastDiceResult.won ? `🎉 命中！+${lastDiceResult.netCoins} 金币` : `未中 -${diceBetAmount}花瓣`}
                 </div>
               </div>
             )}

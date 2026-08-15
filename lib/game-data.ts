@@ -245,16 +245,32 @@ export function getFlowerSellPrice(flower: FlowerType, rank: number): number {
 // 工具价格调控兼容别名
 export const TOOL_TYPES = TOOLS
 
-// 幸运转盘奖励配置（花瓣代币玩法）- 期望值约 18 金币/抽（原 37.2，避免转盘成为印钞机跳过种花）
-export const WHEEL_REWARDS: { key: string; label: string; weight: number; coins: number; petals?: number }[] = [
-  { key: 'coins_10',    label: '10 金币',  weight: 35, coins: 10 },
-  { key: 'coins_20',    label: '20 金币',  weight: 20, coins: 20 },
-  { key: 'coins_50',    label: '50 金币',  weight: 6,  coins: 50 },
-  { key: 'coins_100',   label: '100 金币', weight: 3,  coins: 100 },
-  { key: 'coins_200',   label: '200 金币', weight: 1,  coins: 200 },
-  { key: 'petal_1',     label: '+1 花瓣',  weight: 8,  coins: 0, petals: 1 },
-  { key: 'jackpot',     label: '🎉 500💰', weight: 1,  coins: 500 },
-  { key: 'nothing',     label: '谢谢参与',  weight: 40, coins: 0 },
+// 幸运转盘奖励配置（花瓣代币玩法）
+// 奖励类型：coins（金币）| seed（种子）| flower（花朵）
+// 期望值约 7 金币/抽（原 18，避免转盘成为印钞机）；大奖 500 概率 0.01%
+export const WHEEL_REWARDS: {
+  key: string
+  label: string
+  weight: number
+  coins: number
+  petals?: number
+  /** seed/flower 类型的奖励数据 */
+  itemType?: 'seed' | 'flower'
+  referenceId?: string
+  quantity?: number
+}[] = [
+  { key: 'coins_10',    label: '10 金币',    weight: 2000, coins: 10 },
+  { key: 'coins_20',    label: '20 金币',    weight: 1200, coins: 20 },
+  { key: 'seed_daisy',  label: '雏菊种子',    weight: 1000, coins: 0, itemType: 'seed', referenceId: 'seed_daisy', quantity: 1 },
+  { key: 'flower_common', label: '随机花朵',  weight: 800, coins: 0, itemType: 'flower', referenceId: 'random', quantity: 1 },
+  { key: 'seed_rose',   label: '玫瑰种子',    weight: 600, coins: 0, itemType: 'seed', referenceId: 'seed_rose', quantity: 1 },
+  { key: 'coins_50',    label: '50 金币',    weight: 300, coins: 50 },
+  { key: 'coins_100',   label: '100 金币',   weight: 120, coins: 100 },
+  { key: 'seed_plum',   label: '梅花种子',    weight: 150, coins: 0, itemType: 'seed', referenceId: 'seed_plum', quantity: 1 },
+  { key: 'flower_rare', label: '稀有花朵',    weight: 80, coins: 0, itemType: 'flower', referenceId: 'random', quantity: 1, petals: 0 },
+  { key: 'coins_200',   label: '200 金币',   weight: 30, coins: 200 },
+  { key: 'jackpot',     label: '🎉 500💰',   weight: 1, coins: 500 },
+  { key: 'nothing',     label: '谢谢参与',    weight: 3719, coins: 0 },
 ]
 
 export function pickWheelIndex(): number {
