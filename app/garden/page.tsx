@@ -268,7 +268,7 @@ export default function GardenPage() {
 
       {/* 提示 */}
       <div className="mt-6 text-center text-xs text-slate-400">
-        💡 小贴士：多浇水施肥可以让花朵长得更快，品质更高哦！
+        💡 小贴士：多浇水施肥可以让花朵长得更快；想提升品质，去工坊试试杂交育种吧！
       </div>
     </div>
   )

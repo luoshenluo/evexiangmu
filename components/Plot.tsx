@@ -304,7 +304,7 @@ export default function Plot({ plot, onUpdate }: Props) {
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
                   <div className="flex items-center gap-1 text-slate-600"><Droplets size={12} className="text-blue-500" /> 浇水 {flower.waterCount}</div>
                   <div className="flex items-center gap-1 text-slate-600"><Sparkles size={12} className="text-purple-500" /> 施肥 {flower.fertilizeCount}</div>
-                  <div className="flex items-center gap-1 text-slate-600"><Coins size={12} className="text-amber-500" /> 售价 {sellPrice}</div>
+                  <div className="flex items-center gap-1 text-slate-600"><Coins size={12} className="text-amber-500" /> 回收价 {sellPrice}</div>
                 </div>
               </div>
             </div>
@@ -412,7 +412,7 @@ export default function Plot({ plot, onUpdate }: Props) {
             {flower.isReady && (
               <div className="mt-3">
                 <div className="text-xs text-slate-500 mb-2 flex items-center justify-between">
-                  <span>售价：{sellPrice} 💰 / 朵（需存入背包后到市场上架出售）</span>
+                  <span>回收价：{sellPrice} 💰 / 朵（需存入背包后到市场出售）</span>
                   <button
                     onClick={() => router.push('/market')}
                     className="text-[11px] font-semibold text-garden-600 hover:text-garden-700 flex items-center gap-0.5"

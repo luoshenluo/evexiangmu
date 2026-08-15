@@ -65,7 +65,7 @@ export default function WorkshopPage() {
   const ftB = selectedB ? FLOWER_TYPES.find(f => f.id === selectedB.referenceId) : null
   const sellA = ftA ? effFlowerSellPrice(ftA.id, (selectedA?.rank || 1) as any) : 0
   const sellB = ftB ? effFlowerSellPrice(ftB.id, (selectedB?.rank || 1) as any) : 0
-  const breedCost = (sellA + sellB) * 2
+  const breedCost = Math.min(sellA, sellB)
 
   const bouquetFt = bouquetSelected ? FLOWER_TYPES.find(f => f.id === bouquetSelected.referenceId) : null
   const bouquetSingleSell = bouquetFt ? effFlowerSellPrice(bouquetFt.id, (bouquetSelected?.rank || 1) as any) : 0
@@ -175,7 +175,8 @@ export default function WorkshopPage() {
                 选择两朵花进行杂交，消耗金币获得新种子。
                 <span className="text-purple-600 font-medium">60%</span> 继承父本 ·
                 <span className="text-blue-600 font-medium"> 30%</span> 升级品质 ·
-                <span className="text-amber-600 font-medium"> 10%</span> 稀有突变
+                <span className="text-amber-600 font-medium"> 10%</span> 稀有突变。
+                <span className="text-slate-400">杂交成本取两花回收价较低者</span>
               </div>
             </div>
 
@@ -292,7 +293,7 @@ export default function WorkshopPage() {
               <div>
                 消耗 <span className="font-bold text-amber-600">3 朵同种花</span> +
                 <span className="font-bold text-amber-600"> 10 金币</span> 手工费，
-                合成花束后售价为单朵的 <span className="font-bold text-amber-600">4.5 倍</span>（3×1.5）
+                合成花束售价为单朵的 <span className="font-bold text-amber-600">4.5 倍</span>（3 朵 × 1.5 倍溢价）
               </div>
             </div>
 

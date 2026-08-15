@@ -258,8 +258,7 @@ export default function VisitPage() {
             <div className="flex-1">
               <div className="font-bold text-slate-800 text-lg">{garden.user.nickname}</div>
               <div className="text-xs text-slate-500 flex items-center gap-2">
-                <span className="flex items-center gap-0.5"><Coins size={11} /> {formatNumber(garden.user.coins)}</span>
-                {garden.isFriend && <span className="text-garden-600">· 好友</span>}
+                {garden.isFriend && <span className="text-garden-600">好友</span>}
                 {typeof garden.likeCount === 'number' && (
                   <span className="flex items-center gap-0.5 text-pink-500">
                     · <Heart size={11} className={garden.liked ? 'fill-pink-500' : ''} /> {garden.likeCount}

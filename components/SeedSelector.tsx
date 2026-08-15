@@ -65,7 +65,7 @@ export default function SeedSelector({ plotId, onClose, onPlanted }: Props) {
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               当前季节：<span className="font-bold text-garden-600">{SEASON_NAMES[currentSeason]}</span>
-              ，非当季花可能无法生长哦
+              ，非当季花无法种植哦
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl flex-shrink-0">

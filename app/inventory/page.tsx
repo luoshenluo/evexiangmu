@@ -88,7 +88,7 @@ export default function InventoryPage() {
     if (selectedItem.type === 'flower') {
       const officialPrice = getOfficialPrice(selectedItem)
       const ok = confirm(
-        `鲜花不能直接出售。请前往市场上架挂售，可自行设定价格；\n官方收购价约 ${officialPrice} 💰 / 朵，是否前往市场？`
+        `鲜花不能直接出售。请前往市场上架挂售，可自行设定价格；\n官方回收价约 ${officialPrice} 💰 / 朵，是否前往市场？`
       )
       if (ok) router.push('/market')
       return
@@ -280,7 +280,7 @@ export default function InventoryPage() {
                 <div className="text-[11px] text-pink-800">
                   <span className="font-bold">🌸 鲜花挂售提示：</span>
                   鲜花需前往市场上架，可自定义价格卖给其他玩家；
-                  官方收购价约 <span className="font-bold text-amber-700">{getOfficialPrice(selectedItem)} 💰</span> / 朵。
+                  官方回收价约 <span className="font-bold text-amber-700">{getOfficialPrice(selectedItem)} 💰</span> / 朵。
                 </div>
               </div>
             )}

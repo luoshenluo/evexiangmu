@@ -390,7 +390,7 @@ export default function MarketPage() {
         {tab === 'buy' && (
           <div className="space-y-2">
             <div className="text-xs text-slate-500 mb-2 px-1">
-              以下价格为官方或玩家收购价，可从背包直接出售
+              以下价格为官方回收价或玩家收购单，可从背包直接出售
             </div>
             {buyOrders.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">暂无收购</div>

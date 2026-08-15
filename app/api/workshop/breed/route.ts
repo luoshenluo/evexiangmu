@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
     const ftB = FLOWER_TYPES.find(f => f.id === itemB.referenceId)
     if (!ftA || !ftB) return jsonResponse(false, null, '花型异常', 400)
 
-    // 金币成本（应用价格覆盖）
+    // 金币成本（应用价格覆盖，取两花回收价较低者，保证育种有正期望）
     const sellA = await getFlowerSellPriceEffective(itemA.referenceId, (itemA.rank || 1) as any)
     const sellB = await getFlowerSellPriceEffective(itemB.referenceId, (itemB.rank || 1) as any)
-    const cost = (sellA + sellB) * 2
+    const cost = Math.min(sellA, sellB)
     if (user.coins < cost) {
       return jsonResponse(false, null, `金币不足，需要 ${cost} 金币`, 400)
     }

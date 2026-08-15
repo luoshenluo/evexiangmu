@@ -606,7 +606,7 @@ export default function FamilyPage() {
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       {m.online ? <span className="text-green-600">● 在线</span> : `离线 · ${formatDateTime(m.lastLogin).slice(5, 16)}`}
-                      {' · '}花园 {m.plotsUnlocked} 块 · 💰 {formatNumber(m.coins)}
+                      {' · '}花园 {m.plotsUnlocked} 块
                     </div>
                   </div>
                   {family.myRole === 'owner' && m.userId !== family.ownerId && (
