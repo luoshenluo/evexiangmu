@@ -1379,10 +1379,53 @@ export async function incrementTaskProgress(userId: string, action: string, amou
   if (!user) return
 
   const progress = { ...(user.taskProgress || {}) }
+  const lastReset = { ...(user.taskLastReset || {}) }
+  const now = Date.now()
+  const periodStart = (type: string) => {
+    const d = new Date()
+    if (type === 'daily') return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    if (type === 'weekly') {
+      const day = d.getDay() || 7
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 1).getTime()
+    }
+    if (type === 'monthly') return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+    return 0
+  }
 
   // 从数据库读取当前启用的任务模板（按 action 匹配，避免硬编码 ID 与模板 ID 不一致）
   const templates = await getAllTaskTemplates(true).catch(() => [])
 
+  // ========== 先重置过期任务（必须在推进之前，否则刚推进的会被清空） ==========
+  // 重置逻辑：若该类型（daily/weekly/monthly）距上次重置已跨周期，则清零该类型所有任务进度
+  // 注意：只在"周期已过"时清零，新注册用户首次登录时 lastReset 为空也应重置（但登录是当天的，推进后不被清）
+  const typePrefixes: Record<string, string> = {
+    't_daily_': 'daily', 't_weekly_': 'weekly', 't_monthly_': 'monthly',
+  }
+  for (const [prefix, type] of Object.entries(typePrefixes)) {
+    if (!lastReset[type] || lastReset[type] < periodStart(type)) {
+      for (const key of Object.keys(progress)) {
+        if (key.startsWith(prefix)) {
+          progress[key] = 0
+        }
+      }
+      lastReset[type] = now
+    }
+  }
+  // 模板可能用任意 ID 前缀（如 t_daily_msrqflvp），按模板 type 重置
+  const resetKeys = new Set<string>()
+  for (const tpl of templates) {
+    if (!resetKeys.has(tpl.type)) {
+      resetKeys.add(tpl.type)
+      if (!lastReset[tpl.type] || lastReset[tpl.type] < periodStart(tpl.type)) {
+        for (const t of templates) {
+          if (t.type === tpl.type) progress[t.id] = 0
+        }
+        lastReset[tpl.type] = now
+      }
+    }
+  }
+
+  // ========== 推进当前 action ==========
   // 主任务推进：匹配 action 相同的模板
   for (const tpl of templates) {
     if (tpl.action === action) {
@@ -1431,47 +1474,6 @@ export async function incrementTaskProgress(userId: string, action: string, amou
       }
     }
     progress['t_daily_1'] = 1
-  }
-
-  const lastReset = { ...(user.taskLastReset || {}) }
-  const now = Date.now()
-  const periodStart = (type: string) => {
-    const d = new Date()
-    if (type === 'daily') return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-    if (type === 'weekly') {
-      const day = d.getDay() || 7
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 1).getTime()
-    }
-    if (type === 'monthly') return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
-    return 0
-  }
-
-  // 重置过期任务（按模板类型前缀 + 模板自身 type）
-  const typePrefixes: Record<string, string> = {
-    't_daily_': 'daily', 't_weekly_': 'weekly', 't_monthly_': 'monthly',
-  }
-  for (const [prefix, type] of Object.entries(typePrefixes)) {
-    if (!lastReset[type] || lastReset[type] < periodStart(type)) {
-      for (const key of Object.keys(progress)) {
-        if (key.startsWith(prefix)) {
-          progress[key] = 0
-        }
-      }
-      lastReset[type] = now
-    }
-  }
-  // 模板可能用任意 ID 前缀（如 t_daily_msrqflvp），按模板 type 重置
-  const resetKeys = new Set<string>()
-  for (const tpl of templates) {
-    if (!resetKeys.has(tpl.type)) {
-      resetKeys.add(tpl.type)
-      if (!lastReset[tpl.type] || lastReset[tpl.type] < periodStart(tpl.type)) {
-        for (const t of templates) {
-          if (t.type === tpl.type) progress[t.id] = 0
-        }
-        lastReset[tpl.type] = now
-      }
-    }
   }
 
   await updateUser(userId, { taskProgress: progress, taskLastReset: lastReset })
@@ -3013,6 +3015,54 @@ export async function setSeedOverride(
   if (error) return { success: false, error: error.message }
   // 刷新缓存
   _seedOverridesCache = { data: {}, fetchedAt: 0 }
+
+  // ===== 联动官方挂售（让玩家市场立即生效） =====
+  // 读取该种子的有效配置（含本次 patch）
+  const seedCfg = SEED_TYPES.find(s => s.id === seedId)
+  if (seedCfg) {
+    const existing = await getSeedOverrides()
+    const merged: any = {
+      season: patch.season ?? existing[seedId]?.season ?? seedCfg.season,
+      tier: patch.tier ?? existing[seedId]?.tier ?? seedCfg.tier,
+      price: patch.price ?? existing[seedId]?.price ?? seedCfg.price,
+      officialSell: patch.officialSell ?? existing[seedId]?.officialSell ?? seedCfg.officialSell,
+    }
+    // 官方挂售中是否已有该种子
+    const { data: list } = await sb.from('listings')
+      .select('id')
+      .eq('is_official', true)
+      .eq('item_type', 'seed')
+      .eq('reference_id', seedId)
+    const hasListing = (list || []).length > 0
+
+    if (merged.officialSell) {
+      // 上架：若不在官方挂售则新增；更新价格
+      const now = Date.now()
+      if (!hasListing) {
+        await sb.from('listings').insert({
+          id: `l_seed_${seedId.replace(/^seed_/, '')}`,
+          seller_id: 'system',
+          seller_name: '官方',
+          is_official: true,
+          item_type: 'seed',
+          reference_id: seedId,
+          name: seedCfg.name,
+          emoji: '🌱',
+          price: merged.price,
+          quantity: 99,
+          created_at: now,
+        })
+      } else {
+        await sb.from('listings').update({ price: merged.price }).eq('is_official', true).eq('item_type', 'seed').eq('reference_id', seedId)
+      }
+    } else {
+      // 下架：移除该种子的官方挂售
+      if (hasListing) {
+        await sb.from('listings').delete().eq('is_official', true).eq('item_type', 'seed').eq('reference_id', seedId)
+      }
+    }
+  }
+
   return { success: true }
 }
 
