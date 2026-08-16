@@ -90,8 +90,16 @@ export const FLOWER_TYPES: FlowerType[] = [
 ]
 
 // 种子配置
-// 官方售卖的基础种子（玩家可购买起步）
-const OFFICIAL_BASIC_SEEDS = new Set(['daisy', 'sunflower', 'tulip'])
+// 官方售卖的基础种子（每季 1 种新手种子，玩家可购买起步）
+const OFFICIAL_BASIC_SEEDS = new Set(['daisy', 'sunflower', 'okra', 'crocus'])
+
+// 每季对应的新手基础种子（flowerId），用于新用户按季节赠送
+export const SEASON_BASIC_SEEDS: Record<string, string> = {
+  spring: 'daisy',
+  summer: 'sunflower',
+  autumn: 'okra',
+  winter: 'crocus',
+}
 
 // maxRank → 种子阶级（决定杂交升级路径）
 function flowerTier(maxRank: number): SeedType['tier'] {

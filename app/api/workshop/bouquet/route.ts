@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, createNotification } from '@/lib/server-store'
+import { updateUser, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES } from '@/lib/game-data'
 import { getTodayBouquetPrices, RANK_CN } from '@/lib/bouquet-config'
 import type { InventoryItem, RankLevel } from '@/lib/types'
@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
     })
 
     if (!updated) return jsonResponse(false, null, '合成失败', 500)
+
+    // 推进花束任务
+    try { await incrementTaskProgress(user.id, 'bouquet', 1) } catch {}
 
     logger.info('garden', '花束合成成功', {
       userId: user.id, rank: maxRank, bouquetSell, fee: BOUQUET_FEE,

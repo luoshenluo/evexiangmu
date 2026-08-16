@@ -11,7 +11,7 @@ import type {
 import {
   FLOWER_TYPES, INITIAL_GAME_STATE, INITIAL_ANNOUNCEMENTS,
   getPlotUnlockPrice, PEST_CONFIG, STEAL_CONFIG, rollPestSeverity,
-  getFlowerSellPrice, getSeasonByMonth,
+  getFlowerSellPrice, getSeasonByMonth, SEASON_ORDER, SEASON_BASIC_SEEDS,
   FAMILY_LEVEL_EXP, calcFamilyLevel, calcFamilyMaxMembers,
   filterSensitiveWords,
   SEED_TYPES, TOOLS,
@@ -497,10 +497,12 @@ async function doSeed(): Promise<void> {
   })
 
   // 官方挂售（只卖基础种子 + 工具，官方价比种植处便宜）
+  // 基础种子 = 每季 1 种（春雏菊/夏向日葵/秋秋葵/冬番红花）
   const listings: Record<string, any>[] = [
-    { id: 'l1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_tulip', name: '郁金香种子', emoji: '🌱', price: 12, quantity: 99, created_at: now - 100000 },
-    { id: 'l2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_daisy', name: '雏菊种子', emoji: '🌱', price: 6, quantity: 99, created_at: now - 90000 },
-    { id: 'l3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', price: 10, quantity: 99, created_at: now - 80000 },
+    { id: 'l1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_daisy', name: '雏菊种子', emoji: '🌱', price: 6, quantity: 99, created_at: now - 100000 },
+    { id: 'l2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', price: 10, quantity: 99, created_at: now - 90000 },
+    { id: 'l3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_okra', name: '秋葵种子', emoji: '🌱', price: 8, quantity: 99, created_at: now - 80000 },
+    { id: 'l4', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'seed', reference_id: 'seed_crocus', name: '番红花种子', emoji: '🌱', price: 8, quantity: 99, created_at: now - 70000 },
     { id: 'l_t1', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'watering_can', name: '水壶', emoji: '💧', price: 5, quantity: 99, created_at: now - 65000 },
     { id: 'l_t2', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'fertilizer', name: '化肥', emoji: '🧪', price: 8, quantity: 99, created_at: now - 60000 },
     { id: 'l_t3', seller_id: 'system', seller_name: '官方', is_official: true, item_type: 'tool', reference_id: 'pesticide', name: '除虫剂', emoji: '🧴', price: 10, quantity: 99, created_at: now - 55000 },
@@ -614,6 +616,38 @@ export async function createUser(data: { username: string; password: string; nic
   const now = Date.now()
   const hash = bcrypt.hashSync(data.password, 10)
 
+  // 新用户赠送：当前季节 + 后续 2 季 各 1 种基础种子 ×3 + 除虫剂 ×5
+  const currentSeason = getSeasonByMonth()
+  const seasonIdx = SEASON_ORDER.indexOf(currentSeason)
+  const giftSeasons = [0, 1, 2].map(off => SEASON_ORDER[(seasonIdx + off) % SEASON_ORDER.length])
+  const giftInventory: any[] = giftSeasons.map((season, i) => {
+    const flowerId = SEASON_BASIC_SEEDS[season]
+    const seed = SEED_TYPES.find(s => s.flowerTypeId === flowerId)
+    const flower = FLOWER_TYPES.find(f => f.id === flowerId)
+    return {
+      id: `inv_gift_${i}`,
+      type: 'seed' as const,
+      referenceId: seed ? seed.id : `seed_${flowerId}`,
+      name: seed ? seed.name : `${flower?.name || ''}种子`,
+      emoji: '🌱',
+      quantity: 3,
+      maxStack: 99,
+      sellable: false,
+      tradeable: true,
+    }
+  })
+  giftInventory.push({
+    id: 'inv_gift_t1',
+    type: 'tool' as const,
+    referenceId: 'pesticide',
+    name: '除虫剂',
+    emoji: '🧴',
+    quantity: 5,
+    maxStack: 99,
+    sellable: true,
+    tradeable: true,
+  })
+
   const newRow = {
     id: userId,
     username: data.username,
@@ -624,13 +658,7 @@ export async function createUser(data: { username: string; password: string; nic
     created_at: now,
     last_login: now,
     plots: createInitialPlots(1),
-    inventory: [
-      // 新用户赠送：3 种官方基础种子各 3 颗 + 除虫剂 ×5
-      { id: 'inv_s1', type: 'seed', referenceId: 'seed_daisy', name: '雏菊种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-      { id: 'inv_s2', type: 'seed', referenceId: 'seed_tulip', name: '郁金香种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-      { id: 'inv_s3', type: 'seed', referenceId: 'seed_sunflower', name: '向日葵种子', emoji: '🌱', quantity: 3, maxStack: 99, sellable: false, tradeable: true },
-      { id: 'inv_t1', type: 'tool', referenceId: 'pesticide', name: '除虫剂', emoji: '🧴', quantity: 5, maxStack: 99, sellable: true, tradeable: true },
-    ],
+    inventory: giftInventory,
     inventory_size: 5,
     is_admin: false,
     muted_until: null,
@@ -1372,25 +1400,27 @@ export async function incrementTaskProgress(userId: string, action: string, amou
   }
 
   // 兼容旧版硬编码 ID（历史数据或模板 ID 恰好为 t_xxx_N 时）
-  const legacyMap: Record<string, string> = {
-    'login': 't_daily_1',
-    'daily_checkin': 't_daily_1',
-    'plant': 't_daily_2',
-    'water': 't_daily_2',
-    'fertilize': 't_daily_2',
-    'pesticide': 't_daily_2',
-    'harvest': 't_daily_3',
-    'chat': 't_daily_5',
-    'trade': 't_daily_4',
-    'unlock': 't_weekly_1',
-    'earn_coin': 't_weekly_2',
-  }
-  const legacyId = legacyMap[action]
-  if (legacyId) {
-    progress[legacyId] = (progress[legacyId] || 0) + amount
-  }
-  if (action === 'harvest') {
-    progress['t_monthly_1'] = (progress['t_monthly_1'] || 0) + amount
+  // 注：主循环已按 action 匹配所有模板，legacyMap 仅对"模板不在 DB（历史数据）"时兜底，
+  // 若模板存在则主循环已计数，避免重复。
+  const templatesExist = templates.length > 0
+  if (!templatesExist) {
+    const legacyMap: Record<string, string> = {
+      'login': 't_daily_1',
+      'daily_checkin': 't_daily_1',
+      'plant': 't_daily_2',
+      'water': 't_daily_2',
+      'fertilize': 't_daily_2',
+      'pesticide': 't_daily_2',
+      'harvest': 't_daily_3',
+      'chat': 't_daily_5',
+      'trade': 't_daily_4',
+      'unlock': 't_weekly_1',
+      'earn_coin': 't_weekly_2',
+    }
+    const legacyId = legacyMap[action]
+    if (legacyId) {
+      progress[legacyId] = (progress[legacyId] || 0) + amount
+    }
   }
 
   // 登录任务特殊处理：幂等，最多到 1（避免重复累加）
@@ -1450,15 +1480,26 @@ export async function incrementTaskProgress(userId: string, action: string, amou
 // ==================== 任务模板管理（管理员可配置） ====================
 
 // 默认任务模板（首次启动时自动种子到数据库）
+// 每日固定 5 个 / 每周固定 5 个 / 每月固定 5 个；后台可增删改
 const DEFAULT_TASK_TEMPLATES = [
-  { id: 't_daily_1', type: 'daily', title: '登录游戏', description: '今日首次登录游戏', target: 1, action: 'login', rewards: { coins: 10 }, enabled: true, sortOrder: 1 },
-  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵3次', target: 3, action: 'plant', rewards: { coins: 15 }, enabled: true, sortOrder: 2 },
-  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获任意 2 朵花', target: 2, action: 'harvest', rewards: { coins: 25, items: [{ referenceId: 'seed_rose', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 3 },
+  // ===== 每日任务（5 个）=====
+  { id: 't_daily_1', type: 'daily', title: '每日登录', description: '今日登录游戏', target: 1, action: 'login', rewards: { coins: 10 }, enabled: true, sortOrder: 1 },
+  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵 3 次', target: 3, action: 'plant', rewards: { coins: 15 }, enabled: true, sortOrder: 2 },
+  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获 2 朵花', target: 2, action: 'harvest', rewards: { coins: 25, items: [{ referenceId: 'seed_okra', type: 'seed', quantity: 2 }] }, enabled: true, sortOrder: 3 },
   { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, action: 'trade', rewards: { coins: 20 }, enabled: true, sortOrder: 4 },
   { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, action: 'chat', rewards: { coins: 10 }, enabled: true, sortOrder: 5 },
-  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, action: 'unlock', rewards: { coins: 80, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 10 },
-  { id: 't_weekly_2', type: 'weekly', title: '周常·富豪', description: '累计获得 500 金币', target: 500, action: 'earn_coin', rewards: { coins: 50 }, enabled: true, sortOrder: 11 },
-  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, action: 'harvest', rewards: { coins: 300, items: [{ referenceId: 'seed_plum', type: 'seed', quantity: 3 }] }, enabled: true, sortOrder: 20 },
+  // ===== 每周任务（5 个）=====
+  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, action: 'unlock', rewards: { coins: 80, items: [{ referenceId: 'seed_lily', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 10 },
+  { id: 't_weekly_2', type: 'weekly', title: '周常·小富豪', description: '累计获得 500 金币', target: 500, action: 'earn_coin', rewards: { coins: 50 }, enabled: true, sortOrder: 11 },
+  { id: 't_weekly_3', type: 'weekly', title: '周常·除虫专家', description: '给花朵除虫 5 次', target: 5, action: 'pesticide', rewards: { coins: 60, items: [{ referenceId: 'seed_camellia', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 12 },
+  { id: 't_weekly_4', type: 'weekly', title: '周常·加速达人', description: '使用加速卡 3 次', target: 3, action: 'speedup', rewards: { coins: 70, items: [{ referenceId: 'seed_delphinium', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 13 },
+  { id: 't_weekly_5', type: 'weekly', title: '周常·浇水能手', description: '给花朵浇水 20 次', target: 20, action: 'water', rewards: { coins: 65, items: [{ referenceId: 'seed_hibiscus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 14 },
+  // ===== 每月任务（5 个）=====
+  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, action: 'harvest', rewards: { coins: 300, items: [{ referenceId: 'seed_peony', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 20 },
+  { id: 't_monthly_2', type: 'monthly', title: '月常·花束大师', description: '合成花束 3 束', target: 3, action: 'bouquet', rewards: { coins: 200, items: [{ referenceId: 'seed_osmanthus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 21 },
+  { id: 't_monthly_3', type: 'monthly', title: '月常·杂交学者', description: '进行杂交育种 5 次', target: 5, action: 'breed', rewards: { coins: 250, items: [{ referenceId: 'seed_orchid', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 22 },
+  { id: 't_monthly_4', type: 'monthly', title: '月常·大富翁', description: '累计获得 2000 金币', target: 2000, action: 'earn_coin', rewards: { coins: 150 }, enabled: true, sortOrder: 23 },
+  { id: 't_monthly_5', type: 'monthly', title: '月常·社交之星', description: '在世界频道发言 50 次', target: 50, action: 'chat', rewards: { coins: 180, items: [{ referenceId: 'seed_plumking', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 24 },
 ]
 
 // 可选的行为类型（供前端下拉选择）
@@ -1474,6 +1515,8 @@ export const TASK_ACTION_OPTIONS = [
   { value: 'trade', label: '市场交易', desc: '买入或卖出物品' },
   { value: 'unlock', label: '解锁地块', desc: '花费金币解锁新地块' },
   { value: 'earn_coin', label: '获得金币', desc: '通过任意途径获得金币（签到/出售/任务奖励等）' },
+  { value: 'bouquet', label: '合成花束', desc: '在工坊合成花束' },
+  { value: 'breed', label: '杂交育种', desc: '在工坊进行杂交' },
 ]
 
 let _taskTemplatesCache: any[] | null = null
@@ -1496,18 +1539,33 @@ async function ensureTaskTemplatesTable(): Promise<void> {
       return
     }
   }
-  // 如果表为空，种子默认数据
-  const { count } = await sb.from('task_templates').select('*', { count: 'exact', head: true })
-  if (count === 0) {
-    const now = Date.now()
-    const rows = DEFAULT_TASK_TEMPLATES.map(t => ({
-      ...t,
-      rewards: JSON.stringify(t.rewards),
-      created_at: now,
-      updated_at: now,
-    }))
-    await sb.from('task_templates').insert(rows)
-    logger.info('system', '已种子默认任务模板', { count: rows.length })
+  // 如果表为空，种子默认数据；否则检查是否缺少默认模板（缺失则补齐）
+  const { data: existing, error: listErr } = await sb.from('task_templates').select('id')
+  if (!listErr && existing) {
+    const existingIds = new Set(existing.map((r: any) => r.id))
+    const missing = DEFAULT_TASK_TEMPLATES.filter(t => !existingIds.has(t.id))
+    if (missing.length > 0) {
+      const now = Date.now()
+      const rows = missing.map(t => ({
+        id: t.id,
+        type: t.type,
+        title: t.title,
+        description: t.description,
+        target: t.target,
+        action: t.action,
+        rewards: JSON.stringify(t.rewards),
+        enabled: t.enabled ?? true,
+        sort_order: t.sortOrder ?? 0,
+        created_at: now,
+        updated_at: now,
+      }))
+      const { error: insErr } = await sb.from('task_templates').insert(rows)
+      if (insErr) {
+        logger.warn('system', '补齐任务模板失败', { error: insErr.message, count: rows.length })
+      } else {
+        logger.info('system', '已补齐缺失任务模板', { count: rows.length })
+      }
+    }
   }
 }
 

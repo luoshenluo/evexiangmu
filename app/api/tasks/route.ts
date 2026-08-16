@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { updateUser, findUserById, incrementTaskProgress, getAllTaskTemplates, atomicClaimTask } from '@/lib/server-store'
 import { authRequest, sanitizeUser, jsonResponse } from '@/lib/auth'
+import { SEED_TYPES, FLOWER_TYPES } from '@/lib/game-data'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'edge'
@@ -138,15 +139,30 @@ export async function POST(req: NextRequest) {
     if (task.rewards.items) {
       for (const reward of task.rewards.items) {
         const isSeed = reward.type === 'seed'
-        const seedNames: Record<string, string> = {
-          'seed_rose': '玫瑰种子', 'seed_tulip': '郁金香种子',
-          'seed_daisy': '雏菊种子', 'seed_plum': '梅花种子',
-          'seed_sunflower': '向日葵种子', 'seed_chrysanthemum': '菊花种子',
+        // 从种子配置表查真实名称（支持 80 种新种子）
+        let name = ''
+        let emoji = '🎁'
+        let maxStack = 99
+        let sellable = true
+        if (reward.type === 'seed') {
+          const seedCfg = SEED_TYPES.find(s => s.id === reward.referenceId)
+          name = seedCfg?.name || (isSeed ? '种子' : '道具')
+          emoji = '🌱'
+          maxStack = 99
+          sellable = false
+        } else if (reward.type === 'flower') {
+          const ft = FLOWER_TYPES.find(f => f.id === reward.referenceId)
+          name = ft?.name || '花朵'
+          emoji = ft?.emoji || '🌸'
+          maxStack = 99
+          sellable = false
+        } else {
+          name = reward.name || '道具'
+          sellable = true
         }
-        const name = seedNames[reward.referenceId] || (isSeed ? '种子' : '道具')
 
         const existing = newInv.find(
-          i => i && i.type === reward.type && i.referenceId === reward.referenceId
+          i => i && i.type === reward.type && i.referenceId === reward.referenceId && (i.rank || 1) === (reward.rank || 1)
         )
         if (existing) {
           const idx = newInv.indexOf(existing)
@@ -157,14 +173,15 @@ export async function POST(req: NextRequest) {
             type: reward.type as any,
             referenceId: reward.referenceId,
             name,
-            emoji: isSeed ? '🌱' : '🎁',
+            emoji,
+            rank: reward.rank as any,
             quantity: reward.quantity,
-            maxStack: 99,
-            sellable: !isSeed,
+            maxStack,
+            sellable,
             tradeable: true,
           })
         }
-        rewardDetails.push(`${isSeed ? '🌱' : '🎁'} ${name} × ${reward.quantity}`)
+        rewardDetails.push(`${emoji} ${name} × ${reward.quantity}`)
       }
     }
 

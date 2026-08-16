@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { updateUser, createNotification } from '@/lib/server-store'
+import { updateUser, createNotification, incrementTaskProgress } from '@/lib/server-store'
 import { FLOWER_TYPES, SEED_TYPES } from '@/lib/game-data'
 import { hybridResultTier, pickFlowerFromSeasons, SEED_TIER_CN } from '@/lib/seed-tiers'
 import type { InventoryItem, SeedTier } from '@/lib/types'
@@ -107,6 +107,9 @@ export async function POST(req: NextRequest) {
     })
 
     if (!updated) return jsonResponse(false, null, '杂交失败', 500)
+
+    // 推进杂交任务
+    try { await incrementTaskProgress(user.id, 'breed', 1) } catch {}
 
     logger.info('garden', '杂交育种成功', {
       userId: user.id,
