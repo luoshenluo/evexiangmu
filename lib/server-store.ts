@@ -1423,14 +1423,14 @@ export async function incrementTaskProgress(userId: string, action: string, amou
     }
   }
 
-  // 登录任务特殊处理：幂等，最多到 1（避免重复累加）
+  // 登录任务特殊处理：幂等，每天最多 1（避免重复登录累加）
   if (action === 'login' || action === 'daily_checkin') {
     for (const tpl of templates) {
       if (tpl.action === 'login' || tpl.action === 'daily_checkin') {
-        progress[tpl.id] = Math.max(1, progress[tpl.id] || 1)
+        progress[tpl.id] = 1
       }
     }
-    progress['t_daily_1'] = Math.max(1, progress['t_daily_1'] || 1)
+    progress['t_daily_1'] = 1
   }
 
   const lastReset = { ...(user.taskLastReset || {}) }
@@ -1483,23 +1483,23 @@ export async function incrementTaskProgress(userId: string, action: string, amou
 // 每日固定 5 个 / 每周固定 5 个 / 每月固定 5 个；后台可增删改
 const DEFAULT_TASK_TEMPLATES = [
   // ===== 每日任务（5 个）=====
-  { id: 't_daily_1', type: 'daily', title: '每日登录', description: '今日登录游戏', target: 1, action: 'login', rewards: { coins: 10 }, enabled: true, sortOrder: 1 },
-  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵 3 次', target: 3, action: 'plant', rewards: { coins: 15 }, enabled: true, sortOrder: 2 },
-  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获 2 朵花', target: 2, action: 'harvest', rewards: { coins: 25, items: [{ referenceId: 'seed_okra', type: 'seed', quantity: 2 }] }, enabled: true, sortOrder: 3 },
-  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, action: 'trade', rewards: { coins: 20 }, enabled: true, sortOrder: 4 },
-  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, action: 'chat', rewards: { coins: 10 }, enabled: true, sortOrder: 5 },
+  { id: 't_daily_1', type: 'daily', title: '每日登录', description: '今日登录游戏', target: 1, action: 'login', rewards: { coins: 5 }, enabled: true, sortOrder: 1 },
+  { id: 't_daily_2', type: 'daily', title: '勤劳花农', description: '种植或打理花朵 3 次', target: 3, action: 'plant', rewards: { coins: 8 }, enabled: true, sortOrder: 2 },
+  { id: 't_daily_3', type: 'daily', title: '收获季节', description: '收获 2 朵花', target: 2, action: 'harvest', rewards: { coins: 12, items: [{ referenceId: 'seed_okra', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 3 },
+  { id: 't_daily_4', type: 'daily', title: '贸易达人', description: '在市场完成 1 次交易', target: 1, action: 'trade', rewards: { coins: 10 }, enabled: true, sortOrder: 4 },
+  { id: 't_daily_5', type: 'daily', title: '聊天爱好者', description: '在世界频道发言 3 次', target: 3, action: 'chat', rewards: { coins: 5 }, enabled: true, sortOrder: 5 },
   // ===== 每周任务（5 个）=====
-  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, action: 'unlock', rewards: { coins: 80, items: [{ referenceId: 'seed_lily', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 10 },
-  { id: 't_weekly_2', type: 'weekly', title: '周常·小富豪', description: '累计获得 500 金币', target: 500, action: 'earn_coin', rewards: { coins: 50 }, enabled: true, sortOrder: 11 },
-  { id: 't_weekly_3', type: 'weekly', title: '周常·除虫专家', description: '给花朵除虫 5 次', target: 5, action: 'pesticide', rewards: { coins: 60, items: [{ referenceId: 'seed_camellia', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 12 },
-  { id: 't_weekly_4', type: 'weekly', title: '周常·加速达人', description: '使用加速卡 3 次', target: 3, action: 'speedup', rewards: { coins: 70, items: [{ referenceId: 'seed_delphinium', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 13 },
-  { id: 't_weekly_5', type: 'weekly', title: '周常·浇水能手', description: '给花朵浇水 20 次', target: 20, action: 'water', rewards: { coins: 65, items: [{ referenceId: 'seed_hibiscus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 14 },
+  { id: 't_weekly_1', type: 'weekly', title: '周常·花园扩张', description: '解锁或打理共 10 次', target: 10, action: 'unlock', rewards: { coins: 40, items: [{ referenceId: 'seed_lily', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 10 },
+  { id: 't_weekly_2', type: 'weekly', title: '周常·小富豪', description: '累计获得 500 金币', target: 500, action: 'earn_coin', rewards: { coins: 25 }, enabled: true, sortOrder: 11 },
+  { id: 't_weekly_3', type: 'weekly', title: '周常·除虫专家', description: '给花朵除虫 5 次', target: 5, action: 'pesticide', rewards: { coins: 30, items: [{ referenceId: 'seed_camellia', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 12 },
+  { id: 't_weekly_4', type: 'weekly', title: '周常·加速达人', description: '使用加速卡 3 次', target: 3, action: 'speedup', rewards: { coins: 35, items: [{ referenceId: 'seed_delphinium', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 13 },
+  { id: 't_weekly_5', type: 'weekly', title: '周常·浇水能手', description: '给花朵浇水 20 次', target: 20, action: 'water', rewards: { coins: 33, items: [{ referenceId: 'seed_hibiscus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 14 },
   // ===== 每月任务（5 个）=====
-  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, action: 'harvest', rewards: { coins: 300, items: [{ referenceId: 'seed_peony', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 20 },
-  { id: 't_monthly_2', type: 'monthly', title: '月常·花束大师', description: '合成花束 3 束', target: 3, action: 'bouquet', rewards: { coins: 200, items: [{ referenceId: 'seed_osmanthus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 21 },
-  { id: 't_monthly_3', type: 'monthly', title: '月常·杂交学者', description: '进行杂交育种 5 次', target: 5, action: 'breed', rewards: { coins: 250, items: [{ referenceId: 'seed_orchid', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 22 },
-  { id: 't_monthly_4', type: 'monthly', title: '月常·大富翁', description: '累计获得 2000 金币', target: 2000, action: 'earn_coin', rewards: { coins: 150 }, enabled: true, sortOrder: 23 },
-  { id: 't_monthly_5', type: 'monthly', title: '月常·社交之星', description: '在世界频道发言 50 次', target: 50, action: 'chat', rewards: { coins: 180, items: [{ referenceId: 'seed_plumking', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 24 },
+  { id: 't_monthly_1', type: 'monthly', title: '月常·大收藏家', description: '收获 20 朵花', target: 20, action: 'harvest', rewards: { coins: 150, items: [{ referenceId: 'seed_peony', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 20 },
+  { id: 't_monthly_2', type: 'monthly', title: '月常·花束大师', description: '合成花束 3 束', target: 3, action: 'bouquet', rewards: { coins: 100, items: [{ referenceId: 'seed_osmanthus', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 21 },
+  { id: 't_monthly_3', type: 'monthly', title: '月常·杂交学者', description: '进行杂交育种 5 次', target: 5, action: 'breed', rewards: { coins: 125, items: [{ referenceId: 'seed_orchid', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 22 },
+  { id: 't_monthly_4', type: 'monthly', title: '月常·大富翁', description: '累计获得 2000 金币', target: 2000, action: 'earn_coin', rewards: { coins: 75 }, enabled: true, sortOrder: 23 },
+  { id: 't_monthly_5', type: 'monthly', title: '月常·社交之星', description: '在世界频道发言 50 次', target: 50, action: 'chat', rewards: { coins: 90, items: [{ referenceId: 'seed_plumking', type: 'seed', quantity: 1 }] }, enabled: true, sortOrder: 24 },
 ]
 
 // 可选的行为类型（供前端下拉选择）
