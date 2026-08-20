@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES, RankNames, RankColors } from '@/lib/game-data'
+import { FLOWER_TYPES, SEED_TYPES, TOOL_TYPES, RankNames, RankColors, SEASON_NAMES } from '@/lib/game-data'
 import type { MarketListing, BuyOrder, InventoryItem } from '@/lib/types'
 import { ShoppingCart, Tag, Download, Flower2, Leaf, Search, ArrowRightLeft, Coins, Plus, X, Minus, ShoppingBag, MessageCircle, Trash2, Sparkles } from 'lucide-react'
 
@@ -274,7 +274,7 @@ export default function MarketPage() {
                 )}>
                   {item.emoji}
                 </div>
-                <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
                     {item.rank && (
@@ -286,6 +286,14 @@ export default function MarketPage() {
                       </span>
                     )}
                   </div>
+                  {type === 'seed' && (
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {(() => {
+                        const seed = SEED_TYPES.find(s => s.id === item.referenceId)
+                        return seed ? `可种植季节：${seed.season.map(s => SEASON_NAMES[s]).join('、')}` : ''
+                      })()}
+                    </div>
+                  )}
                   <div className="text-[11px] text-slate-500 mt-0.5">
                     出售者：
                     <span className={item.isOfficial ? 'text-garden-600 font-medium' : 'text-slate-600'}>

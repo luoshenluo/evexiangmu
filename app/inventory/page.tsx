@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { apiFetch, classNames, formatNumber } from '@/lib/utils'
-import { RankNames, RankColors, getInventoryExpandPrice, FLOWER_TYPES } from '@/lib/game-data'
+import { RankNames, RankColors, getInventoryExpandPrice, FLOWER_TYPES, SEED_TYPES, SEASON_NAMES } from '@/lib/game-data'
 import { Package, Trash2, Tag, Droplets, Sparkles, Bug, Zap, Plus, X, Coins, ShoppingCart } from 'lucide-react'
 import type { InventoryItem } from '@/lib/types'
 
@@ -262,6 +262,12 @@ export default function InventoryPage() {
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 mt-1">数量: {selectedItem.quantity} / {selectedItem.maxStack}</div>
+                {selectedItem.type === 'seed' && (() => {
+                  const seed = SEED_TYPES.find(s => s.id === selectedItem.referenceId)
+                  return seed ? (
+                    <div className="text-xs text-slate-500 mt-0.5">可种植季节：{seed.season.map(s => SEASON_NAMES[s]).join('、')}</div>
+                  ) : null
+                })()}
                 <div className="text-xs text-slate-500 mt-0.5">
                   {selectedItem.tradeable ? '✓ 可交易' : '✗ 不可交易'} · {selectedItem.sellable ? '✓ 可出售' : '✗ 不可出售'}
                 </div>
